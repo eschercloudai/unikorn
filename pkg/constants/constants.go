@@ -39,3 +39,14 @@ var (
 func VersionString() string {
 	return fmt.Sprintf("%s/%s (revision/%s)", Application, Version, Revision)
 }
+
+const (
+	// VersionLabel is a label applied to resources so we know the application
+	// version that was used to create them (and thus what metadata is valid
+	// for them).  Metadata may be upgraded to a later version for any resource.
+	VersionLabel = "unikorn.eschercloud.ai/version"
+
+	// ControlPlaneLabel is a label applied to namespaces to indicate it is under
+	// control of this tool.  Useful for label selection.
+	ControlPlaneLabel = "namespace.unikorn.eschercloud.ai/control-plane"
+)
