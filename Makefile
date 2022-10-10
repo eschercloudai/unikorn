@@ -47,3 +47,9 @@ ${BINDIR}/%: ${SOURCES} | ${BINDIR}
 lint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.0
 	${GOBIN}/golangci-lint run --timeout 5m ./...
+
+# Perform license checking.
+# This must pass or you will be denied by CI.
+.PHONY: license
+license:
+	go run ./hack/check_license.go
