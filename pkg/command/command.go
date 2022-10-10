@@ -12,6 +12,24 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+var (
+	rootLongDesc = templates.LongDesc(`
+	EscherCloudAI Kubernetes Provisioning.
+
+	This CLI toolset provides dynamic provisioning of Kubernetes clusters
+	and Cluster API control planes.  It also provides various Kubernetes
+	cluster life-cycle management functions.  For additional details on
+	how the individual components operatate, see the individual 'create'
+	help topics.
+
+	This tool is designed with flexibility in mind, so doesn't force any
+	sort of cardinality between control planes and clusters, however as
+	the control plane management is somewhat new, there are bugs that
+	suggest a 1:1 mapping is best intiial for teardown operations.  In the
+	future, some upstream hardening will allow 1:N and better resource
+	utilisation.`)
+)
+
 // newRootCommand returns the root command and all its subordinates.
 // This sets global flags for standard Kubernetes configuration options
 // such as --kubeconfig, --context, --namespace, etc.
@@ -19,7 +37,7 @@ func newRootCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   constants.Application,
 		Short: "EscherCloudAI Kubernetes Provisioning.",
-		Long:  "EscherCloudAI Kubernetes Provisioning.",
+		Long:  rootLongDesc,
 	}
 
 	cf.AddFlags(cmd.PersistentFlags())
@@ -82,32 +100,45 @@ func newDynamicTemplateOptions() *DynamicTemplateOptions {
 	}
 }
 
+// templatedExample applies a templating function to the example string so
+// we can make the text dyanamic.  It also applies standard Kubernetes
+// formatting rules after the templating step.
+func templatedExample(s string) string {
+	s = util.TemplatedString(s, newDynamicTemplateOptions())
+	return templates.Examples(s)
+}
+
+var (
+	createControlPlaneLong = templates.LongDesc(`
+	Create a Cluster API control plane.
+
+	Control planes are modelled on Kubernetes namespaces, this gives
+	us a primitive to label, and annotate, to aid in life-cycle management.
+
+	Each control plane namespace will contain an instance of a loft.io
+	vcluster.  The use of vclusters allows a level of isolation between
+	users in a multi-tenancy environment.  It also allows trivial deletion
+	of resources contained within that vcluster as that is not subject
+	to finalizers and the like (Cluster API is poorly tested in failure
+	scenarios.)`)
+
+	createControlPlaneExample = templatedExample(`
+	# Create a control plane with a generated name.
+	{{.Application}} create control-plane
+
+	# Create a control plane with an explcit name.
+	{{.Application}} create control-plane foo`)
+)
+
 // newCreateControlPlaneCommand creates a command that can create control planes.
 // The initial intention is to have a per-user/organization control plane that
 // contains Cluster API in a virtual cluster
 func newCreateControlPlaneCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "control-plane",
-		Short: "Create a Cluster API control plane.",
-		Long: `Create a Cluster API control plane.
-
-			Control planes are modelled on Kubernetes namespaces, this gives
-			us a primitive to label and annotate to aid in life-cycle management.
-
-			Each control plane namespace will contain an instance of a loft.io
-			vcluster.  The use of vclusters allows a level of isolation between
-			users in a multi-tenancy environment.  It also allows trivial deletion
-			of resources contained within that vcluster as that is not subject
-			to finalizers and the like (Cluster API is poorly tested in failure
-			scenarios.)
-		`,
-		Example: util.TemplatedString(`
-			# Create a control plane with a generated name.
-			{{.Application}} create control-plane
-
-			# Create a control plane with an explcit name.
-			{{.Application}} create control-plane foo
-		`, newDynamicTemplateOptions()),
+		Use:     "control-plane",
+		Short:   "Create a Cluster API control plane.",
+		Long:    createControlPlaneLong,
+		Example: createControlPlaneExample,
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
@@ -132,19 +163,22 @@ func (o *createClusterOptions) addFlags(cmd *cobra.Command) {
 	}
 }
 
+var (
+	createClusterExamples = templatedExample(`
+	# Create a Kubernetes cluster
+	{{.Application}} create cluster --control-plane foo`)
+)
+
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes
 // cluster with a Cluster API control plane.
 func newCreateClusterCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &createClusterOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "cluster",
-		Short: "Create a Kubernetes cluster",
-		Long:  "Create a Kubernetes cluster",
-		Example: util.TemplatedString(`
-                        # Create a Kubernetes cluster
-                        {{.Application}} create cluster --control-plane foo
-                `, newDynamicTemplateOptions()),
+		Use:     "cluster",
+		Short:   "Create a Kubernetes cluster",
+		Long:    "Create a Kubernetes cluster",
+		Example: createClusterExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
@@ -202,19 +236,22 @@ func (o *deleteClusterOptions) addFlags(cmd *cobra.Command) {
 	}
 }
 
+var (
+	deleteClusterExamples = templatedExample(`
+	# Delete a Kubernetes cluster
+	{{.Application}} delete cluster --control-plane foo`)
+)
+
 // newDeleteClusterCommand creates a command that deletes a Kubenretes cluster in the
 // specified Cluster API control plane.
 func newDeleteClusterCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &deleteClusterOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "cluster",
-		Short: "Delete a Kubernetes cluster",
-		Long:  "Delete a Kubernetes cluster",
-		Example: util.TemplatedString(`
-                        # Delete a Kubernetes cluster
-                        {{.Application}} delete cluster --control-plane foo
-                `, newDynamicTemplateOptions()),
+		Use:     "cluster",
+		Short:   "Delete a Kubernetes cluster",
+		Long:    "Delete a Kubernetes cluster",
+		Example: deleteClusterExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
@@ -274,19 +311,22 @@ func (o *getClusterOptions) addFlags(cmd *cobra.Command) {
 	}
 }
 
+var (
+	getClusterExamples = templatedExample(`
+	# List Kubernetes clusters in control plane foo
+	{{.Application}} get cluster --control-plane foo`)
+)
+
 // newGetClusterCommand returns a command that is able to get or list Kubernetes clusters
 // found in the provided Cluster API control plane.
 func newGetClusterCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &getClusterOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "cluster",
-		Short: "Get or list Kubernetes clusters",
-		Long:  "Get or list Kubernetes clusters",
-		Example: util.TemplatedString(`
-                        # List Kubernetes clusters in control plane foo
-                        {{.Application}} get cluster --control-plane foo
-                `, newDynamicTemplateOptions()),
+		Use:     "cluster",
+		Short:   "Get or list Kubernetes clusters",
+		Long:    "Get or list Kubernetes clusters",
+		Example: getClusterExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
@@ -302,7 +342,6 @@ func Generate() *cobra.Command {
 	cf := genericclioptions.NewConfigFlags(true)
 
 	cmd := newRootCommand(cf)
-	templates.NormalizeAll(cmd)
 
 	return cmd
 }
