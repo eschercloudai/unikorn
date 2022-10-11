@@ -27,8 +27,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -41,13 +41,10 @@ type createControlPlaneOptions struct {
 }
 
 // complete fills in any options not does automatically by flag parsing.
-func (o *createControlPlaneOptions) complete(cf *genericclioptions.ConfigFlags, args []string) error {
-	config, err := cf.ToRESTConfig()
-	if err != nil {
-		return err
-	}
+func (o *createControlPlaneOptions) complete(f cmdutil.Factory, args []string) error {
+	var err error
 
-	if o.client, err = kubernetes.NewForConfig(config); err != nil {
+	if o.client, err = f.KubernetesClientSet(); err != nil {
 		return err
 	}
 
@@ -115,7 +112,7 @@ var (
 // newCreateControlPlaneCommand creates a command that can create control planes.
 // The initial intention is to have a per-user/organization control plane that
 // contains Cluster API in a virtual cluster
-func newCreateControlPlaneCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
+func newCreateControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
 	o := &createControlPlaneOptions{}
 
 	cmd := &cobra.Command{
@@ -124,7 +121,7 @@ func newCreateControlPlaneCommand(cf *genericclioptions.ConfigFlags) *cobra.Comm
 		Long:    createControlPlaneLong,
 		Example: createControlPlaneExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.AssertNilError(o.complete(cf, args))
+			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())
 			util.AssertNilError(o.run())
 		},

@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // deleteClusterOptions defines a set of options that are required to delete
@@ -49,7 +49,7 @@ var (
 
 // newDeleteClusterCommand creates a command that deletes a Kubenretes cluster in the
 // specified Cluster API control plane.
-func newDeleteClusterCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
+func newDeleteClusterCommand(f cmdutil.Factory) *cobra.Command {
 	o := &deleteClusterOptions{}
 
 	cmd := &cobra.Command{

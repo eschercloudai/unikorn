@@ -19,12 +19,12 @@ package get
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // NewGetCommand returns a command that can list all resources, or get information
 // about a single one.
-func NewGetCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
+func NewGetCommand(f cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get Kubernetes clusters and resources",
@@ -32,8 +32,8 @@ func NewGetCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 	}
 
 	commands := []*cobra.Command{
-		newGetControlPlaneCommand(cf),
-		newGetClusterCommand(cf),
+		newGetControlPlaneCommand(f),
+		newGetClusterCommand(f),
 	}
 
 	cmd.AddCommand(commands...)

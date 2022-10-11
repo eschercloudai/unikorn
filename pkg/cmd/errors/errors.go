@@ -28,4 +28,7 @@ var (
 	// ErrInvalidName is raised when a name is zero length or another constraint
 	// is invalid.
 	ErrInvalidName = errors.New("invalid name specified")
+
+	// ErrNotFound is raised when a requested resource name isn't found.
+	ErrNotFound = errors.New("resource name not found")
 )

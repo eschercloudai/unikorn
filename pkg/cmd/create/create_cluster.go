@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // createClusterOptions defines a set of options that are required to create
@@ -49,7 +49,7 @@ var (
 
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes
 // cluster with a Cluster API control plane.
-func newCreateClusterCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
+func newCreateClusterCommand(f cmdutil.Factory) *cobra.Command {
 	o := &createClusterOptions{}
 
 	cmd := &cobra.Command{

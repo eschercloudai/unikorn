@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -49,20 +50,24 @@ var (
 // newRootCommand returns the root command and all its subordinates.
 // This sets global flags for standard Kubernetes configuration options
 // such as --kubeconfig, --context, --namespace, etc.
-func newRootCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
+func newRootCommand() *cobra.Command {
+	configFlags := genericclioptions.NewConfigFlags(true)
+
+	f := cmdutil.NewFactory(configFlags)
+
 	cmd := &cobra.Command{
 		Use:   constants.Application,
 		Short: "EscherCloudAI Kubernetes Provisioning.",
 		Long:  rootLongDesc,
 	}
 
-	cf.AddFlags(cmd.PersistentFlags())
+	configFlags.AddFlags(cmd.PersistentFlags())
 
 	commands := []*cobra.Command{
 		newVersionCommand(),
-		create.NewCreateCommand(cf),
-		delete.NewDeleteCommand(cf),
-		get.NewGetCommand(cf),
+		create.NewCreateCommand(f),
+		delete.NewDeleteCommand(f),
+		get.NewGetCommand(f),
 	}
 
 	cmd.AddCommand(commands...)
@@ -73,9 +78,5 @@ func newRootCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 // Generate creates a hierarchy of cobra commands for the application.  It can
 // also be used to walk the structure and generate HTML documentation for example.
 func Generate() *cobra.Command {
-	cf := genericclioptions.NewConfigFlags(true)
-
-	cmd := newRootCommand(cf)
-
-	return cmd
+	return newRootCommand()
 }
