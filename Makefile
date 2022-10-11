@@ -15,8 +15,14 @@ BINDIR = bin
 CMDDIR = cmd
 SRCDIR = src
 
+# Where to install things.
+PREFIX = ${HOME}/bin
+
 # List of binaries to build.
 BINARIES := $(patsubst %,${BINDIR}/%,${COMMANDS})
+
+# And where to install them to.
+INSTALL_BINARIES := $(patsubst %,${PREFIX}/%,${COMMANDS})
 
 # List of sources to trigger a build.
 # TODO: Bazel may be quicker, but it's a massive hog, and a pain in the arse.
@@ -40,6 +46,15 @@ ${BINDIR}:
 # Create a binary from a command.
 ${BINDIR}/%: ${SOURCES} | ${BINDIR}
 	CGO_ENABLED=0 go build ${FLAGS} -o $@ ${CMDDIR}/$*/main.go
+
+# Installation target, to test out things like shell completion you'll
+# want to install it somewhere in your PATH.
+.PHONY: install
+install: ${INSTALL_BINARIES}
+
+# Build a binary and install it.
+${PREFIX}/%: ${BINDIR}/%
+	install -m 750 $< $@
 
 # Perform linting.
 # This must pass or you will be denied by CI.

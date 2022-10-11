@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // getClusterOptions defines a set of options that are required to get
@@ -49,7 +49,7 @@ var (
 
 // newGetClusterCommand returns a command that is able to get or list Kubernetes clusters
 // found in the provided Cluster API control plane.
-func newGetClusterCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
+func newGetClusterCommand(f cmdutil.Factory) *cobra.Command {
 	o := &getClusterOptions{}
 
 	cmd := &cobra.Command{

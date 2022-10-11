@@ -19,11 +19,11 @@ package create
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // NewCreateCommand creates a command that allows creation of various resources.
-func NewCreateCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
+func NewCreateCommand(f cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create Kubernetes clusters and resources.",
@@ -31,8 +31,8 @@ func NewCreateCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 	}
 
 	commands := []*cobra.Command{
-		newCreateControlPlaneCommand(cf),
-		newCreateClusterCommand(cf),
+		newCreateControlPlaneCommand(f),
+		newCreateClusterCommand(f),
 	}
 
 	cmd.AddCommand(commands...)

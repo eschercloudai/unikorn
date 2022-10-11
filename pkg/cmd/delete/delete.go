@@ -19,11 +19,11 @@ package delete
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // NewDeleteCommand creates a command that is responsible for deleting various resources.
-func NewDeleteCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
+func NewDeleteCommand(f cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete Kubernetes clusters and resources",
@@ -31,8 +31,8 @@ func NewDeleteCommand(cf *genericclioptions.ConfigFlags) *cobra.Command {
 	}
 
 	commands := []*cobra.Command{
-		newDeleteControlPlaneCommand(cf),
-		newDeleteClusterCommand(cf),
+		newDeleteControlPlaneCommand(f),
+		newDeleteClusterCommand(f),
 	}
 
 	cmd.AddCommand(commands...)
