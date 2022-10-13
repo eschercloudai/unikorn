@@ -31,6 +31,7 @@ func NewCreateCommand(f cmdutil.Factory) *cobra.Command {
 	}
 
 	commands := []*cobra.Command{
+		newCreateProjectCommand(f),
 		newCreateControlPlaneCommand(f),
 		newCreateClusterCommand(f),
 	}

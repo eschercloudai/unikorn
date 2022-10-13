@@ -14,26 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
-
-import (
-	"os"
-
-	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
-	"github.com/eschercloudai/unikorn/pkg/cmd"
-
-	"k8s.io/client-go/kubernetes/scheme"
-)
-
-func main() {
-	// Imbue the Kubernetes client library with knowledge of our types.
-	if err := unikornscheme.AddToScheme(scheme.Scheme); err != nil {
-		panic(err)
-	}
-
-	c := cmd.Generate()
-
-	if err := c.Execute(); err != nil {
-		os.Exit(1)
-	}
-}
+// +k8s:deepcopy-gen=package,register
+// +groupName=unikorn.eschercloud.ai
+package v1alpha1
