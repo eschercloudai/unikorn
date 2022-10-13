@@ -36,14 +36,16 @@ type ProjectList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;eschercloud
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="projectid",type="string",JSONPath=".spec.projectID"
 // +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
-// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type=\"Provisioned\")].status"
+// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type Project struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              ProjectSpec   `json:"spec"`
-	Status            ProjectStatus `json:"status"`
+	Status            ProjectStatus `json:"status,omitempty"`
 }
 
 // ProjectSpec defines project specific metadata.
@@ -75,7 +77,7 @@ type ProjectCondition struct {
 	// Can be True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status"`
 	// Last time the condition transitioned from one status to another.
-	LastTrasitionTime metav1.Time `json:"lastTransitionTime"`
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 	// Unique, one-word, CamelCase reason for the condition's last transition.
 	Reason string `json:"reason"`
 	// Human-readable message indicating details about last transition.
@@ -94,12 +96,13 @@ type ControlPlaneList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;eschercloud
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type ControlPlane struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              ControlPlaneSpec   `json:"spec"`
-	Status            ControlPlaneStatus `json:"status"`
+	Status            ControlPlaneStatus `json:"status,omitempty"`
 }
 
 // ControlPlaneSpec defines any control plane specific options.
@@ -125,7 +128,7 @@ type ControlPlaneCondition struct {
 	// Can be True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status"`
 	// Last time the condition transitioned from one status to another.
-	LastTrasitionTime metav1.Time `json:"lastTransitionTime"`
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 	// Unique, one-word, CamelCase reason for the condition's last transition.
 	Reason string `json:"reason"`
 	// Human-readable message indicating details about last transition.
