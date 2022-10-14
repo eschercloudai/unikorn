@@ -72,6 +72,7 @@ const (
 
 type ProjectCondition struct {
 	// Type is the type of the condition.
+	// +kubebuilder:validation:enum=Provisioned
 	Type ProjectConditionType `json:"type"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
@@ -97,6 +98,7 @@ type ControlPlaneList struct {
 // +kubebuilder:resource:categories=all;eschercloud
 // +kubebuilder:resource:scope=Namespaced
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type ControlPlane struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -123,7 +125,8 @@ const (
 
 type ControlPlaneCondition struct {
 	// Type is the type of the condition.
-	Type ProjectConditionType `json:"type"`
+	// +kubebuilder:validation:enum=Provisioned
+	Type ControlPlaneConditionType `json:"type"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status"`

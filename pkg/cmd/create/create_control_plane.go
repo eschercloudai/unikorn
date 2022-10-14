@@ -19,6 +19,8 @@ package create
 import (
 	"context"
 
+	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
+	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -29,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -36,8 +39,27 @@ type createControlPlaneOptions struct {
 	// name is the name of the control plane to create.
 	name string
 
+	// project is the project name.
+	project string
+
 	// client is the Kubernetes v1 client.
 	client kubernetes.Interface
+
+	// unikornClient gives access to our custom resources.
+	unikornClient unikorn.Interface
+}
+
+// addFlags registers create cluster options flags with the specified cobra command.
+func (o *createControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
+	cmd.Flags().StringVar(&o.project, "project", "", "Kubernetes project name that contains the control plane.")
+
+	if err := cmd.MarkFlagRequired("project"); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("project", completion.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)); err != nil {
+		panic(err)
+	}
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -45,6 +67,15 @@ func (o *createControlPlaneOptions) complete(f cmdutil.Factory, args []string) e
 	var err error
 
 	if o.client, err = f.KubernetesClientSet(); err != nil {
+		return err
+	}
+
+	config, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	if o.unikornClient, err = unikorn.NewForConfig(config); err != nil {
 		return err
 	}
 
@@ -69,21 +100,46 @@ func (o *createControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *createControlPlaneOptions) run() error {
-	ns := &corev1.Namespace{
+	project, err := o.unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	namespace := project.Status.Namespace
+
+	if len(namespace) == 0 {
+		panic("achtung!")
+	}
+
+	controlPlane := &unikornv1alpha1.ControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.name,
 			Labels: map[string]string{
-				constants.VersionLabel:      constants.Version,
-				constants.ControlPlaneLabel: "true",
+				constants.VersionLabel: constants.Version,
 			},
 		},
 	}
 
-	// TODO: we can probably make use of the dynamic client here and just say
-	// here's a list of stuff, create it, rather than mess around with huge
-	// swathes of typed API code.  That way we can have say an explicit
-	// provisioner, a helm provisioner, a binary provisioner...
-	if _, err := o.client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
+	controlPlane, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).Create(context.TODO(), controlPlane, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	// Pretend from this line onward it's an asynchronous controller/operator
+	// like thing.
+
+	controlPlane.Status.Conditions = []unikornv1alpha1.ControlPlaneCondition{
+		{
+			Type:               unikornv1alpha1.ControlPlaneConditionProvisioned,
+			Status:             corev1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "Provisioning",
+			Message:            "Provisioning of control plane has started",
+		},
+	}
+
+	_, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).UpdateStatus(context.TODO(), controlPlane, metav1.UpdateOptions{})
+	if err != nil {
 		return err
 	}
 
@@ -126,6 +182,8 @@ func newCreateControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
 			util.AssertNilError(o.run())
 		},
 	}
+
+	o.addFlags(f, cmd)
 
 	return cmd
 }

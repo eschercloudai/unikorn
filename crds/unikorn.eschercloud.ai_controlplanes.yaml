@@ -16,6 +16,9 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Provisioned")].reason
+      name: status
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: age
       type: date
