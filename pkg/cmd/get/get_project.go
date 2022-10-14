@@ -27,7 +27,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/cmd/get"
@@ -39,9 +43,14 @@ type getProjectOptions struct {
 	// name allows explict filtering of control plane namespaces.
 	names []string
 
-	// printFlags gives a rich set of functionality shamelessly stolen from
-	// kubectl e.g. -o yaml etc.
-	printFlags *get.PrintFlags
+	// outputFormat selects formatting e.g. json, yaml, or human readable by default.
+	outputFormat string
+
+	// jsonYamlPrintFlags specifies any json/yaml formatting options.
+	jsonYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
+
+	// humanReadableFlags allows the default table output format to be tweaked.
+	humanReadableFlags *get.HumanPrintFlags
 
 	// f is the factory used to create clients.
 	f cmdutil.Factory
@@ -53,8 +62,57 @@ type getProjectOptions struct {
 // newGetProjectOptions returns a correctly initialized set of options.
 func newGetProjectOptions() *getProjectOptions {
 	return &getProjectOptions{
-		printFlags: get.NewGetPrintFlags(),
+		jsonYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
+		humanReadableFlags: get.NewHumanPrintFlags(),
 	}
+}
+
+// allowedFormats specifies the possible formats for the output format flag.
+func (o *getProjectOptions) allowedFormats() []string {
+	var formats []string
+
+	formats = append(formats, o.jsonYamlPrintFlags.AllowedFormats()...)
+	formats = append(formats, o.humanReadableFlags.AllowedFormats()...)
+
+	return formats
+}
+
+// outputCompletion is a shell completion function for the output format flag.
+func (o *getProjectOptions) outputCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	var matches []string
+
+	for _, format := range o.allowedFormats() {
+		if strings.HasPrefix(format, toComplete) {
+			matches = append(matches, format)
+		}
+	}
+
+	return matches, cobra.ShellCompDirectiveNoFileComp
+}
+
+// addFlags registers create cluster options flags with the specified cobra command.
+func (o *getProjectOptions) addFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&o.outputFormat, "output", "o", "", fmt.Sprintf("Output format. One of (%s)", strings.Join(o.allowedFormats(), ", ")))
+
+	o.jsonYamlPrintFlags.AddFlags(cmd)
+	o.humanReadableFlags.AddFlags(cmd)
+
+	if err := cmd.RegisterFlagCompletionFunc("output", o.outputCompletion); err != nil {
+		panic(err)
+	}
+}
+
+// toPrinter returns the correct printer for the given output format.
+func (o *getProjectOptions) toPrinter() (printers.ResourcePrinter, error) {
+	if printer, err := o.jsonYamlPrintFlags.ToPrinter(o.outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
+		return printer, err
+	}
+
+	if printer, err := o.humanReadableFlags.ToPrinter(o.outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
+		return &get.TablePrinter{Delegate: printer}, err
+	}
+
+	return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &o.outputFormat, AllowedFormats: o.allowedFormats()}
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -91,7 +149,7 @@ func (o *getProjectOptions) validate() error {
 // humanReadableOutput indicates whether the output is human readable (server formatted
 // as a table using additional printer columns), or machine readable (e.g. JSON, YAML).
 func (o *getProjectOptions) humanReadableOutput() bool {
-	return len(*o.printFlags.OutputFormat) == 0
+	return len(o.outputFormat) == 0
 }
 
 // transformRequests requests the Kubernetes API return a formatted table when
@@ -126,24 +184,44 @@ func (o *getProjectOptions) run() error {
 		TransformRequests(o.transformRequests).
 		Do()
 
+	if err := r.Err(); err != nil {
+		return err
+	}
+
 	infos, err := r.Infos()
 	if err != nil {
 		return err
 	}
 
-	for _, info := range infos {
-		printer, err := o.printFlags.ToPrinter()
-		if err != nil {
-			return err
+	// Assume we have a single object, the r.Err above will crap out if no results are
+	// found.  We know all returned results will be projects.  If doing a human printable
+	// get, then a single table will be returned.  If getting by name, especially multiple
+	// names, then there may be multiple results.  Coalesce these into a single list
+	// as that's what is expected from standard tools.
+	object := infos[0].Object
+
+	if len(infos) > 1 {
+		list := &corev1.List{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "List",
+			},
 		}
 
-		if o.humanReadableOutput() {
-			printer = &get.TablePrinter{Delegate: printer}
+		for _, info := range infos {
+			list.Items = append(list.Items, runtime.RawExtension{Object: info.Object})
 		}
 
-		if err := printer.PrintObj(info.Object, os.Stdout); err != nil {
-			return err
-		}
+		object = list
+	}
+
+	printer, err := o.toPrinter()
+	if err != nil {
+		return err
+	}
+
+	if err := printer.PrintObj(object, os.Stdout); err != nil {
+		return err
 	}
 
 	return nil
@@ -151,11 +229,17 @@ func (o *getProjectOptions) run() error {
 
 var (
 	getProjectExample = util.TemplatedExample(`
+	# Get all projects.
+	{{.Application}} get project
+
 	# Get a single project named my-project-name.
 	{{.Application}} get project my-project-name
 
 	# Get multiple projects.
-	{{.Application}} get project my-project-name my-other-project-name`)
+	{{.Application}} get project my-project-name my-other-project-name
+
+	# Get all projects formatted in YAML.
+	{{.Application}} get project -o yaml`)
 )
 
 // newGetProjectCommand returns a command that is able to get or list Cluster API
@@ -179,7 +263,7 @@ func newGetProjectCommand(f cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	o.printFlags.AddFlags(cmd)
+	o.addFlags(cmd)
 
 	return cmd
 }
