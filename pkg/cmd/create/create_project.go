@@ -115,7 +115,7 @@ func (o *createProjectOptions) run() error {
 		return err
 	}
 
-	// Pretend from this line orward it's an asynchronous controller/operator
+	// Pretend from this line onward it's an asynchronous controller/operator
 	// like thing.
 
 	project.Status.Conditions = []unikornv1alpha1.ProjectCondition{
@@ -151,7 +151,7 @@ func (o *createProjectOptions) run() error {
 	// deletion.
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "controlplane-",
+			GenerateName: "project-",
 			Labels: map[string]string{
 				constants.ControlPlaneLabel: o.name,
 			},
