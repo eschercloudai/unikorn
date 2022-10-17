@@ -120,4 +120,4 @@ lint: $(GENDIR)
 # This must pass or you will be denied by CI.
 .PHONY: license
 license:
-	go run ./hack/check_license.go
+	go run ./hack/check_license/main.go
