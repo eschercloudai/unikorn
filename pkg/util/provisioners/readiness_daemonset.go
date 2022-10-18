@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provisioner
+package provisioners
 
 import (
 	"context"
@@ -40,7 +40,7 @@ type DaemonsetReady struct {
 	name string
 }
 
-// Ensure the ReadinessCheck interface is implmented.
+// Ensure the ReadinessCheck interface is implemented.
 var _ ReadinessCheck = &DaemonsetReady{}
 
 // NewDaemonsetReady creates a new daemonset readiness check.

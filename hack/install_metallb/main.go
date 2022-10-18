@@ -26,7 +26,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/eschercloudai/unikorn/pkg/util/provisioner"
+	"github.com/eschercloudai/unikorn/pkg/util/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
 	"github.com/spf13/pflag"
@@ -80,7 +80,7 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 		Resource: resource,
 	}
 
-	checker := provisioner.NewStatusConditionReady(client, gvr, namespace, name, conditionType)
+	checker := provisioners.NewStatusConditionReady(client, gvr, namespace, name, conditionType)
 
 	if err := retry.WithContext(c).Do(checker.Check); err != nil {
 		panic(err)
@@ -90,7 +90,7 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 // waitDaemonsetReady performs a type specific wait function until the desired and actual
 // number of rready processes match.
 func waitDaemonsetReady(c context.Context, client kubernetes.Interface, namespace, name string) {
-	checker := provisioner.NewDaemonsetReady(client, namespace, name)
+	checker := provisioners.NewDaemonsetReady(client, namespace, name)
 
 	if err := retry.WithContext(c).Do(checker.Check); err != nil {
 		panic(err)
@@ -98,19 +98,11 @@ func waitDaemonsetReady(c context.Context, client kubernetes.Interface, namespac
 
 }
 
-// execWithDefaults runs a genricclioptions enabled client application overriding
-// the default Kubernetes config and context parameters with those specified at the
-// top level.
-func execWithDefaults(config *genericclioptions.ConfigFlags, command string, args ...string) {
-	if len(*config.KubeConfig) > 0 {
-		args = append(args, "--kubconfig", *config.KubeConfig)
-	}
+// applyManifest does exactly that.
+func applyManifest(config *genericclioptions.ConfigFlags, path string) {
+	provisioner := provisioners.NewManifestProvisioner(config, path)
 
-	if len(*config.Context) > 0 {
-		args = append(args, "--context", *config.Context)
-	}
-
-	if err := exec.Command(command, args...).Run(); err != nil {
+	if err := provisioner.Provision(); err != nil {
 		panic(err)
 	}
 }
@@ -220,7 +212,7 @@ func applyMetalLBAddressPools(config *genericclioptions.ConfigFlags, start, end 
 
 	tf.Close()
 
-	execWithDefaults(config, "kubectl", "apply", "-f", tf.Name())
+	applyManifest(config, tf.Name())
 }
 
 // main is the main entry point, shock!
@@ -256,7 +248,7 @@ func main() {
 
 	// And finally do the install.
 	fmt.Println("🦄 Applying MetalLB manifest ...")
-	execWithDefaults(configFlags, "kubectl", "apply", "-f", metalLBManifest)
+	applyManifest(configFlags, metalLBManifest)
 
 	fmt.Println("🦄 Waiting for MetalLB controller to be ready ...")
 	waitCondition(c, dynamicClient, "apps", "v1", "deployments", metalLBNamespace, "controller", "Available")
