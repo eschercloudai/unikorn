@@ -18,12 +18,15 @@ package create
 
 import (
 	"context"
+	"time"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/util/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
 	"github.com/spf13/cobra"
 
@@ -42,6 +45,9 @@ type createControlPlaneOptions struct {
 	// project is the project name.
 	project string
 
+	// timeout is how long to wait for everything to provision.
+	timeout time.Duration
+
 	// client is the Kubernetes v1 client.
 	client kubernetes.Interface
 
@@ -52,6 +58,7 @@ type createControlPlaneOptions struct {
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.project, "project", "", "Kubernetes project name that contains the control plane.")
+	cmd.Flags().DurationVar(&o.timeout, "timeout", 5*time.Minute, "Duration to wait for provisioning.")
 
 	if err := cmd.MarkFlagRequired("project"); err != nil {
 		panic(err)
@@ -100,6 +107,9 @@ func (o *createControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *createControlPlaneOptions) run() error {
+	c, cancel := context.WithTimeout(context.TODO(), o.timeout)
+	defer cancel()
+
 	project, err := o.unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -140,6 +150,19 @@ func (o *createControlPlaneOptions) run() error {
 
 	_, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).UpdateStatus(context.TODO(), controlPlane, metav1.UpdateOptions{})
 	if err != nil {
+		return err
+	}
+
+	// TODO: this needs fixing, we cannot pass through the kubeconfig or context.
+	vclusterProvisioner := provisioners.NewBinaryProvisioner(nil, "vcluster", "create", "--namespace", namespace, "--expose", "--expose-local=False", "--connect=False", o.name)
+
+	if err := vclusterProvisioner.Provision(); err != nil {
+		return err
+	}
+
+	statefulsetReadiness := provisioners.NewStatefulSetReady(o.client, namespace, o.name)
+
+	if err := retry.WithContext(c).Do(statefulsetReadiness.Check); err != nil {
 		return err
 	}
 

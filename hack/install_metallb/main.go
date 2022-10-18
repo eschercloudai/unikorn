@@ -87,10 +87,10 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 	}
 }
 
-// waitDaemonsetReady performs a type specific wait function until the desired and actual
+// waitDaemonSetReady performs a type specific wait function until the desired and actual
 // number of rready processes match.
-func waitDaemonsetReady(c context.Context, client kubernetes.Interface, namespace, name string) {
-	checker := provisioners.NewDaemonsetReady(client, namespace, name)
+func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespace, name string) {
+	checker := provisioners.NewDaemonSetReady(client, namespace, name)
 
 	if err := retry.WithContext(c).Do(checker.Check); err != nil {
 		panic(err)
@@ -254,7 +254,7 @@ func main() {
 	waitCondition(c, dynamicClient, "apps", "v1", "deployments", metalLBNamespace, "controller", "Available")
 
 	fmt.Println("🦄 Waiting for MetalLB daemonset to be ready ...")
-	waitDaemonsetReady(c, kubernetesClient, metalLBNamespace, "speaker")
+	waitDaemonSetReady(c, kubernetesClient, metalLBNamespace, "speaker")
 
 	fmt.Println("🦄 Getting network configuration ...")
 	network := getDockerNetwork(clusterName)
