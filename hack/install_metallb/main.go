@@ -26,9 +26,11 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/eschercloudai/unikorn/pkg/util/provisioner"
+	"github.com/eschercloudai/unikorn/pkg/util/retry"
+
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -71,100 +73,29 @@ metadata:
 )
 
 // waitCondition waits for a condtion to be true on a generic resource.
-// TODO: utility function.
-func waitCondition(client dynamic.Interface, group, version, resource, namespace, name, conditionType string, timeout time.Duration) {
-	// TODO: you should use a RESTMapper here to derive whether it's a namespaced or
-	// cluster resource.
+func waitCondition(c context.Context, client dynamic.Interface, group, version, resource, namespace, name, conditionType string) {
 	gvr := schema.GroupVersionResource{
 		Group:    group,
 		Version:  version,
 		Resource: resource,
 	}
 
-	// TODO: this is a generic retry function.
-	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
-	defer cancel()
+	checker := provisioner.NewStatusConditionReady(client, gvr, namespace, name, conditionType)
 
-	t := time.NewTicker(time.Second)
-	defer t.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			panic(ctx.Err())
-		case <-t.C:
-			object, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-			if err != nil {
-				fmt.Println("get error", err)
-				break
-			}
-
-			conditions, _, err := unstructured.NestedSlice(object.Object, "status", "conditions")
-			if err != nil {
-				fmt.Println("conditions lookup error", err)
-				break
-			}
-
-			for i := range conditions {
-				condition, ok := conditions[i].(map[string]interface{})
-				if !ok {
-					fmt.Println("condition type assertion error")
-				}
-
-				t, _, err := unstructured.NestedString(condition, "type")
-				if err != nil {
-					fmt.Println("condition type error", err)
-					continue
-				}
-
-				if t != conditionType {
-					continue
-				}
-
-				s, _, err := unstructured.NestedString(condition, "status")
-				if err != nil {
-					fmt.Println("condition status error", err)
-					continue
-				}
-
-				if s != "True" {
-					continue
-				}
-
-				return
-			}
-		}
+	if err := retry.WithContext(c).Do(checker.Check); err != nil {
+		panic(err)
 	}
 }
 
 // waitDaemonsetReady performs a type specific wait function until the desired and actual
 // number of rready processes match.
-// TODO: we could probably make this generic.
-func waitDaemonsetReady(client kubernetes.Interface, namespace, name string, timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
-	defer cancel()
+func waitDaemonsetReady(c context.Context, client kubernetes.Interface, namespace, name string) {
+	checker := provisioner.NewDaemonsetReady(client, namespace, name)
 
-	t := time.NewTicker(time.Second)
-	defer t.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			panic(ctx.Err())
-		case <-t.C:
-			daemonset, err := client.AppsV1().DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-			if err != nil {
-				fmt.Println("daemonset get error", err)
-				break
-			}
-
-			if daemonset.Status.NumberReady != daemonset.Status.DesiredNumberScheduled {
-				break
-			}
-
-			return
-		}
+	if err := retry.WithContext(c).Do(checker.Check); err != nil {
+		panic(err)
 	}
+
 }
 
 // execWithDefaults runs a genricclioptions enabled client application overriding
@@ -297,15 +228,20 @@ func applyMetalLBAddressPools(config *genericclioptions.ConfigFlags, start, end 
 // load balancer VIPs from, and make that live.  For a real cloud this is a non-event,
 // this is more for local testing with Kind and other provisioners of that ilk.
 func main() {
+	// Parse flags.
 	var clusterName string
 
+	var timeout time.Duration
+
 	pflag.StringVar(&clusterName, "cluster-name", "kind", "Kind cluster name to probe.")
+	pflag.DurationVar(&timeout, "timeout", 5*time.Minute, "Global timeout to complete installation.")
 
 	configFlags := genericclioptions.NewConfigFlags(true)
 	configFlags.AddFlags(pflag.CommandLine)
 
 	pflag.Parse()
 
+	// Perform Kubernetes configuration.
 	config, err := configFlags.ToRESTConfig()
 	if err != nil {
 		panic(err)
@@ -314,14 +250,19 @@ func main() {
 	kubernetesClient := kubernetes.NewForConfigOrDie(config)
 	dynamicClient := dynamic.NewForConfigOrDie(config)
 
+	// Set up our global timeout.
+	c, cancel := context.WithTimeout(context.TODO(), timeout)
+	defer cancel()
+
+	// And finally do the install.
 	fmt.Println("🦄 Applying MetalLB manifest ...")
 	execWithDefaults(configFlags, "kubectl", "apply", "-f", metalLBManifest)
 
 	fmt.Println("🦄 Waiting for MetalLB controller to be ready ...")
-	waitCondition(dynamicClient, "apps", "v1", "deployments", metalLBNamespace, "controller", "Available", 5*time.Minute)
+	waitCondition(c, dynamicClient, "apps", "v1", "deployments", metalLBNamespace, "controller", "Available")
 
 	fmt.Println("🦄 Waiting for MetalLB daemonset to be ready ...")
-	waitDaemonsetReady(kubernetesClient, metalLBNamespace, "speaker", 5*time.Minute)
+	waitDaemonsetReady(c, kubernetesClient, metalLBNamespace, "speaker")
 
 	fmt.Println("🦄 Getting network configuration ...")
 	network := getDockerNetwork(clusterName)
