@@ -26,10 +26,10 @@ import (
 )
 
 var (
-	ErrDaemonSetUnready = errors.New("daemonset readiness doesn't match desired")
+	ErrStatefulSetUnready = errors.New("statefulset readiness doesn't match desired")
 )
 
-type DaemonSetReady struct {
+type StatefulSetReady struct {
 	// client is an intialized Kubernetes client.
 	client kubernetes.Interface
 
@@ -41,11 +41,11 @@ type DaemonSetReady struct {
 }
 
 // Ensure the ReadinessCheck interface is implemented.
-var _ ReadinessCheck = &DaemonSetReady{}
+var _ ReadinessCheck = &StatefulSetReady{}
 
-// NewDaemonSetReady creates a new daemonset readiness check.
-func NewDaemonSetReady(client kubernetes.Interface, namespace, name string) ReadinessCheck {
-	return &DaemonSetReady{
+// NewStatefulSetReady creates a new statefulset readiness check.
+func NewStatefulSetReady(client kubernetes.Interface, namespace, name string) ReadinessCheck {
+	return &StatefulSetReady{
 		client:    client,
 		namespace: namespace,
 		name:      name,
@@ -53,14 +53,21 @@ func NewDaemonSetReady(client kubernetes.Interface, namespace, name string) Read
 }
 
 // Check implements the ReadinessCheck interface.
-func (r *DaemonSetReady) Check() error {
-	daemonset, err := r.client.AppsV1().DaemonSets(r.namespace).Get(context.TODO(), r.name, metav1.GetOptions{})
+func (r *StatefulSetReady) Check() error {
+	statefulset, err := r.client.AppsV1().StatefulSets(r.namespace).Get(context.TODO(), r.name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("daemonset get error: %w", err)
+		return fmt.Errorf("statefulset get error: %w", err)
 	}
 
-	if daemonset.Status.NumberReady != daemonset.Status.DesiredNumberScheduled {
-		return fmt.Errorf("%w: status mismatch", ErrDaemonSetUnready)
+	// k8s.io/api/apps/v1/types.go indicates this defaults to 1.
+	replicas := int32(1)
+
+	if statefulset.Spec.Replicas != nil {
+		replicas = *statefulset.Spec.Replicas
+	}
+
+	if statefulset.Status.ReadyReplicas != replicas {
+		return fmt.Errorf("%w: status mismatch", ErrStatefulSetUnready)
 	}
 
 	return nil
