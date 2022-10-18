@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provisioner
+package provisioners
 
 import (
 	"context"
@@ -64,7 +64,7 @@ type StatusConditionReady struct {
 	conditionType string
 }
 
-// Ensure the ReadinessCheck interface is implmented.
+// Ensure the ReadinessCheck interface is implemented.
 var _ ReadinessCheck = &StatusConditionReady{}
 
 // NewStatusConditionReady creates a new status condition readiness check.
