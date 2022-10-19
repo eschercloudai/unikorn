@@ -17,6 +17,7 @@ limitations under the License.
 package provisioners
 
 import (
+	"fmt"
 	"os/exec"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -71,7 +72,9 @@ func (p *BinaryProvisioner) Provision() error {
 
 	args = append(args, p.args...)
 
-	if err := exec.Command(p.command, args...).Run(); err != nil {
+	out, err := exec.Command(p.command, args...).CombinedOutput()
+	if err != nil {
+		fmt.Println(string(out))
 		return err
 	}
 
