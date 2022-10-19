@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 
 	"github.com/spf13/cobra"
 
@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/completion"
+	computil "k8s.io/kubectl/pkg/util/completion"
 )
 
 type getControlPlaneOptions struct {
@@ -72,7 +72,7 @@ func (o *getControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command)
 		panic(err)
 	}
 
-	if err := cmd.RegisterFlagCompletionFunc("project", completion.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)); err != nil {
+	if err := cmd.RegisterFlagCompletionFunc("project", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)); err != nil {
 		panic(err)
 	}
 
@@ -195,50 +195,6 @@ func (o *getControlPlaneOptions) run() error {
 	return nil
 }
 
-// getControlPlanesCompletionFunc is a bit messy but allows us to do the project
-// to namespace indirection, as the default namespace in the Factory cannot
-// be overridden and we cannot use the generic function provided by kubectl.
-// Obviously this will get worse when we have vcluster to battle against as that
-// needs a whole new kubeconfig.
-func (o *getControlPlaneOptions) getControlPlanesCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		config, err := f.ToRESTConfig()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		unikornClient, err := unikorn.NewForConfig(config)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		project, err := unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		namespace := project.Status.Namespace
-		if len(namespace) == 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		controlPlanes, err := unikornClient.UnikornV1alpha1().ControlPlanes(namespace).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		var matches []string
-
-		for _, cp := range controlPlanes.Items {
-			if strings.HasPrefix(cp.Name, toComplete) {
-				matches = append(matches, cp.Name)
-			}
-		}
-
-		return matches, cobra.ShellCompDirectiveNoFileComp
-	}
-}
-
 // newGetControlPlaneCommand returns a command that is able to get or list Cluster API
 // control planes found on the management cluster.
 func newGetControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
@@ -248,7 +204,7 @@ func newGetControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
 		Use:               "control-plane",
 		Short:             "Get or list Cluster API control planes",
 		Long:              "Get or list Cluster API control planes",
-		ValidArgsFunction: o.getControlPlanesCompletionFunc(f),
+		ValidArgsFunction: completion.ControlPlanesCompletionFunc(f, &o.project),
 		Aliases: []string{
 			"control-planes",
 			"cp",
