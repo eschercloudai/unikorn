@@ -18,6 +18,8 @@ package create
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
@@ -154,6 +156,11 @@ func (o *createControlPlaneOptions) run() error {
 	}
 
 	// TODO: this needs fixing, we cannot pass through the kubeconfig or context.
+	// TODO: deletion would require a deprovisioning step, we'd be better off creating
+	// resources with owner references and let the garbage collector do it's thing.
+	// TODO: In relation to the above, we probably want the control plane resource
+	// to defer deletion until its children are done, thus preventing race conditions
+	// on delete and recreate.
 	vclusterProvisioner := provisioners.NewBinaryProvisioner(nil, "vcluster", "create", "--namespace", namespace, "--expose", "--expose-local=False", "--connect=False", o.name)
 
 	if err := vclusterProvisioner.Provision(); err != nil {
@@ -163,6 +170,37 @@ func (o *createControlPlaneOptions) run() error {
 	statefulsetReadiness := provisioners.NewStatefulSetReady(o.client, namespace, o.name)
 
 	if err := retry.WithContext(c).Do(statefulsetReadiness.Check); err != nil {
+		return err
+	}
+
+	// TODO: there is a syncer sidecar that sets this by the looks of things
+	// we'll probably need a retry loop in here.
+	secret, err := o.client.CoreV1().Secrets(namespace).Get(context.TODO(), "vc-"+o.name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	config, ok := secret.Data["config"]
+	if !ok {
+		return fmt.Errorf("no config data found")
+	}
+
+	tf, err := os.CreateTemp("", "")
+	if err != nil {
+		return err
+	}
+
+	defer os.Remove(tf.Name())
+
+	if _, err := tf.Write(config); err != nil {
+		return err
+	}
+
+	tf.Close()
+
+	clusterAPIProvisioner := provisioners.NewBinaryProvisioner(nil, "clusterctl", "init", "--kubeconfig", tf.Name(), "--infrastructure", "openstack", "--wait-providers")
+
+	if err := clusterAPIProvisioner.Provision(); err != nil {
 		return err
 	}
 
