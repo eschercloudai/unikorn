@@ -18,7 +18,7 @@ package vcluster
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
@@ -27,6 +27,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+)
+
+var (
+	ErrConfigDataMissing          = errors.New("config data not found")
+	ErrLoadBalancerIngressMissing = errors.New("ingress address not found")
 )
 
 // GetConfig acknowledges that vcluster configuration is synchronized by a side car, so it
@@ -45,7 +50,7 @@ func GetConfig(c context.Context, client kubernetes.Interface, namespace, name s
 		// LoadBalancer endpoint.
 		configBytes, ok := secret.Data["config"]
 		if !ok {
-			return fmt.Errorf("no config data found")
+			return ErrConfigDataMissing
 		}
 
 		configStruct, err := clientcmd.NewClientConfigFromBytes(configBytes)
@@ -64,7 +69,7 @@ func GetConfig(c context.Context, client kubernetes.Interface, namespace, name s
 		}
 
 		if len(service.Status.LoadBalancer.Ingress) == 0 {
-			return fmt.Errorf("no loadbalancer status present")
+			return ErrLoadBalancerIngressMissing
 		}
 
 		configRaw.Clusters["my-vcluster"].Server = "https://" + service.Status.LoadBalancer.Ingress[0].IP + ":443"
@@ -74,7 +79,7 @@ func GetConfig(c context.Context, client kubernetes.Interface, namespace, name s
 		return nil
 	}
 
-	if err := retry.WithContext(c).Do(callback); err != nil {
+	if err := retry.Forever().DoWithContext(c, callback); err != nil {
 		return nil, err
 	}
 
@@ -98,6 +103,7 @@ func WriteConfig(c context.Context, client kubernetes.Interface, namespace, name
 
 	if err := clientcmd.WriteToFile(*config, tf.Name()); err != nil {
 		os.Remove(tf.Name())
+
 		return "", nil, err
 	}
 

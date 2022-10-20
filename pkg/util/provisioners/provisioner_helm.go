@@ -18,7 +18,7 @@ package provisioners
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os/exec"
 	"strings"
 
@@ -26,7 +26,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
 	"sigs.k8s.io/yaml"
+)
+
+var (
+	// ErrUnsupportedScope is raised when we see a cluster resources e.g.
+	// ClusterRole, Namespace.
+	ErrUnsupportedScope = errors.New("cluster scoped resources not supported")
 )
 
 // HelmProvisioner runs helm template to install a package.
@@ -61,7 +68,7 @@ var _ Provisioner = &HelmProvisioner{}
 
 // NewHelmProvisioner returns a provisioner that installs a component or package
 // with Helm.
-func NewHelmProvisioner(f cmdutil.Factory, repo, chart, namespace, name string, args []string, ownerReferences []metav1.OwnerReference) Provisioner {
+func NewHelmProvisioner(f cmdutil.Factory, repo, chart, namespace, name string, args []string, ownerReferences []metav1.OwnerReference) *HelmProvisioner {
 	return &HelmProvisioner{
 		f:               f,
 		repo:            repo,
@@ -125,7 +132,7 @@ func (p *HelmProvisioner) Provision() error {
 
 		// Because cascading delete don't work for these (I think, plus the code is ugly!)
 		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			return fmt.Errorf("cluster scoped resources unsupported")
+			return ErrUnsupportedScope
 		}
 
 		if _, err := client.Resource(mapping.Resource).Namespace(p.namespace).Create(context.TODO(), object, metav1.CreateOptions{}); err != nil {

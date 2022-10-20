@@ -64,5 +64,6 @@ func templatedString(s string, data any) string {
 // formatting rules after the templating step.
 func TemplatedExample(s string) string {
 	s = templatedString(s, newDynamicTemplateOptions())
+
 	return templates.Examples(s)
 }

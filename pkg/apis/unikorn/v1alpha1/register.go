@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
@@ -41,15 +42,19 @@ const (
 
 var (
 	// SchemeGroupVersion defines the GV of our resources.
+	//nolint:gochecknoglobals
 	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: GroupVersion}
 
 	// SchemeBuilder creates a mapping between GVK and type.
+	//nolint:gochecknoglobals
 	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
 
 	// AddToScheme adds our GVK to resource mappings to an existing scheme.
+	//nolint:gochecknoglobals
 	AddToScheme = SchemeBuilder.AddToScheme
 )
 
+//nolint:gochecknoinits
 func init() {
 	SchemeBuilder.Register(&Project{}, &ProjectList{})
 	SchemeBuilder.Register(&ControlPlane{}, &ControlPlaneList{})

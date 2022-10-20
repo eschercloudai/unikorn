@@ -24,12 +24,15 @@ import (
 
 var (
 	// Application is the application name.
+	//nolint:gochecknoglobals
 	Application = path.Base(os.Args[0])
 
 	// Version is the application version set via the Makefile.
+	//nolint:gochecknoglobals
 	Version string
 
 	// Revision is the git revision set via the Makefile.
+	//nolint:gochecknoglobals
 	Revision string
 )
 

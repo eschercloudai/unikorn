@@ -31,4 +31,8 @@ var (
 
 	// ErrNotFound is raised when a requested resource name isn't found.
 	ErrNotFound = errors.New("resource name not found")
+
+	// ErrProjectNamespaceUndefined is raised when you try to provision a control
+	// plane against a project that hasn't fully provisioned yet.
+	ErrProjectNamespaceUndefined = errors.New("project namespace is not set")
 )

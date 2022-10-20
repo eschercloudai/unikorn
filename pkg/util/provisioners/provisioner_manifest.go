@@ -46,7 +46,7 @@ var _ Provisioner = &ManifestProvisioner{}
 // NewManifestProvisioner returns a new provisioner that is capable of applying
 // a manifest with kubectl.  The path argument may be a path on the local file
 // system or a URL.
-func NewManifestProvisioner(config *genericclioptions.ConfigFlags, path string) Provisioner {
+func NewManifestProvisioner(config *genericclioptions.ConfigFlags, path string) *ManifestProvisioner {
 	return &ManifestProvisioner{
 		config: config,
 		path:   path,

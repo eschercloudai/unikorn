@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-
-	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +35,7 @@ import (
 )
 
 type getProjectOptions struct {
-	// name allows explict filtering of control plane namespaces.
+	// name allows explicit filtering of control plane namespaces.
 	names []string
 
 	// getPrintFlags is a generic and reduced set of printing options.
@@ -152,6 +152,7 @@ func (o *getProjectOptions) run() error {
 }
 
 var (
+	//nolint:gochecknoglobals
 	getProjectExample = util.TemplatedExample(`
 	# Get all projects.
 	{{.Application}} get project

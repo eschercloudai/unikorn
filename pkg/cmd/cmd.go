@@ -17,12 +17,12 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/spf13/cobra"
+
 	"github.com/eschercloudai/unikorn/pkg/cmd/create"
 	"github.com/eschercloudai/unikorn/pkg/cmd/delete"
 	"github.com/eschercloudai/unikorn/pkg/cmd/get"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-
-	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -30,6 +30,7 @@ import (
 )
 
 var (
+	//nolint:gochecknoglobals
 	rootLongDesc = templates.LongDesc(`
 	EscherCloudAI Kubernetes Provisioning.
 

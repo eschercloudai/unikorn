@@ -17,9 +17,9 @@ limitations under the License.
 package get
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-
 	"github.com/spf13/cobra"
+
+	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -42,6 +42,7 @@ func (o *getClusterOptions) addFlags(cmd *cobra.Command) {
 }
 
 var (
+	//nolint:gochecknoglobals
 	getClusterExamples = util.TemplatedExample(`
         # List Kubernetes clusters in control plane foo
         {{.Application}} get cluster --control-plane foo`)
@@ -49,7 +50,7 @@ var (
 
 // newGetClusterCommand returns a command that is able to get or list Kubernetes clusters
 // found in the provided Cluster API control plane.
-func newGetClusterCommand(f cmdutil.Factory) *cobra.Command {
+func newGetClusterCommand(_ cmdutil.Factory) *cobra.Command {
 	o := &getClusterOptions{}
 
 	cmd := &cobra.Command{

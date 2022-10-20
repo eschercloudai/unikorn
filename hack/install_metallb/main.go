@@ -26,10 +26,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/spf13/pflag"
+
 	"github.com/eschercloudai/unikorn/pkg/util/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
-
-	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -82,7 +82,7 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 
 	checker := provisioners.NewStatusConditionReady(client, gvr, namespace, name, conditionType)
 
-	if err := retry.WithContext(c).Do(checker.Check); err != nil {
+	if err := retry.Forever().DoWithContext(c, checker.Check); err != nil {
 		panic(err)
 	}
 }
@@ -92,10 +92,9 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespace, name string) {
 	checker := provisioners.NewDaemonSetReady(client, namespace, name)
 
-	if err := retry.WithContext(c).Do(checker.Check); err != nil {
+	if err := retry.Forever().DoWithContext(c, checker.Check); err != nil {
 		panic(err)
 	}
-
 }
 
 // applyManifest does exactly that.
@@ -169,7 +168,7 @@ func getVIPRange(network *net.IPNet, rangeStart, rangeEnd uint) (net.IP, net.IP)
 
 	// Calculate the topmost /24 e.g. (1<<(32-16))-1 -> 0xffff & 0xffffff00 -> 0xff00.
 	ones, bits := network.Mask.Size()
-	offset := uint(((1 << (bits - ones)) - 1) & ^uint(0xff))
+	offset := ((1 << (bits - ones)) - 1) & ^uint(0xff)
 
 	// Add the offset to the prefix, and some start and end ranges
 	// e.g. 0xac120000 + 0xff00 + 0xc8 -> 0xac12ffc8.
@@ -257,6 +256,7 @@ func main() {
 	waitDaemonSetReady(c, kubernetesClient, metalLBNamespace, "speaker")
 
 	fmt.Println("🦄 Getting network configuration ...")
+
 	network := getDockerNetwork(clusterName)
 	fmt.Println("💡 Using routable prefix", network)
 

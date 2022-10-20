@@ -17,9 +17,9 @@ limitations under the License.
 package delete
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-
 	"github.com/spf13/cobra"
+
+	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -42,6 +42,7 @@ func (o *deleteClusterOptions) addFlags(cmd *cobra.Command) {
 }
 
 var (
+	//nolint:gochecknoglobals
 	deleteClusterExamples = util.TemplatedExample(`
         # Delete a Kubernetes cluster
         {{.Application}} delete cluster --control-plane foo`)
@@ -49,7 +50,7 @@ var (
 
 // newDeleteClusterCommand creates a command that deletes a Kubenretes cluster in the
 // specified Cluster API control plane.
-func newDeleteClusterCommand(f cmdutil.Factory) *cobra.Command {
+func newDeleteClusterCommand(_ cmdutil.Factory) *cobra.Command {
 	o := &deleteClusterOptions{}
 
 	cmd := &cobra.Command{

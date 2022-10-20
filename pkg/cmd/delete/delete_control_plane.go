@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
-
-	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -96,7 +96,7 @@ func (o *deleteControlPlaneOptions) run() error {
 
 	namespace := project.Status.Namespace
 	if len(namespace) == 0 {
-		return fmt.Errorf("project namespace undefined")
+		return errors.ErrProjectNamespaceUndefined
 	}
 
 	if err := o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).Delete(context.TODO(), o.name, metav1.DeleteOptions{}); err != nil {
