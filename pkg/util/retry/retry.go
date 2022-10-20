@@ -21,19 +21,13 @@ import (
 	"time"
 )
 
-// RetryFunc is a callback that must return nil to escape the retry loop.
-type RetryFunc func() error
+// Callback is a callback that must return nil to escape the retry loop.
+type Callback func() error
 
 // Retrier implements retry loop logic.
 type Retrier struct {
-	// context is used to terminate the retry loop on either a timeout
-	// or a cancellation call from another routine.  See WithContext()
-	// and WithTimeout for additional behaviour.  If not set it will
-	// retry forever.
-	context context.Context
-
-	// cancel is associated with a context to free resources.
-	cancel func()
+	// timeout is used to terminate the retry after a period of time.
+	timeout time.Duration
 
 	// period defines the default retry period, defaulting to 1 second.
 	period time.Duration
@@ -43,51 +37,31 @@ type Retrier struct {
 // is returned.
 func Forever() *Retrier {
 	return &Retrier{
-		context: context.TODO(),
-		period:  time.Second,
-	}
-}
-
-// WithContext allows a global context to be registered with this retry function,
-// e.g. if a timeout spans the whole transaction, and not just this single retry.
-func WithContext(c context.Context) *Retrier {
-	return &Retrier{
-		context: c,
-		period:  time.Second,
+		period: time.Second,
 	}
 }
 
 // WithTimeout returns a retrier that will execute for a specifc length of time.
 func WithTimeout(timeout time.Duration) *Retrier {
-	c, cancel := context.WithTimeout(context.TODO(), timeout)
-
 	return &Retrier{
-		context: c,
-		cancel:  cancel,
+		timeout: timeout,
 		period:  time.Second,
 	}
 }
 
-// WithPeriod defines how often to perform the retry.
-func (r *Retrier) WithPeriod(period time.Duration) *Retrier {
-	r.period = period
-	return r
+// Do starts the retry loop.  It will run until success or until an optional
+// timeout expires.
+func (r *Retrier) Do(f Callback) error {
+	return r.DoWithContext(context.TODO(), f)
 }
 
-// WithTimeout wraps the existing context with a timeout specific to this retry
-// invocation.  This should only be used with WithContext(ctx).WithTimeout() to
-// augment a global timeout with a local one as this call does not respect existing
-// cancel functions.
-func (r *Retrier) WithTimeout(timeout time.Duration) *Retrier {
-	r.context, r.cancel = context.WithTimeout(r.context, timeout)
-	return r
-}
+// DoWithContext allows you to use a global context to interrupt execution.
+func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
+	if r.timeout != 0 {
+		ctx, cancel := context.WithTimeout(c, r.timeout)
+		defer cancel()
 
-// Do starts the retry loop.  It will run until a context times out or is cancelled,
-// or the retry function returns nil indicating success.
-func (r *Retrier) Do(f RetryFunc) error {
-	if r.cancel != nil {
-		defer r.cancel()
+		c = ctx
 	}
 
 	t := time.NewTicker(r.period)
@@ -95,8 +69,8 @@ func (r *Retrier) Do(f RetryFunc) error {
 
 	for {
 		select {
-		case <-r.context.Done():
-			return r.context.Err()
+		case <-c.Done():
+			return c.Err()
 		case <-t.C:
 			if err := f(); err != nil {
 				break

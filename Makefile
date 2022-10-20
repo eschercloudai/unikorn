@@ -114,7 +114,7 @@ touch:
 .PHOMY: lint
 lint: $(GENDIR)
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(LINT_VERSION)
-	$(GOBIN)/golangci-lint run --timeout 5m ./...
+	$(GOBIN)/golangci-lint run ./...
 
 # Perform license checking.
 # This must pass or you will be denied by CI.

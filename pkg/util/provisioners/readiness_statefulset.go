@@ -44,7 +44,7 @@ type StatefulSetReady struct {
 var _ ReadinessCheck = &StatefulSetReady{}
 
 // NewStatefulSetReady creates a new statefulset readiness check.
-func NewStatefulSetReady(client kubernetes.Interface, namespace, name string) ReadinessCheck {
+func NewStatefulSetReady(client kubernetes.Interface, namespace, name string) *StatefulSetReady {
 	return &StatefulSetReady{
 		client:    client,
 		namespace: namespace,
@@ -71,5 +71,4 @@ func (r *StatefulSetReady) Check() error {
 	}
 
 	return nil
-
 }

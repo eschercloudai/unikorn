@@ -33,7 +33,7 @@ import (
 )
 
 type deleteProjectOptions struct {
-	// name allows explict filtering of control plane namespaces.
+	// name allows explicit filtering of control plane namespaces.
 	names []string
 
 	// unikornClient is a typed client for our custom resources.
@@ -84,6 +84,7 @@ func (o *deleteProjectOptions) run() error {
 }
 
 var (
+	//nolint:gochecknoglobals
 	deleteProjectLong = templates.LongDesc(`
 	Delete a project.
 
@@ -92,6 +93,7 @@ var (
 	control planes, so deletion of a project will cascade down and delete
 	all control planes in that project.`)
 
+	//nolint:gochecknoglobals
 	deleteProjectExample = util.TemplatedExample(`
         # Delete a single project named my-project-name.
         {{.Application}} delete project my-project-name
@@ -114,7 +116,6 @@ func newDeleteProjectCommand(f cmdutil.Factory) *cobra.Command {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())
 			util.AssertNilError(o.run())
-
 		},
 	}
 

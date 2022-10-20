@@ -1,0 +1,40 @@
+run:
+  timeout: 5m
+linters:
+  enable-all: true
+  disable:
+  - exhaustivestruct
+  - exhaustruct
+  - lll
+  - gofumpt
+  - deadcode
+  - nosnakecase
+  - scopelint
+  - golint
+  - ifshort
+  - maligned
+  - structcheck
+  - varcheck
+  - interfacer
+  - rowserrcheck
+  - sqlclosecheck
+  - structcheck
+  - wastedassign
+  - forbidigo
+  - wrapcheck
+  - varnamelen
+  - gomnd
+  - ireturn
+  - godox
+  - funlen
+  - predeclared
+  - cyclop
+linters-settings:
+  gci:
+    sections:
+    - standard
+    - default
+    - prefix(github.com/eschercloudai/unikorn)
+    - prefix(k8s.io)
+    - prefix(sigs.k8s.io)
+    skip-generated: true

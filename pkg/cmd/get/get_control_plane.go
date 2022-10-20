@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
-
-	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +41,7 @@ type getControlPlaneOptions struct {
 	// project allows scoping of control plane searching.
 	project string
 
-	// name allows explict filtering of control plane namespaces.
+	// name allows explicit filtering of control plane namespaces.
 	names []string
 
 	// getPrintFlags is a generic and reduced set of printing options.
@@ -132,7 +132,7 @@ func (o *getControlPlaneOptions) run() error {
 
 	namespace := project.Status.Namespace
 	if len(namespace) == 0 {
-		return fmt.Errorf("project namespace undefined")
+		return errors.ErrProjectNamespaceUndefined
 	}
 
 	// We are using the "kubectl get" library to retrieve resources.  That command

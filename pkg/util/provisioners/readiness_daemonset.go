@@ -44,7 +44,7 @@ type DaemonSetReady struct {
 var _ ReadinessCheck = &DaemonSetReady{}
 
 // NewDaemonSetReady creates a new daemonset readiness check.
-func NewDaemonSetReady(client kubernetes.Interface, namespace, name string) ReadinessCheck {
+func NewDaemonSetReady(client kubernetes.Interface, namespace, name string) *DaemonSetReady {
 	return &DaemonSetReady{
 		client:    client,
 		namespace: namespace,
@@ -64,5 +64,4 @@ func (r *DaemonSetReady) Check() error {
 	}
 
 	return nil
-
 }

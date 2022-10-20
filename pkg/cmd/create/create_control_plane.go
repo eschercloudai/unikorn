@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
@@ -29,8 +31,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/util/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
 	"github.com/eschercloudai/unikorn/pkg/util/vcluster"
-
-	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -194,7 +194,7 @@ func (o *createControlPlaneOptions) run() error {
 
 	statefulsetReadiness := provisioners.NewStatefulSetReady(o.client, namespace, o.name)
 
-	if err := retry.WithContext(c).Do(statefulsetReadiness.Check); err != nil {
+	if err := retry.Forever().DoWithContext(c, statefulsetReadiness.Check); err != nil {
 		return err
 	}
 
@@ -237,6 +237,7 @@ func (o *createControlPlaneOptions) run() error {
 }
 
 var (
+	//nolint:gochecknoglobals
 	createControlPlaneLong = templates.LongDesc(`
         Create a Cluster API control plane.
 
@@ -250,6 +251,7 @@ var (
         to finalizers and the like (Cluster API is poorly tested in failure
         scenarios.)`)
 
+	//nolint:gochecknoglobals
 	createControlPlaneExample = util.TemplatedExample(`
         # Create a control plane named my-control-plane-name.
         {{.Application}} create control-plane my-control-plane-name`)
@@ -257,7 +259,7 @@ var (
 
 // newCreateControlPlaneCommand creates a command that can create control planes.
 // The initial intention is to have a per-user/organization control plane that
-// contains Cluster API in a virtual cluster
+// contains Cluster API in a virtual cluster.
 func newCreateControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
 	o := &createControlPlaneOptions{}
 

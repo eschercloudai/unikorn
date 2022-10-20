@@ -45,7 +45,7 @@ var _ Provisioner = &BinaryProvisioner{}
 
 // NewBinaryProvisioner returns a provisioner that installs a component or package
 // with a binary installer.
-func NewBinaryProvisioner(config *genericclioptions.ConfigFlags, command string, args ...string) Provisioner {
+func NewBinaryProvisioner(config *genericclioptions.ConfigFlags, command string, args ...string) *BinaryProvisioner {
 	return &BinaryProvisioner{
 		config:  config,
 		command: command,
@@ -72,9 +72,11 @@ func (p *BinaryProvisioner) Provision() error {
 
 	args = append(args, p.args...)
 
+	//nolint:gosec
 	out, err := exec.Command(p.command, args...).CombinedOutput()
 	if err != nil {
 		fmt.Println(string(out))
+
 		return err
 	}
 

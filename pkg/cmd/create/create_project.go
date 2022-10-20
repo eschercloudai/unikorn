@@ -19,13 +19,13 @@ package create
 import (
 	"context"
 
+	"github.com/spf13/cobra"
+
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-
-	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -186,11 +186,12 @@ func (o *createProjectOptions) run() error {
 }
 
 var (
+	//nolint:gochecknoglobals
 	createProjectLong = templates.LongDesc(`
         Create a project.
 
 	Projects are modelled as custom resources, as they are domain specific
-	abstractions.  We tried intially modelling control planes on namespaces,
+	abstractions.  We tried initially modelling control planes on namespaces,
 	with projects being an annotations, but it turns out this is a whole
 	world of pain.
 
@@ -201,6 +202,7 @@ var (
 
 	Projects are cluster scoped.`)
 
+	//nolint:gochecknoglobals
 	createProjectExample = util.TemplatedExample(`
         # Create a control plane named my-project-name.
         {{.Application}} create project my-project-name`)
@@ -208,7 +210,7 @@ var (
 
 // newCreateProjectCommand creates a command that can create control planes.
 // The initial intention is to have a per-user/organization control plane that
-// contains Cluster API in a virtual cluster
+// contains Cluster API in a virtual cluster.
 func newCreateProjectCommand(f cmdutil.Factory) *cobra.Command {
 	o := &createProjectOptions{}
 

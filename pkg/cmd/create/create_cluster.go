@@ -17,9 +17,9 @@ limitations under the License.
 package create
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-
 	"github.com/spf13/cobra"
+
+	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -42,6 +42,7 @@ func (o *createClusterOptions) addFlags(cmd *cobra.Command) {
 }
 
 var (
+	//nolint:gochecknoglobals
 	createClusterExamples = util.TemplatedExample(`
         # Create a Kubernetes cluster
         {{.Application}} create cluster --control-plane foo`)
@@ -49,7 +50,7 @@ var (
 
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes
 // cluster with a Cluster API control plane.
-func newCreateClusterCommand(f cmdutil.Factory) *cobra.Command {
+func newCreateClusterCommand(_ cmdutil.Factory) *cobra.Command {
 	o := &createClusterOptions{}
 
 	cmd := &cobra.Command{

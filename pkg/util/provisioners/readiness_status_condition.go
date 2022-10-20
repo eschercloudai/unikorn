@@ -68,7 +68,7 @@ type StatusConditionReady struct {
 var _ ReadinessCheck = &StatusConditionReady{}
 
 // NewStatusConditionReady creates a new status condition readiness check.
-func NewStatusConditionReady(client dynamic.Interface, gvr schema.GroupVersionResource, namespace, name, conditionType string) ReadinessCheck {
+func NewStatusConditionReady(client dynamic.Interface, gvr schema.GroupVersionResource, namespace, name, conditionType string) *StatusConditionReady {
 	return &StatusConditionReady{
 		client:        client,
 		gvr:           gvr,
@@ -93,7 +93,7 @@ func (r *StatusConditionReady) Check() error {
 	for i := range conditions {
 		condition, ok := conditions[i].(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("%w: condition type assertion error:", ErrConditionFormat)
+			return fmt.Errorf("%w: condition type assertion error", ErrConditionFormat)
 		}
 
 		t, _, err := unstructured.NestedString(condition, "type")

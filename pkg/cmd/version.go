@@ -19,9 +19,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/eschercloudai/unikorn/pkg/constants"
-
 	"github.com/spf13/cobra"
+
+	"github.com/eschercloudai/unikorn/pkg/constants"
 )
 
 // newVersionCommand returns a version command that prints out application

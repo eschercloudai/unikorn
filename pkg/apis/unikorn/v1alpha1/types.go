@@ -52,7 +52,7 @@ type Project struct {
 type ProjectSpec struct {
 	// ProjectID is the lobally unique project identifier. This is intended to be
 	// managed by an external system.
-	ProjectID string `json:"projectID"`
+	ProjectID string `json:"projectId"`
 }
 
 // ProjectStatus defines the status of the project.
