@@ -30,6 +30,8 @@ import (
 )
 
 // HelmProvisioner runs helm template to install a package.
+// TODO: This sucks balls in an environment where the internet is not present,
+// we need to handle air-gaps better.
 type HelmProvisioner struct {
 	// f is a factory used to access Kubernetes clients.
 	f cmdutil.Factory

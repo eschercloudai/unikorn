@@ -19,7 +19,6 @@ package create
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
@@ -29,6 +28,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/util/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
+	"github.com/eschercloudai/unikorn/pkg/util/vcluster"
 
 	"github.com/spf13/cobra"
 
@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -147,6 +146,8 @@ func (o *createControlPlaneOptions) run() error {
 	// Pretend from this line onward it's an asynchronous controller/operator
 	// like thing.
 
+	fmt.Println("🦄 Provisioning control plane ...")
+
 	controlPlane.Status.Conditions = []unikornv1alpha1.ControlPlaneCondition{
 		{
 			Type:               unikornv1alpha1.ControlPlaneConditionProvisioned,
@@ -156,6 +157,8 @@ func (o *createControlPlaneOptions) run() error {
 			Message:            "Provisioning of control plane has started",
 		},
 	}
+
+	fmt.Println("🦄 Provisioning virtual cluster ...")
 
 	controlPlane, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).UpdateStatus(context.TODO(), controlPlane, metav1.UpdateOptions{})
 	if err != nil {
@@ -195,73 +198,40 @@ func (o *createControlPlaneOptions) run() error {
 		return err
 	}
 
-	// TODO: there is a syncer sidecar that sets this by the looks of things
-	// we'll probably need a retry loop in here.
-	secret, err := o.client.CoreV1().Secrets(namespace).Get(context.TODO(), "vc-"+o.name, metav1.GetOptions{})
+	fmt.Println("🦄 Extracting Kubernetes config ...")
+
+	configPath, cleanup, err := vcluster.WriteConfig(c, o.client, namespace, o.name)
 	if err != nil {
 		return err
 	}
 
-	// Acquire the kubeconfig and hack it so that the server points to the
-	// LoadBalancer endpoint.
-	configBytes, ok := secret.Data["config"]
-	if !ok {
-		return fmt.Errorf("no config data found")
-	}
+	defer cleanup()
 
-	config, err := clientcmd.NewClientConfigFromBytes(configBytes)
-	if err != nil {
-		return err
-	}
-
-	service, err := o.client.CoreV1().Services(namespace).Get(context.TODO(), o.name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	configRaw, err := config.RawConfig()
-	if err != nil {
-		return err
-	}
-
-	// TODO: there is no guarantee this is set yet, especially on OpenStack where it'll be doing
-	// all kinds of haproxy wizardry.
-	configRaw.Clusters["my-vcluster"].Server = "https://" + service.Status.LoadBalancer.Ingress[0].IP + ":443"
-
-	tf, err := os.CreateTemp("", "")
-	if err != nil {
-		return err
-	}
-
-	defer os.Remove(tf.Name())
-
-	tf.Close()
-
-	if err := clientcmd.WriteToFile(configRaw, tf.Name()); err != nil {
-		return err
-	}
+	fmt.Println("🦄 Provisioning Cluster API ...")
 
 	// TODO: we need a better provisioner for this.
-	clusterAPIProvisioner := provisioners.NewBinaryProvisioner(nil, "clusterctl", "init", "--kubeconfig", tf.Name(), "--infrastructure", "openstack", "--wait-providers")
+	clusterAPIProvisioner := provisioners.NewBinaryProvisioner(nil, "clusterctl", "init", "--kubeconfig", configPath, "--infrastructure", "openstack", "--wait-providers")
 
 	if err := clusterAPIProvisioner.Provision(); err != nil {
 		return err
 	}
 
 	controlPlane.Status.Conditions = []unikornv1alpha1.ControlPlaneCondition{
-                {
-                        Type:               unikornv1alpha1.ControlPlaneConditionProvisioned,
-                        Status:             corev1.ConditionTrue,
-                        LastTransitionTime: metav1.Now(),
-                        Reason:             "Provisioned",
-                        Message:            "Provisioning of control plane has completed",
-                },
-        }
+		{
+			Type:               unikornv1alpha1.ControlPlaneConditionProvisioned,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "Provisioned",
+			Message:            "Provisioning of control plane has completed",
+		},
+	}
 
-        _, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).UpdateStatus(context.TODO(), controlPlane, metav1.UpdateOptions{})
-        if err != nil {
-                return err
-        }
+	_, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).UpdateStatus(context.TODO(), controlPlane, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("🦄 Neigh")
 
 	return nil
 }
