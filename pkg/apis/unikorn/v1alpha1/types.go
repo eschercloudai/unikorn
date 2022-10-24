@@ -37,7 +37,7 @@ type ProjectList struct {
 // +kubebuilder:resource:categories=all;eschercloud
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="projectid",type="string",JSONPath=".spec.projectID"
+// +kubebuilder:printcolumn:name="projectid",type="string",JSONPath=".spec.projectId"
 // +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"

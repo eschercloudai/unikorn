@@ -180,6 +180,13 @@ func (o *createControlPlaneOptions) run() error {
 	// children are done, thus preventing race conditions on delete and recreate.
 	args := []string{
 		"--set=service.type=LoadBalancer",
+		// TODO: this is a hack, the vcluster will lose all configuration if
+		// it crashes, however PVCs left lying about cause vcluster name reuse
+		// to bring shit back from the dead!  We really want to use the feature
+		// gate "StatefulSetAutoDeletePVC" and just attach a policy so that they
+		// are cleaned up on delete or scale down (user initiated actions), but
+		// that's been in alpha since 1.22.
+		"--set=storage.persistence=false",
 	}
 
 	ownerReferences := []metav1.OwnerReference{
@@ -209,10 +216,13 @@ func (o *createControlPlaneOptions) run() error {
 
 	fmt.Println("🦄 Provisioning Cluster API ...")
 
+	// TODO: the fact a VIP has been provisioned is no guarantee that you can actually
+	// contact the Kubernetes API (especially talking to you Neutron).  We should do
+	// a TCP/HTTP connectivity check before continuing.
 	// TODO: we need a better provisioner for this.
 	clusterAPIProvisioner := provisioners.NewBinaryProvisioner(nil, "clusterctl", "init", "--kubeconfig", configPath, "--infrastructure", "openstack", "--wait-providers")
 
-	if err := clusterAPIProvisioner.Provision(); err != nil {
+	if err := retry.Forever().DoWithContext(c, clusterAPIProvisioner.Provision); err != nil {
 		return err
 	}
 

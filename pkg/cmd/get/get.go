@@ -34,6 +34,7 @@ func NewGetCommand(f cmdutil.Factory) *cobra.Command {
 	commands := []*cobra.Command{
 		newGetProjectCommand(f),
 		newGetControlPlaneCommand(f),
+		newGetKubeConfigCommand(f),
 		newGetClusterCommand(f),
 	}
 
