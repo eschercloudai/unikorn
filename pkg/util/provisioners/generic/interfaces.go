@@ -14,7 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provisioners
+package generic
+
+import (
+	"context"
+)
 
 // Provisioner is an abstract type that allows provisioning of Kubernetes
 // packages in a technology agnostic way.  For example some things may be
@@ -22,7 +26,7 @@ package provisioners
 type Provisioner interface {
 	// Provision deploys the requested package.
 	// Implementations should ensure this receiver is idempotent.
-	Provision() error
+	Provision(context.Context) error
 }
 
 // ReadinessCheck is an abstract way of reasoning about the readiness of
@@ -32,5 +36,5 @@ type Provisioner interface {
 type ReadinessCheck interface {
 	// Check performs a single iteration of a readiness check.
 	// Retries are delegated to the caller.
-	Check() error
+	Check(context.Context) error
 }

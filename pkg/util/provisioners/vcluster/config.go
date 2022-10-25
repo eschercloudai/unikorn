@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -33,6 +34,16 @@ var (
 	ErrConfigDataMissing          = errors.New("config data not found")
 	ErrLoadBalancerIngressMissing = errors.New("ingress address not found")
 )
+
+func RESTClient(c context.Context, client kubernetes.Interface, namespace, name string) (*rest.Config, error) {
+	return clientcmd.BuildConfigFromKubeconfigGetter("", KubeConfigGetter(c, client, namespace, name))
+}
+
+func KubeConfigGetter(c context.Context, client kubernetes.Interface, namespace, name string) clientcmd.KubeconfigGetter {
+	return func() (*clientcmdapi.Config, error) {
+		return GetConfig(c, client, namespace, name)
+	}
+}
 
 // GetConfig acknowledges that vcluster configuration is synchronized by a side car, so it
 // performs a retry until the provided context expires.  It also acknowledges that load

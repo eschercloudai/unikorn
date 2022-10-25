@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provisioners
+package generic
 
 import (
 	"context"
@@ -79,8 +79,8 @@ func NewStatusConditionReady(client dynamic.Interface, gvr schema.GroupVersionRe
 }
 
 // Check implements the ReadinessCheck interface.
-func (r *StatusConditionReady) Check() error {
-	object, err := r.client.Resource(r.gvr).Namespace(r.namespace).Get(context.TODO(), r.name, metav1.GetOptions{})
+func (r *StatusConditionReady) Check(ctx context.Context) error {
+	object, err := r.client.Resource(r.gvr).Namespace(r.namespace).Get(ctx, r.name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

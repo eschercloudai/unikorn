@@ -28,14 +28,12 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/util/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/util/retry"
-	"github.com/eschercloudai/unikorn/pkg/util/vcluster"
+	provisioners "github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
+	"github.com/eschercloudai/unikorn/pkg/util/provisioners/vcluster"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -158,50 +156,16 @@ func (o *createControlPlaneOptions) run() error {
 		},
 	}
 
-	fmt.Println("🦄 Provisioning virtual cluster ...")
-
 	controlPlane, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).UpdateStatus(context.TODO(), controlPlane, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
 
-	gvks, _, err := scheme.Scheme.ObjectKinds(controlPlane)
-	if err != nil {
-		return err
-	}
+	fmt.Println("🦄 Provisioning virtual cluster ...")
 
-	if len(gvks) != 1 {
-		panic("unexpectedly got multiple gvks for object")
-	}
+	vclusterProvisioner := vcluster.NewProvisioner(o.f, controlPlane)
 
-	gvk := gvks[0]
-
-	// TODO: We probably want the control plane resource to defer deletion until its
-	// children are done, thus preventing race conditions on delete and recreate.
-	args := []string{
-		"--set=service.type=LoadBalancer",
-		// TODO: this is a hack, the vcluster will lose all configuration if
-		// it crashes, however PVCs left lying about cause vcluster name reuse
-		// to bring shit back from the dead!  We really want to use the feature
-		// gate "StatefulSetAutoDeletePVC" and just attach a policy so that they
-		// are cleaned up on delete or scale down (user initiated actions), but
-		// that's been in alpha since 1.22.
-		"--set=storage.persistence=false",
-	}
-
-	ownerReferences := []metav1.OwnerReference{
-		*metav1.NewControllerRef(controlPlane, gvk),
-	}
-
-	vclusterProvisioner := provisioners.NewHelmProvisioner(o.f, "https://charts.loft.sh", "vcluster", namespace, o.name, args, ownerReferences)
-
-	if err := vclusterProvisioner.Provision(); err != nil {
-		return err
-	}
-
-	statefulsetReadiness := provisioners.NewStatefulSetReady(o.client, namespace, o.name)
-
-	if err := retry.Forever().DoWithContext(c, statefulsetReadiness.Check); err != nil {
+	if err := vclusterProvisioner.Provision(c); err != nil {
 		return err
 	}
 
@@ -222,7 +186,7 @@ func (o *createControlPlaneOptions) run() error {
 	// TODO: we need a better provisioner for this.
 	clusterAPIProvisioner := provisioners.NewBinaryProvisioner(nil, "clusterctl", "init", "--kubeconfig", configPath, "--infrastructure", "openstack", "--wait-providers")
 
-	if err := retry.Forever().DoWithContext(c, clusterAPIProvisioner.Provision); err != nil {
+	if err := clusterAPIProvisioner.Provision(c); err != nil {
 		return err
 	}
 

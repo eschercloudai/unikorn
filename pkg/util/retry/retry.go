@@ -18,6 +18,7 @@ package retry
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -67,12 +68,14 @@ func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
 	t := time.NewTicker(r.period)
 	defer t.Stop()
 
+	var rerr error
+
 	for {
 		select {
 		case <-c.Done():
-			return c.Err()
+			return fmt.Errorf("%w: last error: %s", c.Err(), rerr.Error())
 		case <-t.C:
-			if err := f(); err != nil {
+			if rerr = f(); rerr != nil {
 				break
 			}
 
