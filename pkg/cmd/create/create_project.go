@@ -26,11 +26,11 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	uniutil "github.com/eschercloudai/unikorn/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -133,16 +133,10 @@ func (o *createProjectOptions) run() error {
 		return err
 	}
 
-	gvks, _, err := scheme.Scheme.ObjectKinds(project)
+	gvk, err := uniutil.ObjectGroupVersionKind(project)
 	if err != nil {
 		return err
 	}
-
-	if len(gvks) != 1 {
-		panic("unexpectedly got multiple gvks for object")
-	}
-
-	gvk := gvks[0]
 
 	// The namespace name is auto generated, and will be reflected in the Project
 	// status.  Internally we'll use a label to reference the project in order to
@@ -156,7 +150,7 @@ func (o *createProjectOptions) run() error {
 				constants.ControlPlaneLabel: o.name,
 			},
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(project, gvk),
+				*metav1.NewControllerRef(project, *gvk),
 			},
 		},
 	}

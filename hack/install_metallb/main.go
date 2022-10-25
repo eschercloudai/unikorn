@@ -28,8 +28,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/eschercloudai/unikorn/pkg/util/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/util/retry"
+	provisioners "github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -82,7 +81,7 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 
 	checker := provisioners.NewStatusConditionReady(client, gvr, namespace, name, conditionType)
 
-	if err := retry.Forever().DoWithContext(c, checker.Check); err != nil {
+	if err := provisioners.NewReadinessCheckWithRetry(checker).Check(c); err != nil {
 		panic(err)
 	}
 }
@@ -92,7 +91,7 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespace, name string) {
 	checker := provisioners.NewDaemonSetReady(client, namespace, name)
 
-	if err := retry.Forever().DoWithContext(c, checker.Check); err != nil {
+	if err := provisioners.NewReadinessCheckWithRetry(checker).Check(c); err != nil {
 		panic(err)
 	}
 }
@@ -101,7 +100,7 @@ func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespac
 func applyManifest(config *genericclioptions.ConfigFlags, path string) {
 	provisioner := provisioners.NewManifestProvisioner(config, path)
 
-	if err := provisioner.Provision(); err != nil {
+	if err := provisioner.Provision(context.TODO()); err != nil {
 		panic(err)
 	}
 }

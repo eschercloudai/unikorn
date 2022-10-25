@@ -28,7 +28,6 @@ linters:
   - godox
   - funlen
   - predeclared
-  - cyclop
 linters-settings:
   gci:
     sections:

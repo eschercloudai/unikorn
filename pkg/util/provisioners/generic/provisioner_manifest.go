@@ -14,53 +14,51 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provisioners
+package generic
 
 import (
-	"fmt"
+	"context"
 	"os/exec"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-// BinaryProvisioner runs a binary to install a package.
-// This is considered bad practice as it's essentially a black box, and we
-// have limited control over how things are installed from a compliance
-// perspective.
-type BinaryProvisioner struct {
+// ManifestProvisioner uses "kubectl apply" to provision the resources.
+// We use raw config flags here as we can pass them directly to the
+// underlying kubectl command.  We could use a higher level abstraction
+// here, like kubectl's cmdutil.Factory, but then we'd just have to create
+// a temporary kubeconfig.  We could also just hook into kubectl's apply
+// logic, which would be a better solution long term, but time...
+// TODO: some manifests may not have a namspace, we may want to allow
+// overriding this.
+type ManifestProvisioner struct {
 	// config allows access to the provided kubeconfig, context etc.
 	// TODO: this is not aware of ClientConfigLoadingRules so environment
 	// variables will be ignored for now.
 	config *genericclioptions.ConfigFlags
 
-	// command is the command to run.
-	command string
-
-	// args are any required arguments.
-	args []string
+	// path is the path to the YAML manifest.
+	path string
 }
 
 // Ensure the Provisioner interface is implemented.
-var _ Provisioner = &BinaryProvisioner{}
+var _ Provisioner = &ManifestProvisioner{}
 
-// NewBinaryProvisioner returns a provisioner that installs a component or package
-// with a binary installer.
-func NewBinaryProvisioner(config *genericclioptions.ConfigFlags, command string, args ...string) *BinaryProvisioner {
-	return &BinaryProvisioner{
-		config:  config,
-		command: command,
-		args:    args,
+// NewManifestProvisioner returns a new provisioner that is capable of applying
+// a manifest with kubectl.  The path argument may be a path on the local file
+// system or a URL.
+func NewManifestProvisioner(config *genericclioptions.ConfigFlags, path string) *ManifestProvisioner {
+	return &ManifestProvisioner{
+		config: config,
+		path:   path,
 	}
 }
 
 // Provision implements the Provision interface.
-func (p *BinaryProvisioner) Provision() error {
+func (p *ManifestProvisioner) Provision(_ context.Context) error {
 	var args []string
 
-	/* TODO: there is no way to get this information from a cobra command...
 	// If explcitly specified in the top level command, use these
-	// TODO: some binaries may choose not to implement these flags, or more
-	// annoyingly call them something else.
 	if len(*p.config.KubeConfig) > 0 {
 		args = append(args, "--kubeconfig", *p.config.KubeConfig)
 	}
@@ -68,15 +66,10 @@ func (p *BinaryProvisioner) Provision() error {
 	if len(*p.config.Context) > 0 {
 		args = append(args, "--context", *p.config.Context)
 	}
-	*/
 
-	args = append(args, p.args...)
+	args = append(args, "apply", "-f", p.path)
 
-	//nolint:gosec
-	out, err := exec.Command(p.command, args...).CombinedOutput()
-	if err != nil {
-		fmt.Println(string(out))
-
+	if err := exec.Command("kubectl", args...).Run(); err != nil {
 		return err
 	}
 

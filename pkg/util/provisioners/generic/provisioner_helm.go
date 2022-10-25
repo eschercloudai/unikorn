@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provisioners
+package generic
 
 import (
 	"context"
@@ -81,7 +81,7 @@ func NewHelmProvisioner(f cmdutil.Factory, repo, chart, namespace, name string, 
 }
 
 // Provision implements the Provision interface.
-func (p *HelmProvisioner) Provision() error {
+func (p *HelmProvisioner) Provision(ctx context.Context) error {
 	args := []string{
 		"template", p.name, p.chart,
 		"--repo", p.repo,
@@ -135,7 +135,7 @@ func (p *HelmProvisioner) Provision() error {
 			return ErrUnsupportedScope
 		}
 
-		if _, err := client.Resource(mapping.Resource).Namespace(p.namespace).Create(context.TODO(), object, metav1.CreateOptions{}); err != nil {
+		if _, err := client.Resource(mapping.Resource).Namespace(p.namespace).Create(ctx, object, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 	}

@@ -29,7 +29,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
-	"github.com/eschercloudai/unikorn/pkg/util/vcluster"
+	"github.com/eschercloudai/unikorn/pkg/util/provisioners/vcluster"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
