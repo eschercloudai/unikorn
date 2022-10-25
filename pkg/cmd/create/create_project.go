@@ -102,6 +102,9 @@ func (o *createProjectOptions) run() error {
 			Labels: map[string]string{
 				constants.VersionLabel: constants.Version,
 			},
+			Finalizers: []string{
+				metav1.FinalizerDeleteDependents,
+			},
 		},
 		Spec: unikornv1alpha1.ProjectSpec{
 			ProjectID: o.projectID,

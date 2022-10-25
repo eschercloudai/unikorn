@@ -133,6 +133,9 @@ func (o *createControlPlaneOptions) run() error {
 			Labels: map[string]string{
 				constants.VersionLabel: constants.Version,
 			},
+			Finalizers: []string{
+				metav1.FinalizerDeleteDependents,
+			},
 		},
 	}
 
@@ -180,9 +183,6 @@ func (o *createControlPlaneOptions) run() error {
 
 	fmt.Println("🦄 Provisioning Cluster API ...")
 
-	// TODO: the fact a VIP has been provisioned is no guarantee that you can actually
-	// contact the Kubernetes API (especially talking to you Neutron).  We should do
-	// a TCP/HTTP connectivity check before continuing.
 	// TODO: we need a better provisioner for this.
 	clusterAPIProvisioner := provisioners.NewBinaryProvisioner(nil, "clusterctl", "init", "--kubeconfig", configPath, "--infrastructure", "openstack", "--wait-providers")
 
