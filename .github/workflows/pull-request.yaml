@@ -34,5 +34,8 @@ jobs:
         go-version: '1.19.1'
     - name: Build All
       run: make touch all
+    - name: Build Images
+      run: make images
     - name: Generated Code Checked In
       run: '[[ -z $(git status --porcelain) ]]'
+
