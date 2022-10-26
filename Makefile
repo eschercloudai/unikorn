@@ -2,13 +2,18 @@
 VERSION = 0.0.0
 
 # Base go module name.
-MODULE := $(shell cat go.mod | grep module | awk '{print $$2}')
+MODULE := $(shell cat go.mod | grep -m1 module | awk '{print $$2}')
 
 # Git revision.
 REVISION := $(shell git rev-parse HEAD)
 
-# Commands to build.
+# Commands to build, the first lot are architecture agnostic and will be built
+# for your host's architecture.  The latter are going to run in Kubernetes, so
+# want to be amd64.
 COMMANDS = unikornctl
+CONTROLLERS = \
+  unikorn-project-manager \
+  unikorn-control-plane-manager
 
 # Some constants to describe the repository.
 BINDIR = bin
@@ -22,6 +27,7 @@ PREFIX = $(HOME)/bin
 
 # List of binaries to build.
 BINARIES := $(patsubst %,$(BINDIR)/%,$(COMMANDS))
+CONTROLLER_BINARIES := $(patsubst %,$(BINDIR)/amd64-linux-gnu/%,$(CONTROLLERS))
 
 # And where to install them to.
 INSTALL_BINARIES := $(patsubst %,$(PREFIX)/%,$(COMMANDS))
@@ -67,22 +73,39 @@ GENCLIENTNAME = unikorn
 # This defines where clients will be generated.
 GENCLIENTS = $(MODULE)/$(GENDIR)/clientset
 
+# This defines how docker containers are tagged.
+DOCKER_ORG = eschercloudai
+
 # Main target, builds all binaries.
 .PHONY: all
-all: $(BINARIES) $(CRDDIR)
+all: $(BINARIES) $(CONTROLLER_BINARIES) $(CRDDIR)
 
 # Create a binary output directory, this should be an order-only prerequisite.
-$(BINDIR):
-	mkdir -p bin
+$(BINDIR) $(BINDIR)/amd64-linux-gnu:
+	mkdir -p $@
 
 # Create a binary from a command.
 $(BINDIR)/%: $(SOURCES) $(GENDIR) | $(BINDIR)
 	CGO_ENABLED=0 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
 
+$(BINDIR)/amd64-linux-gnu/%: $(SOURCES) $(GENDIR) | $(BINDIR)/amd64-linux-gnu
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
+
 # Installation target, to test out things like shell completion you'll
 # want to install it somewhere in your PATH.
 .PHONY: install
 install: $(INSTALL_BINARIES)
+
+# Create container images.  Use buildkit here, as it's the future, and it does
+# good things, like per file .dockerignores and all that jazz.
+.PHONY: images
+images: $(CONTROLLER_BINARIES)
+	for image in ${CONTROLLERS}; do DOCKER_BUILDKIT=1 docker build . -f docker/$${image}/Dockerfile -t ${DOCKER_ORG}/$${image}:${VERSION}; done
+
+# Purely lazy command that builds and pushes to docker hub.
+.PHONY: images-push
+images-push: images
+	for image in ${CONTROLLERS}; do docker push ${DOCKER_ORG}/$${image}:${VERSION}; done
 
 # Build a binary and install it.
 $(PREFIX)/%: $(BINDIR)/%

@@ -25,6 +25,15 @@ make && make install
 Please note that the `install` target expects ~/bin to exist and be in your PATH.
 You can customize this with `sudo make install -e PREFIX /usr/loca/bin` if that is your desire.
 
+### Creating Docker Images
+
+NOTE: this is a WIP and is unnecessary at present.
+
+```shell
+docker login
+make images-push -e DOCKER_ORG=spjmurray
+```
+
 ### Setting Up Shell Completion
 
 Obviously this works as `kubectl` does to avoid mistakes, do something like:

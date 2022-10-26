@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: unikorn-control-plane-manager
+---
+# Bad, bad Simon
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: unikorn-control-plane-manager
+rules:
+- apiGroups:
+  - "*"
+  resources:
+  - "*"
+  verbs:
+  - "*"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: unikorn-control-plane-manager
+subjects:
+- kind: ServiceAccount
+  namespace: default
+  name: unikorn-control-plane-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: unikorn-control-plane-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unikorn-control-plane-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unikorn-control-plane-manager
+  template:
+    metadata:
+      labels:
+        app: unikorn-control-plane-manager
+    spec:
+      containers:
+      - name: unikorn-control-plane-manager
+        image: eschercloudai/unikorn-control-plane-manager:0.0.0
+        ports:
+        - name: prometheus
+          containerPort: 8080
+      serviceAccountName: unikorn-control-plane-manager
