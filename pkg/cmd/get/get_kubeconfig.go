@@ -114,7 +114,7 @@ func (o *getKubeConfigOptions) run() error {
 		return errors.ErrProjectNamespaceUndefined
 	}
 
-	configPath, cleanup, err := vcluster.WriteConfig(context.TODO(), o.client, namespace, o.name)
+	configPath, cleanup, err := vcluster.WriteConfig(context.TODO(), vcluster.NewKubectlGetter(o.client), namespace, o.name)
 	if err != nil {
 		return err
 	}

@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var (
@@ -36,8 +35,8 @@ var (
 
 // ObjectGroupVersionKind returns a GVK from a Kubernetes typed resource using
 // scheme translation.
-func ObjectGroupVersionKind(o runtime.Object) (*schema.GroupVersionKind, error) {
-	gvks, unversioned, err := scheme.Scheme.ObjectKinds(o)
+func ObjectGroupVersionKind(s *runtime.Scheme, o runtime.Object) (*schema.GroupVersionKind, error) {
+	gvks, unversioned, err := s.ObjectKinds(o)
 	if err != nil {
 		return nil, err
 	}

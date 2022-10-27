@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"os"
 
 	"github.com/eschercloudai/unikorn/pkg/managers/project"
@@ -26,7 +27,12 @@ import (
 )
 
 func main() {
-	log.SetLogger(zap.New())
+	options := &zap.Options{}
+	options.BindFlags(flag.CommandLine)
+
+	flag.Parse()
+
+	log.SetLogger(zap.New(zap.UseFlagOptions(options)))
 
 	logger := log.Log.WithName("main")
 

@@ -27,10 +27,10 @@ import (
 )
 
 var (
-	ErrStatefulSetUnready = errors.New("statefulset readiness doesn't match desired")
+	ErrDeploymentUnready = errors.New("deployment readiness doesn't match desired")
 )
 
-type StatefulSetReady struct {
+type DeploymentReady struct {
 	// client is an intialized Kubernetes client.
 	client client.Client
 
@@ -42,11 +42,11 @@ type StatefulSetReady struct {
 }
 
 // Ensure the ReadinessCheck interface is implemented.
-var _ ReadinessCheck = &StatefulSetReady{}
+var _ ReadinessCheck = &DeploymentReady{}
 
-// NewStatefulSetReady creates a new statefulset readiness check.
-func NewStatefulSetReady(client client.Client, namespace, name string) *StatefulSetReady {
-	return &StatefulSetReady{
+// NewDeploymentReady creates a new deployment readiness check.
+func NewDeploymentReady(client client.Client, namespace, name string) *DeploymentReady {
+	return &DeploymentReady{
 		client:    client,
 		namespace: namespace,
 		name:      name,
@@ -54,21 +54,14 @@ func NewStatefulSetReady(client client.Client, namespace, name string) *Stateful
 }
 
 // Check implements the ReadinessCheck interface.
-func (r *StatefulSetReady) Check(ctx context.Context) error {
-	statefulset := &appsv1.StatefulSet{}
-	if err := r.client.Get(ctx, client.ObjectKey{Namespace: r.namespace, Name: r.name}, statefulset); err != nil {
-		return fmt.Errorf("statefulset get error: %w", err)
+func (r *DeploymentReady) Check(ctx context.Context) error {
+	deployment := &appsv1.Deployment{}
+	if err := r.client.Get(ctx, client.ObjectKey{Namespace: r.namespace, Name: r.name}, deployment); err != nil {
+		return fmt.Errorf("deployment get error: %w", err)
 	}
 
-	// k8s.io/api/apps/v1/types.go indicates this defaults to 1.
-	replicas := int32(1)
-
-	if statefulset.Spec.Replicas != nil {
-		replicas = *statefulset.Spec.Replicas
-	}
-
-	if statefulset.Status.ReadyReplicas != replicas {
-		return fmt.Errorf("%w: status mismatch", ErrStatefulSetUnready)
+	if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
+		return fmt.Errorf("%w: status mismatch", ErrDeploymentUnready)
 	}
 
 	return nil

@@ -26,9 +26,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	uniutil "github.com/eschercloudai/unikorn/pkg/util"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -111,71 +109,7 @@ func (o *createProjectOptions) run() error {
 		},
 	}
 
-	var err error
-
-	project, err = o.unikornClient.UnikornV1alpha1().Projects().Create(context.TODO(), project, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-
-	// Pretend from this line onward it's an asynchronous controller/operator
-	// like thing.
-
-	project.Status.Conditions = []unikornv1alpha1.ProjectCondition{
-		{
-			Type:               unikornv1alpha1.ProjectConditionProvisioned,
-			Status:             corev1.ConditionFalse,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "Provisioning",
-			Message:            "Provisioning of project has started",
-		},
-	}
-
-	project, err = o.unikornClient.UnikornV1alpha1().Projects().UpdateStatus(context.TODO(), project, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-
-	gvk, err := uniutil.ObjectGroupVersionKind(project)
-	if err != nil {
-		return err
-	}
-
-	// The namespace name is auto generated, and will be reflected in the Project
-	// status.  Internally we'll use a label to reference the project in order to
-	// look it up (for restoring status and checking for existence).  Finally set
-	// an owner reference so the namespace is automagically deleted by project
-	// deletion.
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "project-",
-			Labels: map[string]string{
-				constants.ControlPlaneLabel: o.name,
-			},
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(project, *gvk),
-			},
-		},
-	}
-
-	namespace, err = o.client.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-
-	project.Status.Namespace = namespace.Name
-	project.Status.Conditions = []unikornv1alpha1.ProjectCondition{
-		{
-			Type:               unikornv1alpha1.ProjectConditionProvisioned,
-			Status:             corev1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "Provisioned",
-			Message:            "Provisioning of project has completed",
-		},
-	}
-
-	_, err = o.unikornClient.UnikornV1alpha1().Projects().UpdateStatus(context.TODO(), project, metav1.UpdateOptions{})
-	if err != nil {
+	if _, err := o.unikornClient.UnikornV1alpha1().Projects().Create(context.TODO(), project, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
