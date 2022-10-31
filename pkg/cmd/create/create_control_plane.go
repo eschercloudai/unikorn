@@ -18,8 +18,6 @@ package create
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -28,12 +26,8 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	provisioners "github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
-	"github.com/eschercloudai/unikorn/pkg/util/provisioners/vcluster"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -49,20 +43,13 @@ type createControlPlaneOptions struct {
 	// project is the project name.
 	project string
 
-	// timeout is how long to wait for everything to provision.
-	timeout time.Duration
-
-	// client is the Kubernetes v1 client.
-	client kubernetes.Interface
-
-	// unikornClient gives access to our custom resources.
-	unikornClient unikorn.Interface
+	// client gives access to our custom resources.
+	client unikorn.Interface
 }
 
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.project, "project", "", "Kubernetes project name that contains the control plane.")
-	cmd.Flags().DurationVar(&o.timeout, "timeout", 5*time.Minute, "Duration to wait for provisioning.")
 
 	if err := cmd.MarkFlagRequired("project"); err != nil {
 		panic(err)
@@ -77,18 +64,12 @@ func (o *createControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 func (o *createControlPlaneOptions) complete(f cmdutil.Factory, args []string) error {
 	o.f = f
 
-	var err error
-
-	if o.client, err = f.KubernetesClientSet(); err != nil {
-		return err
-	}
-
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
 
-	if o.unikornClient, err = unikorn.NewForConfig(config); err != nil {
+	if o.client, err = unikorn.NewForConfig(config); err != nil {
 		return err
 	}
 
@@ -113,10 +94,7 @@ func (o *createControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *createControlPlaneOptions) run() error {
-	c, cancel := context.WithTimeout(context.TODO(), o.timeout)
-	defer cancel()
-
-	project, err := o.unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
+	project, err := o.client.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -139,73 +117,9 @@ func (o *createControlPlaneOptions) run() error {
 		},
 	}
 
-	controlPlane, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).Create(context.TODO(), controlPlane, metav1.CreateOptions{})
-	if err != nil {
+	if _, err := o.client.UnikornV1alpha1().ControlPlanes(namespace).Create(context.TODO(), controlPlane, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-
-	// Pretend from this line onward it's an asynchronous controller/operator
-	// like thing.
-
-	fmt.Println("🦄 Provisioning control plane ...")
-
-	controlPlane.Status.Conditions = []unikornv1alpha1.ControlPlaneCondition{
-		{
-			Type:               unikornv1alpha1.ControlPlaneConditionProvisioned,
-			Status:             corev1.ConditionFalse,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "Provisioning",
-			Message:            "Provisioning of control plane has started",
-		},
-	}
-
-	controlPlane, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).UpdateStatus(context.TODO(), controlPlane, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("🦄 Provisioning virtual cluster ...")
-
-	vclusterProvisioner := vcluster.NewProvisioner(o.f, controlPlane)
-
-	if err := vclusterProvisioner.Provision(c); err != nil {
-		return err
-	}
-
-	fmt.Println("🦄 Extracting Kubernetes config ...")
-
-	configPath, cleanup, err := vcluster.WriteConfig(c, o.client, namespace, o.name)
-	if err != nil {
-		return err
-	}
-
-	defer cleanup()
-
-	fmt.Println("🦄 Provisioning Cluster API ...")
-
-	// TODO: we need a better provisioner for this.
-	clusterAPIProvisioner := provisioners.NewBinaryProvisioner(nil, "clusterctl", "init", "--kubeconfig", configPath, "--infrastructure", "openstack", "--wait-providers")
-
-	if err := clusterAPIProvisioner.Provision(c); err != nil {
-		return err
-	}
-
-	controlPlane.Status.Conditions = []unikornv1alpha1.ControlPlaneCondition{
-		{
-			Type:               unikornv1alpha1.ControlPlaneConditionProvisioned,
-			Status:             corev1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "Provisioned",
-			Message:            "Provisioning of control plane has completed",
-		},
-	}
-
-	_, err = o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).UpdateStatus(context.TODO(), controlPlane, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("🦄 Neigh")
 
 	return nil
 }

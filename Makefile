@@ -107,6 +107,10 @@ images: $(CONTROLLER_BINARIES)
 images-push: images
 	for image in ${CONTROLLERS}; do docker push ${DOCKER_ORG}/$${image}:${VERSION}; done
 
+.PHONY: images-kind-load
+images-kind-load: images
+	for image in ${CONTROLLERS}; do kind load docker-image ${DOCKER_ORG}/$${image}:${VERSION}; done
+
 # Build a binary and install it.
 $(PREFIX)/%: $(BINDIR)/%
 	install -m 750 $< $@

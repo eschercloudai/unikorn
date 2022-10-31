@@ -18,27 +18,133 @@ package generic
 
 import (
 	"context"
-	"os/exec"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"github.com/drone/envsubst"
+	"github.com/go-logr/logr"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/yaml"
 )
 
-// ManifestProvisioner uses "kubectl apply" to provision the resources.
-// We use raw config flags here as we can pass them directly to the
-// underlying kubectl command.  We could use a higher level abstraction
-// here, like kubectl's cmdutil.Factory, but then we'd just have to create
-// a temporary kubeconfig.  We could also just hook into kubectl's apply
-// logic, which would be a better solution long term, but time...
-// TODO: some manifests may not have a namspace, we may want to allow
-// overriding this.
-type ManifestProvisioner struct {
-	// config allows access to the provided kubeconfig, context etc.
-	// TODO: this is not aware of ClientConfigLoadingRules so environment
-	// variables will be ignored for now.
-	config *genericclioptions.ConfigFlags
+// ManifestID defines a known component that is provisoned with manifests.
+type ManifestID string
 
-	// path is the path to the YAML manifest.
+const (
+	// ManifestVCluster is Loft's vcluster (virtual cluster).
+	ManifestVCluster ManifestID = "vcluster"
+
+	// ManifestCertManager is Jetstack's cert-manager.
+	ManifestCertManager ManifestID = "cert-manager"
+
+	// ManifestClusterAPICore is the cluster API controller manager.
+	ManifestClusterAPICore ManifestID = "cluster-api-core"
+
+	// ManifestClusterAPIControlPlane is the cluster API control plane manager.
+	ManifestClusterAPIControlPlane ManifestID = "cluster-api-control-plane"
+
+	// ManifestClusterAPIBootstrap is the cluster API bootstrap manager.
+	ManifestClusterAPIBootstrap ManifestID = "cluster-api-bootstrap"
+
+	// ManifestClusterAPIProviderOpenstack is the cluster API OpenStack provider.
+	ManifestClusterAPIProviderOpenstack ManifestID = "cluster-api-provider-openstack"
+)
+
+const (
+	HelmReleaseEyecatcher = "unikorn-release"
+
+	HelmNamespaceEyecatcher = "unikorn-namespace"
+)
+
+// manifestRegistryEntry defines where to source manifests from and other metadata
+// about how they were generated and transforms we can or need to perform on them
+// from their raw state.
+type manifestRegistryEntry struct {
+	// path is the path of the manifest directory.
+	// This path is a local path, no URLs are allowed here as that opens up
+	// the possibility of supply chain attacks.  All manifests need to be
+	// peer reviewed for security.
 	path string
+
+	// templated tells us if the manifest is templated e.g. using
+	// "helm template".  If so then it's expected to be seeded with
+	// HelmReleaseEyecatcher as the release name and HelmNamespaceEyecatcher
+	// as the namespace.  Templated manifests are those that can be deployed
+	// multiple times in the same namespace.
+	templated bool
+
+	// withSusbstitution is a bit of a hack for manifests sourced from
+	// the cluster API project.  These feature "shell" variable expansion
+	// to inject values and need to be processed as such.
+	withSusbstitution bool
+}
+
+var (
+	// manifestRegistry records a mpping from manifest ID to its metadata.
+	// At present this is global, but you could make a case for using build
+	// constraints at a later point.
+	//nolint:gochecknoglobals
+	manifestRegistry = map[ManifestID]manifestRegistryEntry{
+		ManifestVCluster: {
+			path:      "/manifests/vcluster",
+			templated: true,
+		},
+		ManifestCertManager: {
+			path: "/manifests/cert-manager",
+		},
+		ManifestClusterAPICore: {
+			path:              "/manifests/cluster-api-core",
+			withSusbstitution: true,
+		},
+		ManifestClusterAPIControlPlane: {
+			path:              "/manifests/cluster-api-control-plane",
+			withSusbstitution: true,
+		},
+		ManifestClusterAPIBootstrap: {
+			path:              "/manifests/cluster-api-bootstrap",
+			withSusbstitution: true,
+		},
+		ManifestClusterAPIProviderOpenstack: {
+			path:              "/manifests/cluster-api-provider-openstack",
+			withSusbstitution: true,
+		},
+	}
+)
+
+// ManifestProvisioner is a provisioner that is able to parse and manage resources
+// sourced from a yaml manifest.
+type ManifestProvisioner struct {
+	// client is a client to allow Kubernetes access.
+	client client.Client
+
+	// id is the manifest we want to provision.
+	id ManifestID
+
+	// name is a replacement name for a templated manifest.
+	name string
+
+	// namespace is a replacement namespace for a templated manifest.
+	namespace string
+
+	// ownerReferences allows all manifest resources to be linked to
+	// a parent resource that will trigger cascading deletion.
+	ownerReferences []metav1.OwnerReference
+
+	// log is set on provison with context specific information for
+	// this provision.
+	log logr.Logger
+
+	// entry is set on provison with a cached copy of the registry
+	// metadata related to the manifest ID.
+	entry manifestRegistryEntry
 }
 
 // Ensure the Provisioner interface is implemented.
@@ -47,29 +153,201 @@ var _ Provisioner = &ManifestProvisioner{}
 // NewManifestProvisioner returns a new provisioner that is capable of applying
 // a manifest with kubectl.  The path argument may be a path on the local file
 // system or a URL.
-func NewManifestProvisioner(config *genericclioptions.ConfigFlags, path string) *ManifestProvisioner {
+func NewManifestProvisioner(client client.Client, id ManifestID) *ManifestProvisioner {
 	return &ManifestProvisioner{
-		config: config,
-		path:   path,
+		client: client,
+		id:     id,
 	}
 }
 
+// WithName associates a replacement name for a templated manifest.
+func (p *ManifestProvisioner) WithName(name string) *ManifestProvisioner {
+	p.name = name
+
+	return p
+}
+
+// WithNamespace associates a replacement namespace for a templated manifest.
+func (p *ManifestProvisioner) WithNamespace(namespace string) *ManifestProvisioner {
+	p.namespace = namespace
+
+	return p
+}
+
+// WithOwnerReferences associates an owner reference list with a manifest for
+// cascading deletion.
+func (p *ManifestProvisioner) WithOwnerReferences(ownerReferences []metav1.OwnerReference) *ManifestProvisioner {
+	p.ownerReferences = ownerReferences
+
+	return p
+}
+
+// readManifest loads the manifest file from the local filesystem.
+func (p *ManifestProvisioner) readManifest() (string, error) {
+	path := filepath.Join(p.entry.path, "manifest.yaml")
+
+	p.log.V(1).Info("loading manifest", "path", path)
+
+	// Load in the main manifest file.
+	manifest, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+
+	defer manifest.Close()
+
+	bytes, err := io.ReadAll(manifest)
+	if err != nil {
+		return "", err
+	}
+
+	return string(bytes), nil
+}
+
+// processTemplate optionally substitutes the name and namespace in a templated
+// manifest.
+func (p *ManifestProvisioner) processTemplate(s string) string {
+	if !p.entry.templated {
+		return s
+	}
+
+	p.log.V(1).Info("applying template", "name", p.name)
+
+	if p.name == "" {
+		panic("no name for templated manifest")
+	}
+
+	s = strings.ReplaceAll(s, HelmReleaseEyecatcher, p.name)
+
+	p.log.V(1).Info("applying template", "namespace", p.namespace)
+
+	if p.namespace == "" {
+		panic("no namespace for templated manifest")
+	}
+
+	return strings.ReplaceAll(s, HelmNamespaceEyecatcher, p.namespace)
+}
+
+// processSubstitution optionally substitutes "shell" environment variables
+// in a manifest.
+func (p *ManifestProvisioner) processSubstitution(s string) (string, error) {
+	if !p.entry.withSusbstitution {
+		return s, nil
+	}
+
+	p.log.V(1).Info("applying environment substitution")
+
+	s, err := envsubst.EvalEnv(s)
+	if err != nil {
+		return "", err
+	}
+
+	return s, nil
+}
+
+// parse splits the manifest up into YAML objects and unmarshals them into a
+// generic unstructured format.
+func (p *ManifestProvisioner) parse(s string) ([]unstructured.Unstructured, error) {
+	sections := strings.Split(s, "\n---\n")
+
+	var yamls []string
+
+	// Discard any empty sections.
+	for _, section := range sections {
+		if strings.TrimSpace(section) != "" {
+			yamls = append(yamls, section)
+		}
+	}
+
+	objects := make([]unstructured.Unstructured, len(yamls))
+
+	for i := range yamls {
+		if err := yaml.Unmarshal([]byte(yamls[i]), &objects[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	return objects, nil
+}
+
+// provision creates any objects required by the manifest.
+func (p *ManifestProvisioner) provision(ctx context.Context, objects []unstructured.Unstructured) error {
+	status, err := GetStatus(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	for i := range objects {
+		object := &objects[i]
+
+		if p.ownerReferences != nil {
+			object.SetOwnerReferences(p.ownerReferences)
+		}
+
+		// Create the object if it doesn't exist.
+		// TODO: the fallthrough case here should be update and upgrade,
+		// but that's a ways off!
+		objectKey := client.ObjectKeyFromObject(object)
+
+		// NOTE: while we don't strictly need the existing resource yet, it'll
+		// moan if you don't provide something to store into.
+		existing, ok := object.NewEmptyInstance().(*unstructured.Unstructured)
+		if !ok {
+			panic("unstructured empty instance fail")
+		}
+
+		if err := p.client.Get(ctx, objectKey, existing); err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+
+			p.log.Info("creating object", "key", objectKey)
+
+			if err := p.client.Create(ctx, object); err != nil {
+				return err
+			}
+
+			// Indicate we did something.
+			status.Provisioned = true
+
+			continue
+		}
+	}
+
+	return nil
+}
+
 // Provision implements the Provision interface.
-func (p *ManifestProvisioner) Provision(_ context.Context) error {
-	var args []string
+func (p *ManifestProvisioner) Provision(ctx context.Context) error {
+	p.log = log.FromContext(ctx).WithValues("manifest", p.id)
 
-	// If explcitly specified in the top level command, use these
-	if len(*p.config.KubeConfig) > 0 {
-		args = append(args, "--kubeconfig", *p.config.KubeConfig)
+	// Find the manifest descriptor.
+	var ok bool
+
+	p.entry, ok = manifestRegistry[p.id]
+	if !ok {
+		panic("no registry entry")
 	}
 
-	if len(*p.config.Context) > 0 {
-		args = append(args, "--context", *p.config.Context)
+	// Do any processing filters.
+	contents, err := p.readManifest()
+	if err != nil {
+		return err
 	}
 
-	args = append(args, "apply", "-f", p.path)
+	contents = p.processTemplate(contents)
 
-	if err := exec.Command("kubectl", args...).Run(); err != nil {
+	contents, err = p.processSubstitution(contents)
+	if err != nil {
+		return err
+	}
+
+	objects, err := p.parse(contents)
+	if err != nil {
+		return err
+	}
+
+	if err := p.provision(ctx, objects); err != nil {
 		return err
 	}
 

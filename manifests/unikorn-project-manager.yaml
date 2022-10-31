@@ -16,7 +16,12 @@ rules:
   - list
   - get
   - watch
-  - post/status
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - projects/status
+  verbs:
+  - update
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -31,7 +36,8 @@ rules:
   - namespaces
   verbs:
   - create
-  - get
+  - list
+  - watch
   - delete
 - apiGroups:
   - ""

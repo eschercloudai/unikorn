@@ -98,7 +98,7 @@ func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespac
 
 // applyManifest does exactly that.
 func applyManifest(config *genericclioptions.ConfigFlags, path string) {
-	provisioner := provisioners.NewManifestProvisioner(config, path)
+	provisioner := provisioners.NewKubectlProvisioner(config, path)
 
 	if err := provisioner.Provision(context.TODO()); err != nil {
 		panic(err)

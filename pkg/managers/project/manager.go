@@ -70,7 +70,6 @@ func Run() error {
 	controllerOptions := controller.Options{
 		Reconciler: &reconciler{
 			client: manager.GetClient(),
-			logger: manager.GetLogger(),
 		},
 	}
 
