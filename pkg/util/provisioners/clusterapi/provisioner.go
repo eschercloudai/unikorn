@@ -19,7 +19,9 @@ package clusterapi
 import (
 	"context"
 
-	"github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
+	provisioners "github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -40,7 +42,7 @@ func New(client client.Client) *Provisioner {
 }
 
 // Ensure the Provisioner interface is implemented.
-var _ generic.Provisioner = &Provisioner{}
+var _ provisioners.Provisioner = &Provisioner{}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
@@ -50,7 +52,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("provisioning Cert Manager")
 
-	certManagerProvisioner := generic.NewManifestProvisioner(p.client, generic.ManifestCertManager)
+	certManagerProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestCertManager)
 
 	if err := certManagerProvisioner.Provision(ctx); err != nil {
 		return err
@@ -58,18 +60,33 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("waiting for Cert Manager webhook to be active")
 
-	certManagerReady := generic.NewDeploymentReady(p.client, "cert-manager", "cert-manager-webhook")
+	certManagerReady := provisioners.NewDeploymentReady(p.client, "cert-manager", "cert-manager-webhook")
 
-	if err := certManagerReady.Check(ctx); err != nil {
+	if err := provisioners.NewReadinessCheckWithRetry(certManagerReady).Check(ctx); err != nil {
 		return err
 	}
 
-	// TODO: active doesn't however mean working, we should manually test this before
-	// continuing to avoid false positives in the logs.
+	log.V(1).Info("waiting for Cert Manager webhook to be functional")
+
+	certificate := &unstructured.Unstructured{}
+	certificate.SetAPIVersion("cert-manager.io/v1")
+	certificate.SetKind("Issuer")
+	certificate.SetName("test")
+	certificate.SetNamespace("default")
+
+	if err := unstructured.SetNestedField(certificate.Object, "foo", "spec", "ca", "secretName"); err != nil {
+		return err
+	}
+
+	certmanagerFunctional := provisioners.NewWebhookReady(p.client, certificate)
+
+	if err := provisioners.NewReadinessCheckWithRetry(certmanagerFunctional).Check(ctx); err != nil {
+		return err
+	}
 
 	log.V(1).Info("provisioning Cluster API core")
 
-	clusterAPICoreProvisioner := generic.NewManifestProvisioner(p.client, generic.ManifestClusterAPICore)
+	clusterAPICoreProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPICore)
 
 	if err := clusterAPICoreProvisioner.Provision(ctx); err != nil {
 		return err
@@ -77,7 +94,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("provisioning Cluster API control plane")
 
-	clusterAPIControlPlaneProvisioner := generic.NewManifestProvisioner(p.client, generic.ManifestClusterAPIControlPlane)
+	clusterAPIControlPlaneProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPIControlPlane)
 
 	if err := clusterAPIControlPlaneProvisioner.Provision(ctx); err != nil {
 		return err
@@ -85,7 +102,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("provisioning Cluster API bootstrap")
 
-	clusterAPIBootstrapProvisioner := generic.NewManifestProvisioner(p.client, generic.ManifestClusterAPIBootstrap)
+	clusterAPIBootstrapProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPIBootstrap)
 
 	if err := clusterAPIBootstrapProvisioner.Provision(ctx); err != nil {
 		return err
@@ -93,7 +110,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("provisioning Cluster API Openstack provider")
 
-	clusterAPIProviderOpenstackProvisioner := generic.NewManifestProvisioner(p.client, generic.ManifestClusterAPIProviderOpenstack)
+	clusterAPIProviderOpenstackProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPIProviderOpenstack)
 
 	if err := clusterAPIProviderOpenstackProvisioner.Provision(ctx); err != nil {
 		return err
