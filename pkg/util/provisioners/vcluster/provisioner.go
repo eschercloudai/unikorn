@@ -19,6 +19,8 @@ package vcluster
 import (
 	"context"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/util"
 	"github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
@@ -28,7 +30,27 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
+
+var (
+	// TODO: move into a metrics struct of some variety and propagate.
+	//nolint:gochecknoglobals
+	durationMetric = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name: "unikorn_vcluster_provision_duration",
+		Help: "Time taken for vcluster to provision",
+		Buckets: []float64{
+			1, 5, 10, 15, 20, 30, 45, 60, 90, 120,
+		},
+	})
+)
+
+// TODO: we should probably have a registry somewhere.
+//
+//nolint:gochecknoinits
+func init() {
+	metrics.Registry.MustRegister(durationMetric)
+}
 
 // Provisioner wraps up a whole load of horror code required to
 // get vcluster into a deployed and usable state.
@@ -54,6 +76,9 @@ var _ generic.Provisioner = &Provisioner{}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
+	timer := prometheus.NewTimer(durationMetric)
+	defer timer.ObserveDuration()
+
 	log := log.FromContext(ctx)
 
 	log.V(1).Info("provisioning vcluster")

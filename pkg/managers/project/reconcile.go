@@ -40,6 +40,7 @@ type reconciler struct {
 
 var _ reconcile.Reconciler = &reconciler{}
 
+//nolint:cyclop
 func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -54,6 +55,13 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		}
 
 		return reconcile.Result{}, err
+	}
+
+	// If it's being deleted, ignore it, we don't need to take any additional action.
+	if project.DeletionTimestamp != nil {
+		log.V(1).Info("resource deleting")
+
+		return reconcile.Result{}, nil
 	}
 
 	log.Info("reconciling resource")

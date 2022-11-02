@@ -115,6 +115,8 @@ kubectl apply -f manifests
 
 If you are installing this on a cloud somewhere, you will most likely need to update the images so that the registry and organization match what you are using.
 
+**NOTE**: Do not be alarmed if some manifests fail to apply, you may want to read the [monitoring](docs/monitoring.md) documentation first.
+
 #### LoadBalancer Service Support
 
 On local development environments, these services aren't supported out of the box.

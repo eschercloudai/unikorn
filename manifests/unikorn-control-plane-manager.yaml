@@ -50,3 +50,18 @@ spec:
         - name: prometheus
           containerPort: 8080
       serviceAccountName: unikorn-control-plane-manager
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unikorn-control-plane-manager
+  labels:
+    service: unikorn-controller
+    unikorn-controller: unikorn-control-plane-manager
+spec:
+  selector:
+    app: unikorn-control-plane-manager
+  ports:
+  - name: prometheus
+    port: 8080
+    targetPort: prometheus
