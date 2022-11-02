@@ -51,7 +51,7 @@ func (o *deleteProjectOptions) complete(f cmdutil.Factory, args []string) error 
 		return err
 	}
 
-	if len(args) < 1 {
+	if len(args) != 1 {
 		return errors.ErrIncorrectArgumentNum
 	}
 

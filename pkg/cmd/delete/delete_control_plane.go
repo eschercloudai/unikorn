@@ -68,6 +68,10 @@ func (o *deleteControlPlaneOptions) complete(f cmdutil.Factory, args []string) e
 		return err
 	}
 
+	if len(args) != 1 {
+		return errors.ErrIncorrectArgumentNum
+	}
+
 	o.name = args[0]
 
 	return nil
