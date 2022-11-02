@@ -49,7 +49,11 @@ spec:
         ports:
         - name: prometheus
           containerPort: 8080
+        securityContext:
+          readOnlyRootFilesystem: true
       serviceAccountName: unikorn-control-plane-manager
+      securityContext:
+        runAsNonRoot: true
 ---
 apiVersion: v1
 kind: Service

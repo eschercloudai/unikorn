@@ -80,7 +80,11 @@ spec:
         ports:
         - name: prometheus
           containerPort: 8080
+        securityContext:
+          readOnlyRootFilesystem: true
       serviceAccountName: unikorn-project-manager
+      securityContext:
+        runAsNonRoot: true
 ---
 apiVersion: v1
 kind: Service

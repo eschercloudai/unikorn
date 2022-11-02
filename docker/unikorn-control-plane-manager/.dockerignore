@@ -1,3 +1,4 @@
 *
 !bin/amd64-linux-gnu/unikorn-control-plane-manager
 !manifests/controlplane
+!hack/passwd.nonroot
