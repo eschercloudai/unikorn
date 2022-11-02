@@ -16,7 +16,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.conditions[?(@.type=="Provisioned")].reason
+    - jsonPath: .status.conditions[?(@.type=="Available")].reason
       name: status
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -40,6 +40,12 @@ spec:
             type: object
           spec:
             description: ControlPlaneSpec defines any control plane specific options.
+            properties:
+              timeout:
+                default: 10m
+                description: Timeout defines how long a control plane is allowed to
+                  provision for before a timeout is triggerd and the request aborts.
+                type: string
             type: object
           status:
             description: ControlPlaneStatus defines the status of the project.

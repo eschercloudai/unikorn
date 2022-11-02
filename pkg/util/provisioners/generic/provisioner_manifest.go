@@ -272,11 +272,6 @@ func (p *ManifestProvisioner) parse(s string) ([]unstructured.Unstructured, erro
 
 // provision creates any objects required by the manifest.
 func (p *ManifestProvisioner) provision(ctx context.Context, objects []unstructured.Unstructured) error {
-	status, err := GetStatus(ctx)
-	if err != nil {
-		panic(err)
-	}
-
 	for i := range objects {
 		object := &objects[i]
 
@@ -306,9 +301,6 @@ func (p *ManifestProvisioner) provision(ctx context.Context, objects []unstructu
 			if err := p.client.Create(ctx, object); err != nil {
 				return err
 			}
-
-			// Indicate we did something.
-			status.Provisioned = true
 
 			continue
 		}

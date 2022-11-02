@@ -98,7 +98,7 @@ type ControlPlaneList struct {
 // +kubebuilder:resource:categories=all;eschercloud
 // +kubebuilder:resource:scope=Namespaced
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].reason"
+// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type ControlPlane struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -109,6 +109,10 @@ type ControlPlane struct {
 
 // ControlPlaneSpec defines any control plane specific options.
 type ControlPlaneSpec struct {
+	// Timeout defines how long a control plane is allowed to provision for before
+	// a timeout is triggerd and the request aborts.
+	// +kubebuilder:default="10m"
+	Timeout *metav1.Duration `json:"timeout,omitempty"`
 }
 
 // ControlPlaneStatus defines the status of the project.
@@ -117,15 +121,47 @@ type ControlPlaneStatus struct {
 	Conditions []ControlPlaneCondition `json:"conditions,omitempty"`
 }
 
+// ControlPlaneConditionType defines the possible conditions a control plane
+// can have.
+// +kubebuilder:validation:enum=Available
 type ControlPlaneConditionType string
 
 const (
-	ControlPlaneConditionProvisioned ControlPlaneConditionType = "Provisioned"
+	// ControlPlaneConditionAvailable if not defined or false means that the
+	// control plane is not ready, or is known to be in a bad state and should
+	// not be used.  When true, while not guaranteed to be fully functional, it
+	// will accept Kubernetes cluster creation requests that will be take care
+	// of by eventual consistency.
+	ControlPlaneConditionAvailable ControlPlaneConditionType = "Available"
+)
+
+// ControlPlaneConditionReason defines the possible reasons of a control plane
+// condition.  These are generic and may be used by any condition.
+// +kubebuilder:validation:enum=Provisioned;Canceled;Timedout;Errored
+type ControlPlaneConditionReason string
+
+const (
+	// ControlPlaneConditionReasonProvisioning is used for the Available condition
+	// to indicate that a resource has been seen, it has no pre-existing condition
+	// and we assume it's being provisioned for the first time.
+	ControlPlaneConditionReasonProvisioning ControlPlaneConditionReason = "Provisioning"
+	// ControlPlaneConditionReasonProvisioned is used for the Available condition
+	// to mean that the control plane is ready to be used.
+	ControlPlaneConditionReasonProvisioned ControlPlaneConditionReason = "Provisioned"
+	// ControlPlaneConditionReasonCanceled is used by a condition to
+	// indicate the controller was cancelled e.g. via a container shutdown.
+	ControlPlaneConditionReasonCanceled ControlPlaneConditionReason = "Canceled"
+	// ControlPlaneConditionReasonTimedout is used by a condition to
+	// indicate the controller timed out e.g. OpenStack is slow or broken.
+	ControlPlaneConditionReasonTimedout ControlPlaneConditionReason = "Timedout"
+	// ControlPlaneConditionReasonErrored is used by a condition to
+	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
+	// If we see these, consider formulating a fix, for example a retry loop.
+	ControlPlaneConditionReasonErrored ControlPlaneConditionReason = "Errored"
 )
 
 type ControlPlaneCondition struct {
 	// Type is the type of the condition.
-	// +kubebuilder:validation:enum=Provisioned
 	Type ControlPlaneConditionType `json:"type"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
@@ -133,7 +169,7 @@ type ControlPlaneCondition struct {
 	// Last time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 	// Unique, one-word, CamelCase reason for the condition's last transition.
-	Reason string `json:"reason"`
+	Reason ControlPlaneConditionReason `json:"reason"`
 	// Human-readable message indicating details about last transition.
 	Message string `json:"message"`
 }
