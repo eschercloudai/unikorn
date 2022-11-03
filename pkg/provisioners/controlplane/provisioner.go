@@ -19,13 +19,34 @@ package controlplane
 import (
 	"context"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusterapi"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
+
+var (
+	// On home broadband it'll take about 150s to pull down images, plus any
+	// readniness gates we put in the way.  If images are cached then 45s.
+	//nolint:gochecknoglobals
+	durationMetric = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name: "unikorn_controlplane_provision_duration",
+		Help: "Time taken for controlplane to provision",
+		Buckets: []float64{
+			1, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300,
+		},
+	})
+)
+
+//nolint:gochecknoinits
+func init() {
+	metrics.Registry.MustRegister(durationMetric)
+}
 
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
@@ -49,6 +70,9 @@ var _ provisioners.Provisioner = &Provisioner{}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
+	timer := prometheus.NewTimer(durationMetric)
+	defer timer.ObserveDuration()
+
 	// Provision a virtual cluster for CAPI to live in.
 	vclusterProvisioner := vcluster.New(p.client, p.controlPlane)
 
