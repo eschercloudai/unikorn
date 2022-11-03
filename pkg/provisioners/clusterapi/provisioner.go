@@ -19,7 +19,8 @@ package clusterapi
 import (
 	"context"
 
-	provisioners "github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
+	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/readiness"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -60,9 +61,9 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("waiting for Cert Manager webhook to be active")
 
-	certManagerReady := provisioners.NewDeploymentReady(p.client, "cert-manager", "cert-manager-webhook")
+	certManagerReady := readiness.NewDeployment(p.client, "cert-manager", "cert-manager-webhook")
 
-	if err := provisioners.NewReadinessCheckWithRetry(certManagerReady).Check(ctx); err != nil {
+	if err := readiness.NewRetry(certManagerReady).Check(ctx); err != nil {
 		return err
 	}
 
@@ -78,9 +79,9 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	certmanagerFunctional := provisioners.NewWebhookReady(p.client, certificate)
+	certmanagerFunctional := readiness.NewWebhook(p.client, certificate)
 
-	if err := provisioners.NewReadinessCheckWithRetry(certmanagerFunctional).Check(ctx); err != nil {
+	if err := readiness.NewRetry(certmanagerFunctional).Check(ctx); err != nil {
 		return err
 	}
 

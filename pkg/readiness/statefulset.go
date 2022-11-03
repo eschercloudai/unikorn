@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package readiness
 
 import (
 	"context"
@@ -30,7 +30,7 @@ var (
 	ErrStatefulSetUnready = errors.New("statefulset readiness doesn't match desired")
 )
 
-type StatefulSetReady struct {
+type StatefulSet struct {
 	// client is an intialized Kubernetes client.
 	client client.Client
 
@@ -41,20 +41,20 @@ type StatefulSetReady struct {
 	name string
 }
 
-// Ensure the ReadinessCheck interface is implemented.
-var _ ReadinessCheck = &StatefulSetReady{}
+// Ensure the Check interface is implemented.
+var _ Check = &StatefulSet{}
 
-// NewStatefulSetReady creates a new statefulset readiness check.
-func NewStatefulSetReady(client client.Client, namespace, name string) *StatefulSetReady {
-	return &StatefulSetReady{
+// NewStatefulSet creates a new statefulset readiness check.
+func NewStatefulSet(client client.Client, namespace, name string) *StatefulSet {
+	return &StatefulSet{
 		client:    client,
 		namespace: namespace,
 		name:      name,
 	}
 }
 
-// Check implements the ReadinessCheck interface.
-func (r *StatefulSetReady) Check(ctx context.Context) error {
+// Check implements the Check interface.
+func (r *StatefulSet) Check(ctx context.Context) error {
 	statefulset := &appsv1.StatefulSet{}
 	if err := r.client.Get(ctx, client.ObjectKey{Namespace: r.namespace, Name: r.name}, statefulset); err != nil {
 		return fmt.Errorf("statefulset get error: %w", err)

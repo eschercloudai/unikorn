@@ -20,9 +20,9 @@ import (
 	"context"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/util/provisioners/clusterapi"
-	provisioner "github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
-	"github.com/eschercloudai/unikorn/pkg/util/provisioners/vcluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/clusterapi"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -45,7 +45,7 @@ func New(client client.Client, controlPlane *unikornv1alpha1.ControlPlane) *Prov
 }
 
 // Ensure the Provisioner interface is implemented.
-var _ provisioner.Provisioner = &Provisioner{}
+var _ provisioners.Provisioner = &Provisioner{}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {

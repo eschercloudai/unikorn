@@ -28,7 +28,8 @@ import (
 
 	"github.com/spf13/pflag"
 
-	provisioners "github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
+	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/readiness"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -79,9 +80,9 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 		Resource: resource,
 	}
 
-	checker := provisioners.NewStatusConditionReady(client, gvr, namespace, name, conditionType)
+	checker := readiness.NewStatusCondition(client, gvr, namespace, name, conditionType)
 
-	if err := provisioners.NewReadinessCheckWithRetry(checker).Check(c); err != nil {
+	if err := readiness.NewRetry(checker).Check(c); err != nil {
 		panic(err)
 	}
 }
@@ -89,9 +90,9 @@ func waitCondition(c context.Context, client dynamic.Interface, group, version, 
 // waitDaemonSetReady performs a type specific wait function until the desired and actual
 // number of rready processes match.
 func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespace, name string) {
-	checker := provisioners.NewDaemonSetReady(client, namespace, name)
+	checker := readiness.NewDaemonSet(client, namespace, name)
 
-	if err := provisioners.NewReadinessCheckWithRetry(checker).Check(c); err != nil {
+	if err := readiness.NewRetry(checker).Check(c); err != nil {
 		panic(err)
 	}
 }

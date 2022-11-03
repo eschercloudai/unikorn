@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/util/provisioners/controlplane"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/controlplane"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"

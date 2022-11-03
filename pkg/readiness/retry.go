@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package readiness
 
 import (
 	"context"
@@ -22,24 +22,24 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
 )
 
-// ReadinessCheckWithRetry wraps a readiness check in a retry loop.
-type ReadinessCheckWithRetry struct {
+// Retry wraps a readiness check in a retry loop.
+type Retry struct {
 	// delegate is a backend readiness check to be retried.
-	delegate ReadinessCheck
+	delegate Check
 }
 
-// Ensure the ReadinessCheck interface is implemented.
-var _ ReadinessCheck = &ReadinessCheckWithRetry{}
+// Ensure the Check interface is implemented.
+var _ Check = &Retry{}
 
-// NewReadinessCheckWithRetry returns a new readiness check that will retry.
-func NewReadinessCheckWithRetry(delegate ReadinessCheck) *ReadinessCheckWithRetry {
-	return &ReadinessCheckWithRetry{
+// NewRetry returns a new readiness check that will retry.
+func NewRetry(delegate Check) *Retry {
+	return &Retry{
 		delegate: delegate,
 	}
 }
 
-// Check implements the ReadinessCheck interface.
-func (r *ReadinessCheckWithRetry) Check(ctx context.Context) error {
+// Check implements the Check interface.
+func (r *Retry) Check(ctx context.Context) error {
 	ready := func() error {
 		return r.delegate.Check(ctx)
 	}
