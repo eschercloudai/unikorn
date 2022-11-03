@@ -25,6 +25,8 @@ Unsurprisingly, as we are dealing with custom resources, we are managing the lif
 
 ## Installation
 
+_NB_: The Makefile in this repository makes use of conventions specific to GNU/Make.  If you're on a non-GNU system (i.e macOS, FreeBSD) then you need to replace `make` in the examples below with `gmake`.
+
 ### Building and Installing the Binaries
 
 Checkout the repository:
