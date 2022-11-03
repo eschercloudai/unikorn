@@ -60,6 +60,8 @@ For the more adventurous, you can add it to `/etc/bash_completion.d/` or whateve
 
 ### Creating Docker Images
 
+Images are built via [Docker buildx](https://docs.docker.com/build/buildx/install/), you should install this first in order to be able to reproduce the following steps.
+
 #### Public Cloud
 
 WHen operating in the Cloud, you'll want to push images to a public registry:
