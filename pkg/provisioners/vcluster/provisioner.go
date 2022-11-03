@@ -35,7 +35,8 @@ import (
 )
 
 var (
-	// TODO: move into a metrics struct of some variety and propagate.
+	// On home broadband it'll take about 90s to pull down images, plus any
+	// readniness gates we put in the way.  If images are cached then 20s.
 	//nolint:gochecknoglobals
 	durationMetric = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name: "unikorn_vcluster_provision_duration",
@@ -46,8 +47,6 @@ var (
 	})
 )
 
-// TODO: we should probably have a registry somewhere.
-//
 //nolint:gochecknoinits
 func init() {
 	metrics.Registry.MustRegister(durationMetric)
@@ -106,7 +105,6 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("waiting for stateful set to become ready")
 
-	// TODO: this is inconsistent, perhaps we just want to use Factory everywhere??
 	statefulsetReadiness := readiness.NewStatefulSet(p.client, namespace, name)
 
 	if err := readiness.NewRetry(statefulsetReadiness).Check(ctx); err != nil {
