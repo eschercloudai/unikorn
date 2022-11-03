@@ -22,8 +22,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/readiness"
 	"github.com/eschercloudai/unikorn/pkg/util"
-	"github.com/eschercloudai/unikorn/pkg/util/provisioners/generic"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +73,7 @@ func New(client client.Client, controlPlane *unikornv1alpha1.ControlPlane) *Prov
 }
 
 // Ensure the Provisioner interface is implemented.
-var _ generic.Provisioner = &Provisioner{}
+var _ provisioners.Provisioner = &Provisioner{}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
@@ -97,7 +98,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		*metav1.NewControllerRef(p.controlPlane, *gvk),
 	}
 
-	provisioner := generic.NewManifestProvisioner(p.client, generic.ManifestVCluster).WithNamespace(namespace).WithName(name).WithOwnerReferences(ownerReferences)
+	provisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestVCluster).WithNamespace(namespace).WithName(name).WithOwnerReferences(ownerReferences)
 
 	if err := provisioner.Provision(ctx); err != nil {
 		return err
@@ -106,9 +107,9 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	log.V(1).Info("waiting for stateful set to become ready")
 
 	// TODO: this is inconsistent, perhaps we just want to use Factory everywhere??
-	statefulsetReadiness := generic.NewStatefulSetReady(p.client, namespace, name)
+	statefulsetReadiness := readiness.NewStatefulSet(p.client, namespace, name)
 
-	if err := generic.NewReadinessCheckWithRetry(statefulsetReadiness).Check(ctx); err != nil {
+	if err := readiness.NewRetry(statefulsetReadiness).Check(ctx); err != nil {
 		return err
 	}
 

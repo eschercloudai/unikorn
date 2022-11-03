@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package readiness
 
 import (
 	"context"
@@ -30,7 +30,7 @@ var (
 	ErrDeploymentUnready = errors.New("deployment readiness doesn't match desired")
 )
 
-type DeploymentReady struct {
+type Deployment struct {
 	// client is an intialized Kubernetes client.
 	client client.Client
 
@@ -41,20 +41,20 @@ type DeploymentReady struct {
 	name string
 }
 
-// Ensure the ReadinessCheck interface is implemented.
-var _ ReadinessCheck = &DeploymentReady{}
+// Ensure the Check interface is implemented.
+var _ Check = &Deployment{}
 
-// NewDeploymentReady creates a new deployment readiness check.
-func NewDeploymentReady(client client.Client, namespace, name string) *DeploymentReady {
-	return &DeploymentReady{
+// NewDeployment creates a new deployment readiness check.
+func NewDeployment(client client.Client, namespace, name string) *Deployment {
+	return &Deployment{
 		client:    client,
 		namespace: namespace,
 		name:      name,
 	}
 }
 
-// Check implements the ReadinessCheck interface.
-func (r *DeploymentReady) Check(ctx context.Context) error {
+// Check implements the Check interface.
+func (r *Deployment) Check(ctx context.Context) error {
 	deployment := &appsv1.Deployment{}
 	if err := r.client.Get(ctx, client.ObjectKey{Namespace: r.namespace, Name: r.name}, deployment); err != nil {
 		return fmt.Errorf("deployment get error: %w", err)

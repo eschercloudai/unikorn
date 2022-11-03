@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package readiness
 
 import (
 	"context"
@@ -39,7 +39,7 @@ var (
 	ErrConditionStatus = errors.New("status condition incorrect status")
 )
 
-// StatusConditionReady allows any Kubernetes resource to be polled for
+// StatusCondition allows any Kubernetes resource to be polled for
 // a status condition that is true.  For example Deployments are ready
 // when the Available status condition is set.
 // TODO: we could provide a nicer interface that accepts a concrete type
@@ -47,7 +47,7 @@ var (
 // GVR.
 // TODO: this only considers namespaced resources, ties into REST mapping
 // also.
-type StatusConditionReady struct {
+type StatusCondition struct {
 	// client is an intialized Kubernetes dynamic client.
 	client dynamic.Interface
 
@@ -64,12 +64,12 @@ type StatusConditionReady struct {
 	conditionType string
 }
 
-// Ensure the ReadinessCheck interface is implemented.
-var _ ReadinessCheck = &StatusConditionReady{}
+// Ensure the Check interface is implemented.
+var _ Check = &StatusCondition{}
 
-// NewStatusConditionReady creates a new status condition readiness check.
-func NewStatusConditionReady(client dynamic.Interface, gvr schema.GroupVersionResource, namespace, name, conditionType string) *StatusConditionReady {
-	return &StatusConditionReady{
+// NewStatusCondition creates a new status condition readiness check.
+func NewStatusCondition(client dynamic.Interface, gvr schema.GroupVersionResource, namespace, name, conditionType string) *StatusCondition {
+	return &StatusCondition{
 		client:        client,
 		gvr:           gvr,
 		namespace:     namespace,
@@ -78,8 +78,8 @@ func NewStatusConditionReady(client dynamic.Interface, gvr schema.GroupVersionRe
 	}
 }
 
-// Check implements the ReadinessCheck interface.
-func (r *StatusConditionReady) Check(ctx context.Context) error {
+// Check implements the Check interface.
+func (r *StatusCondition) Check(ctx context.Context) error {
 	object, err := r.client.Resource(r.gvr).Namespace(r.namespace).Get(ctx, r.name, metav1.GetOptions{})
 	if err != nil {
 		return err

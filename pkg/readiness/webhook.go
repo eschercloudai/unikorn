@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package readiness
 
 import (
 	"context"
@@ -34,18 +34,18 @@ type WebhookReady struct {
 	object *unstructured.Unstructured
 }
 
-// Ensure the ReadinessCheck interface is implemented.
-var _ ReadinessCheck = &WebhookReady{}
+// Ensure the Check interface is implemented.
+var _ Check = &WebhookReady{}
 
-// NewWebhookReady returns a new readiness check that will retry.
-func NewWebhookReady(client client.Client, object *unstructured.Unstructured) *WebhookReady {
+// NewWebhoo returns a new readiness check that will retry.
+func NewWebhook(client client.Client, object *unstructured.Unstructured) *WebhookReady {
 	return &WebhookReady{
 		client: client,
 		object: object,
 	}
 }
 
-// Check implements the ReadinessCheck interface.
+// Check implements the Check interface.
 func (r *WebhookReady) Check(ctx context.Context) error {
 	return r.client.Create(ctx, r.object, client.DryRunAll)
 }

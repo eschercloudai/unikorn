@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package readiness
 
 import (
 	"context"
@@ -29,7 +29,7 @@ var (
 	ErrDaemonSetUnready = errors.New("daemonset readiness doesn't match desired")
 )
 
-type DaemonSetReady struct {
+type DaemonSet struct {
 	// client is an intialized Kubernetes client.
 	client kubernetes.Interface
 
@@ -40,20 +40,20 @@ type DaemonSetReady struct {
 	name string
 }
 
-// Ensure the ReadinessCheck interface is implemented.
-var _ ReadinessCheck = &DaemonSetReady{}
+// Ensure the Check interface is implemented.
+var _ Check = &DaemonSet{}
 
-// NewDaemonSetReady creates a new daemonset readiness check.
-func NewDaemonSetReady(client kubernetes.Interface, namespace, name string) *DaemonSetReady {
-	return &DaemonSetReady{
+// NewDaemonSet creates a new daemonset readiness check.
+func NewDaemonSet(client kubernetes.Interface, namespace, name string) *DaemonSet {
+	return &DaemonSet{
 		client:    client,
 		namespace: namespace,
 		name:      name,
 	}
 }
 
-// Check implements the ReadinessCheck interface.
-func (r *DaemonSetReady) Check(ctx context.Context) error {
+// Check implements the Check interface.
+func (r *DaemonSet) Check(ctx context.Context) error {
 	daemonset, err := r.client.AppsV1().DaemonSets(r.namespace).Get(ctx, r.name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("daemonset get error: %w", err)
