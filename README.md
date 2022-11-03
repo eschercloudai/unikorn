@@ -25,6 +25,8 @@ Unsurprisingly, as we are dealing with custom resources, we are managing the lif
 
 ## Installation
 
+_NB_: The Makefile in this repository makes use of conventions specific to GNU/Make.  If you're on a non-GNU system (i.e macOS, FreeBSD) then you need to replace `make` in the examples below with `gmake`.
+
 ### Building and Installing the Binaries
 
 Checkout the repository:
@@ -57,6 +59,8 @@ source ${TEMP}
 For the more adventurous, you can add it to `/etc/bash_completion.d/` or whatever you use.
 
 ### Creating Docker Images
+
+Images are built via [Docker buildx](https://docs.docker.com/build/buildx/install/), you should install this first in order to be able to reproduce the following steps.
 
 #### Public Cloud
 

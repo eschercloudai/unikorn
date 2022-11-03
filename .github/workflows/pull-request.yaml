@@ -1,5 +1,7 @@
 name: Unikorn Push
 on: [push]
+env:
+  GO_VERSION: 1.19.1
 jobs:
   License:
     runs-on: ubuntu-latest
@@ -9,7 +11,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
-        go-version: '1.19.1'
+        go-version: ${{ env.GO_VERSION }}
     - name: License Checker
       run: make license
   Lint:
@@ -20,7 +22,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
-        go-version: '1.19.1'
+        go-version: ${{ env.GO_VERSION }}
     - name: Golang CI Lint
       run: make touch lint
   Build:
@@ -31,11 +33,10 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
-        go-version: '1.19.1'
+        go-version: ${{ env.GO_VERSION }}
     - name: Build All
       run: make touch all
     - name: Build Images
       run: make images
     - name: Generated Code Checked In
       run: '[[ -z $(git status --porcelain) ]]'
-
