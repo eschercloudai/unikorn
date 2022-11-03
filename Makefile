@@ -100,7 +100,7 @@ install: $(INSTALL_BINARIES)
 # good things, like per file .dockerignores and all that jazz.
 .PHONY: images
 images: $(CONTROLLER_BINARIES)
-	for image in ${CONTROLLERS}; do DOCKER_BUILDKIT=1 docker buildx build --platform linux/amd64 . -f docker/$${image}/Dockerfile -t ${DOCKER_ORG}/$${image}:${VERSION}; done
+	for image in ${CONTROLLERS}; do docker buildx build --platform linux/amd64 . -f docker/$${image}/Dockerfile -t ${DOCKER_ORG}/$${image}:${VERSION}; done
 
 # Purely lazy command that builds and pushes to docker hub.
 .PHONY: images-push
