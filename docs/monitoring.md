@@ -20,6 +20,24 @@ helm install prometheus prometheus-community/kube-prometheus-stack --namespace m
 This will pretty much work out of the box.
 See [`manifests/prometheus.yaml`](https://github.com/eschercloudai/unikorn/blob/main/manifests/prometheus.yaml) for an example of use, using the wonderful Prometheus Operator.
 
+## Metrics Server
+
+The prometheus stuff has some good metrics collected by default, and the Unikorn binaries give a decent view into heap allocations.
+You could use the `contrainer_cpu_usage_second_total` metric in Grafana for example.
+Using the `kubectl top pods` command is a quick and easy way to derive utilisation, hence this section.
+If it's not installed by default on your platform:
+
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+On KinD, this won't work out of the box as the node certificates don't have an IP SAN.
+To fudge this, add the `--kubelet-insecure-tls` flag to the server:
+
+```shell
+kubectl edit -n kube-system deployment/metrics-server
+```
+
 ## Logs
 
 Coming soon!
