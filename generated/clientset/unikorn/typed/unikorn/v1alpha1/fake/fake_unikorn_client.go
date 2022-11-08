@@ -32,6 +32,10 @@ func (c *FakeUnikornV1alpha1) ControlPlanes(namespace string) v1alpha1.ControlPl
 	return &FakeControlPlanes{c, namespace}
 }
 
+func (c *FakeUnikornV1alpha1) KubernetesClusters(namespace string) v1alpha1.KubernetesClusterInterface {
+	return &FakeKubernetesClusters{c, namespace}
+}
+
 func (c *FakeUnikornV1alpha1) Projects() v1alpha1.ProjectInterface {
 	return &FakeProjects{c}
 }
