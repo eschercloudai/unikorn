@@ -72,7 +72,7 @@ const (
 
 type ProjectCondition struct {
 	// Type is the type of the condition.
-	// +kubebuilder:validation:enum=Provisioned
+	// +kubebuilder:validation:Enum=Provisioned
 	Type ProjectConditionType `json:"type"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
@@ -93,6 +93,9 @@ type ControlPlaneList struct {
 	Items           []ControlPlane `json:"items"`
 }
 
+// ControlPlane is an abstraction around resource provisioning, for example
+// it may contain a provider like Cluster API that can provision KubernetesCluster
+// resources.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;eschercloud
@@ -123,7 +126,7 @@ type ControlPlaneStatus struct {
 
 // ControlPlaneConditionType defines the possible conditions a control plane
 // can have.
-// +kubebuilder:validation:enum=Available
+// +kubebuilder:validation:Enum=Available
 type ControlPlaneConditionType string
 
 const (
@@ -137,7 +140,7 @@ const (
 
 // ControlPlaneConditionReason defines the possible reasons of a control plane
 // condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:enum=Provisioned;Canceled;Timedout;Errored
+// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored
 type ControlPlaneConditionReason string
 
 const (
@@ -170,6 +173,187 @@ type ControlPlaneCondition struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 	// Unique, one-word, CamelCase reason for the condition's last transition.
 	Reason ControlPlaneConditionReason `json:"reason"`
+	// Human-readable message indicating details about last transition.
+	Message string `json:"message"`
+}
+
+// KubernetesClusterList is a typed list of kubernetes clusters.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type KubernetesClusterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []KubernetesCluster `json:"items"`
+}
+
+// KubernetesCluster is an object representing a Kubernetes cluster.
+// For now, this is a monolith for simplicity.  In future it may reference
+// a provider specific implementation e.g. if CAPI goes out of favour for
+// some other new starlet.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;eschercloud
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="controlPlane",type="string",JSONPath=".spec.provisionerControlPlane"
+// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.kubernetesVersion"
+// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+type KubernetesCluster struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              KubernetesClusterSpec   `json:"spec"`
+	Status            KubernetesClusterStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:validation:Pattern="^v(?:[0-9]+\\.){2}(?:[0-9]+)$"
+type SemanitcVersion string
+
+// +kubebuilder:validation:Pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$"
+type IPv4Address string
+
+// See https://regex101.com/r/QUfWrF/1
+// +kubebuilder:validation:Pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\/(?:3[0-2]|[1-2]?[0-9])$"
+type IPv4Prefix string
+
+// KubernetesClusterSpec defines the requested state of the Kubernetes cluster.
+type KubernetesClusterSpec struct {
+	// ProvisionerContolPlane is a reference to the ControlPlane object in this namespace
+	// that will provision the cluster.
+	ProvisionerControlPlane string `json:"provisionerControlPlane"`
+	// Timeout is the maximum time to attempt to provision a cluster before aborting.
+	// +kubebuilder:default="20m"
+	TImeout metav1.Duration `json:"timeout"`
+	// KubernetesVersion is the Kubernetes version.
+	KubernetesVersion SemanitcVersion `json:"kubernetesVersion"`
+	// Openstack defines global Openstack related configuration.
+	Openstack KubernetesClusterOpenstackSpec `json:"openstack"`
+	// Network defines the Kubernetes networking.
+	Network KubernetesClusterNetworkSpec `json:"network"`
+	// ControlPlane defines the control plane topology.
+	ControlPlane KubernetesClusterControlPlaneSpec `json:"controlPlane"`
+	// Workload defines the workload cluster topology.
+	Workload KubernetesClusterWorkloadSpec `json:"workload"`
+	// ClusterAutoscaler, if specified, provisions a cluster autoscaler.
+	ClusterAutoscaler *KubernetesClusterAutoscalerSpec `json:"clusterAutoscaler,omitempty"`
+}
+
+type KubernetesClusterOpenstackSpec struct {
+	// CACert is the CA used to trust the Openstack endpoint.
+	CACert []byte `json:"caCert"`
+	// CloudConfig is a base64 encoded minimal clouds.yaml file for
+	// use by the ControlPlane to provision the IaaS bits.
+	CloudConfig []byte `json:"cloudConfig"`
+	// Cloud is the clouds.yaml key that identifes the configuration
+	// to use for provisioning.
+	Cloud string `json:"cloud"`
+	// SSHKeyName is the SSH key name to use to provide access to the VMs.
+	SSHKeyName string `json:"sshKeyName"`
+	// FailureDomain is the failure domain to use.
+	FailureDomain string `json:"failureDomain"`
+}
+
+type KubernetesClusterNetworkSpec struct {
+	// NodeNetwork is the IPv4 prefix for the node network.
+	NodeNetwork IPv4Prefix `json:"nodeNetwork"`
+	// PodNetwork is the IPv4 prefix for the pod network.
+	PodNetwork IPv4Prefix `json:"podNetwork"`
+	// ServiceNetwork is the IPv4 prefix for the service network.
+	ServiceNetwork IPv4Prefix `json:"serviceNetwork"`
+	// DNSNameservers sets the DNS nameservers for pods.
+	// If not specified it will default to 8.8.8.8.
+	DNSNameservers []IPv4Address `json:"dnsNameservers"`
+	// ExternalNetworkID is the Openstack external network ID.
+	ExternalNetworkID string `json:"externalNetworkId"`
+}
+
+type KubernetesClusterControlPlaneSpec struct {
+	// Replicas is the number desired replicas for the control plane.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=3
+	Replicas *int `json:"replicas,omitempty"`
+	// Flavor is the Openstack machine type to use for control
+	// plane nodes.
+	Flavor string `json:"flavor"`
+	// Image is the Openstack image name to use for control
+	// plane nodes.
+	Image string `json:"image"`
+}
+
+type KubernetesClusterWorkloadSpec struct {
+	// Replicas is the number desired replicas for the workload nodes.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=3
+	Replicas *int `json:"replicas,omitempty"`
+	// Flavor is the Openstack machine type to use for workload nodes.
+	Flavor string `json:"flavor"`
+	// Image is the Openstack image name to use for workload nodes.
+	Image string `json:"image"`
+}
+
+type KubernetesClusterAutoscalerSpec struct {
+	// MinimumReplicas defines the smallest a cluster should be scaled to.
+	// If not specified this will inherit from WorkloadReplicas.  Scale to
+	// zero is not supported yet.
+	// +kubebuilder:validation:Minimum=1
+	MinimumReplicas *int `json:"minimumReplicas,omitempty"`
+	// MaximumReplicas defines the largest a cluster should be scaled to.
+	MaximumReplicas *int `json:"maximumReplicas"`
+}
+
+// KubernetesClusterStatus defines the observed state of the Kubernetes cluster.
+type KubernetesClusterStatus struct {
+	// Current service state of a Kubernetes cluster.
+	Conditions []KubernetesClusterCondition `json:"conditions,omitempty"`
+}
+
+// KubernetesClusterConditionType defines the possible conditions a control plane
+// can have.
+// +kubebuilder:validation:Enum=Available
+type KubernetesClusterConditionType string
+
+const (
+	// KubernetesClusterConditionAvailable if not defined or false means that the
+	// cluster is not ready, or is known to be in a bad state and should
+	// not be used.  When true, while not guaranteed to be fully functional, it
+	// will accept API requests.
+	KubernetesClusterConditionAvailable KubernetesClusterConditionType = "Available"
+)
+
+// KubernetesClusterConditionReason defines the possible reasons of a cluster
+// condition.  These are generic and may be used by any condition.
+// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored
+type KubernetesClusterConditionReason string
+
+const (
+	// KubernetesClusterConditionReasonProvisioning is used for the Available condition
+	// to indicate that a resource has been seen, it has no pre-existing condition
+	// and we assume it's being provisioned for the first time.
+	KubernetesClusterConditionReasonProvisioning KubernetesClusterConditionReason = "Provisioning"
+	// KubernetesClusterConditionReasonProvisioned is used for the Available condition
+	// to mean that the control plane is ready to be used.
+	KubernetesClusterConditionReasonProvisioned KubernetesClusterConditionReason = "Provisioned"
+	// KubernetesClusterConditionReasonCanceled is used by a condition to
+	// indicate the controller was cancelled e.g. via a container shutdown.
+	KubernetesClusterConditionReasonCanceled KubernetesClusterConditionReason = "Canceled"
+	// KubernetesClusterConditionReasonTimedout is used by a condition to
+	// indicate the controller timed out e.g. OpenStack is slow or broken.
+	KubernetesClusterConditionReasonTimedout KubernetesClusterConditionReason = "Timedout"
+	// KubernetesClusterConditionReasonErrored is used by a condition to
+	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
+	// If we see these, consider formulating a fix, for example a retry loop.
+	KubernetesClusterConditionReasonErrored KubernetesClusterConditionReason = "Errored"
+)
+
+type KubernetesClusterCondition struct {
+	// Type is the type of the condition.
+	Type KubernetesClusterConditionType `json:"type"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status corev1.ConditionStatus `json:"status"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason KubernetesClusterConditionReason `json:"reason"`
 	// Human-readable message indicating details about last transition.
 	Message string `json:"message"`
 }

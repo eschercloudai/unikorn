@@ -1,0 +1,257 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: kubernetesclusters.unikorn.eschercloud.ai
+spec:
+  group: unikorn.eschercloud.ai
+  names:
+    kind: KubernetesCluster
+    listKind: KubernetesClusterList
+    plural: kubernetesclusters
+    singular: kubernetescluster
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.provisionerControlPlane
+      name: controlPlane
+      type: string
+    - jsonPath: .spec.kubernetesVersion
+      name: version
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Available")].reason
+      name: status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: KubernetesCluster is an object representing a Kubernetes cluster.
+          For now, this is a monolith for simplicity.  In future it may reference
+          a provider specific implementation e.g. if CAPI goes out of favour for some
+          other new starlet.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: KubernetesClusterSpec defines the requested state of the
+              Kubernetes cluster.
+            properties:
+              clusterAutoscaler:
+                description: ClusterAutoscaler, if specified, provisions a cluster
+                  autoscaler.
+                properties:
+                  maximumReplicas:
+                    description: MaximumReplicas defines the largest a cluster should
+                      be scaled to.
+                    type: integer
+                  minimumReplicas:
+                    description: MinimumReplicas defines the smallest a cluster should
+                      be scaled to. If not specified this will inherit from WorkloadReplicas.  Scale
+                      to zero is not supported yet.
+                    minimum: 1
+                    type: integer
+                required:
+                - maximumReplicas
+                type: object
+              controlPlane:
+                description: ControlPlane defines the control plane topology.
+                properties:
+                  flavor:
+                    description: Flavor is the Openstack machine type to use for control
+                      plane nodes.
+                    type: string
+                  image:
+                    description: Image is the Openstack image name to use for control
+                      plane nodes.
+                    type: string
+                  replicas:
+                    default: 3
+                    description: Replicas is the number desired replicas for the control
+                      plane.
+                    minimum: 1
+                    type: integer
+                required:
+                - flavor
+                - image
+                type: object
+              kubernetesVersion:
+                description: KubernetesVersion is the Kubernetes version.
+                pattern: ^v(?:[0-9]+\.){2}(?:[0-9]+)$
+                type: string
+              network:
+                description: Network defines the Kubernetes networking.
+                properties:
+                  dnsNameservers:
+                    description: DNSNameservers sets the DNS nameservers for pods.
+                      If not specified it will default to 8.8.8.8.
+                    items:
+                      pattern: ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$
+                      type: string
+                    type: array
+                  externalNetworkId:
+                    description: ExternalNetworkID is the Openstack external network
+                      ID.
+                    type: string
+                  nodeNetwork:
+                    description: NodeNetwork is the IPv4 prefix for the node network.
+                    pattern: ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\/(?:3[0-2]|[1-2]?[0-9])$
+                    type: string
+                  podNetwork:
+                    description: PodNetwork is the IPv4 prefix for the pod network.
+                    pattern: ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\/(?:3[0-2]|[1-2]?[0-9])$
+                    type: string
+                  serviceNetwork:
+                    description: ServiceNetwork is the IPv4 prefix for the service
+                      network.
+                    pattern: ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\/(?:3[0-2]|[1-2]?[0-9])$
+                    type: string
+                required:
+                - dnsNameservers
+                - externalNetworkId
+                - nodeNetwork
+                - podNetwork
+                - serviceNetwork
+                type: object
+              openstack:
+                description: Openstack defines global Openstack related configuration.
+                properties:
+                  caCert:
+                    description: CACert is the CA used to trust the Openstack endpoint.
+                    format: byte
+                    type: string
+                  cloud:
+                    description: Cloud is the clouds.yaml key that identifes the configuration
+                      to use for provisioning.
+                    type: string
+                  cloudConfig:
+                    description: CloudConfig is a base64 encoded minimal clouds.yaml
+                      file for use by the ControlPlane to provision the IaaS bits.
+                    format: byte
+                    type: string
+                  failureDomain:
+                    description: FailureDomain is the failure domain to use.
+                    type: string
+                  sshKeyName:
+                    description: SSHKeyName is the SSH key name to use to provide
+                      access to the VMs.
+                    type: string
+                required:
+                - caCert
+                - cloud
+                - cloudConfig
+                - failureDomain
+                - sshKeyName
+                type: object
+              provisionerControlPlane:
+                description: ProvisionerContolPlane is a reference to the ControlPlane
+                  object in this namespace that will provision the cluster.
+                type: string
+              timeout:
+                default: 20m
+                description: Timeout is the maximum time to attempt to provision a
+                  cluster before aborting.
+                type: string
+              workload:
+                description: Workload defines the workload cluster topology.
+                properties:
+                  flavor:
+                    description: Flavor is the Openstack machine type to use for workload
+                      nodes.
+                    type: string
+                  image:
+                    description: Image is the Openstack image name to use for workload
+                      nodes.
+                    type: string
+                  replicas:
+                    default: 3
+                    description: Replicas is the number desired replicas for the workload
+                      nodes.
+                    minimum: 1
+                    type: integer
+                required:
+                - flavor
+                - image
+                type: object
+            required:
+            - controlPlane
+            - kubernetesVersion
+            - network
+            - openstack
+            - provisionerControlPlane
+            - timeout
+            - workload
+            type: object
+          status:
+            description: KubernetesClusterStatus defines the observed state of the
+              Kubernetes cluster.
+            properties:
+              conditions:
+                description: Current service state of a Kubernetes cluster.
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition.
+                      type: string
+                    reason:
+                      description: Unique, one-word, CamelCase reason for the condition's
+                        last transition.
+                      enum:
+                      - Provisioning
+                      - Provisioned
+                      - Canceled
+                      - Timedout
+                      - Errored
+                      type: string
+                    status:
+                      description: Status is the status of the condition. Can be True,
+                        False, Unknown.
+                      type: string
+                    type:
+                      description: Type is the type of the condition.
+                      enum:
+                      - Available
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

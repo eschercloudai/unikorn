@@ -38,6 +38,13 @@ const (
 	ControlPlaneKind = "ControlPlane"
 	// ControlPlaneResource is the API endpoint for control plane resources.
 	ControlPlaneResource = "controlplanes"
+	// KubernetesClusterKind is the API kind for a cluster.
+	// NOTE: This is deliberately explicit to avoid a clash with CAPI Cluster
+	// objects (yes it's namespaced by group, but this makes it easier), and
+	// to provide future expansion...
+	KubernetesClusterKind = "KubernetesCluster"
+	// KubernetesClusterResource is the API endpoint for a cluster resource.
+	KubernetesClusterResource = "kubernetesclusters"
 )
 
 var (
@@ -58,6 +65,7 @@ var (
 func init() {
 	SchemeBuilder.Register(&Project{}, &ProjectList{})
 	SchemeBuilder.Register(&ControlPlane{}, &ControlPlaneList{})
+	SchemeBuilder.Register(&KubernetesCluster{}, &KubernetesClusterList{})
 }
 
 // Resource maps a resource type to a group resource.

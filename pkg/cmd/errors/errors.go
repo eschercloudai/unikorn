@@ -29,6 +29,12 @@ var (
 	// is invalid.
 	ErrInvalidName = errors.New("invalid name specified")
 
+	// ErrInvalidPath is raised when a path is zero length or doesn't exist.
+	ErrInvalidPath = errors.New("invalid path specified")
+
+	// ErrInvalidEnvironment is raised when an environment variable is not set.
+	ErrInvalidEnvironment = errors.New("invalid environment")
+
 	// ErrNotFound is raised when a requested resource name isn't found.
 	ErrNotFound = errors.New("resource name not found")
 

@@ -29,6 +29,7 @@ import (
 type UnikornV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	ControlPlanesGetter
+	KubernetesClustersGetter
 	ProjectsGetter
 }
 
@@ -39,6 +40,10 @@ type UnikornV1alpha1Client struct {
 
 func (c *UnikornV1alpha1Client) ControlPlanes(namespace string) ControlPlaneInterface {
 	return newControlPlanes(c, namespace)
+}
+
+func (c *UnikornV1alpha1Client) KubernetesClusters(namespace string) KubernetesClusterInterface {
+	return newKubernetesClusters(c, namespace)
 }
 
 func (c *UnikornV1alpha1Client) Projects() ProjectInterface {
