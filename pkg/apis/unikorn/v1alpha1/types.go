@@ -17,9 +17,137 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"encoding/json"
+	"errors"
+	"net"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
+
+var (
+	ErrJSONUnmarshal = errors.New("failed to unmarshal JSON")
+)
+
+// +kubebuilder:validation:Pattern="^v(?:[0-9]+\\.){2}(?:[0-9]+)$"
+type SemanticVersion string
+
+// +kubebuilder:validation:Type=string
+// +kubebuilder:validation:Pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$"
+type IPv4Address struct {
+	net.IP
+}
+
+// Ensure the type implements json.Unmarshaler.
+var _ = json.Unmarshaler(&IPv4Address{})
+
+func (a *IPv4Address) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+
+	ip := net.ParseIP(str)
+	if ip == nil {
+		return ErrJSONUnmarshal
+	}
+
+	a.IP = ip
+
+	return nil
+}
+
+// Ensure the type implements value.UnstructuredConverter.
+var _ = value.UnstructuredConverter(&IPv4Address{})
+
+func (a IPv4Address) MarshalJSON() ([]byte, error) {
+	return json.Marshal(a.IP.String())
+}
+
+func (a IPv4Address) ToUnstructured() interface{} {
+	return a.IP.String()
+}
+
+// There is no interface defined for these. See
+// https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+// for reference.
+func (IPv4Address) OpenAPISchemaType() []string {
+	return []string{"string"}
+}
+
+func (IPv4Address) OpenAPISchemaFormat() string {
+	return ""
+}
+
+// See https://regex101.com/r/QUfWrF/1
+// +kubebuilder:validation:Type=string
+// +kubebuilder:validation:Pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\/(?:3[0-2]|[1-2]?[0-9])$"
+type IPv4Prefix struct {
+	net.IPNet
+}
+
+// DeepCopyInto implements the interface deepcopy-gen is totally unable to
+// do by itself.
+func (p *IPv4Prefix) DeepCopyInto(out *IPv4Prefix) {
+	if p.IPNet.IP != nil {
+		in, out := &p.IPNet.IP, &out.IPNet.IP
+		*out = make(net.IP, len(*in))
+		copy(*out, *in)
+	}
+
+	if p.IPNet.Mask != nil {
+		in, out := &p.IPNet.Mask, &out.IPNet.Mask
+		*out = make(net.IPMask, len(*in))
+		copy(*out, *in)
+	}
+}
+
+// Ensure the type implements json.Unmarshaler.
+var _ = json.Unmarshaler(&IPv4Prefix{})
+
+func (p *IPv4Prefix) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+
+	_, network, err := net.ParseCIDR(str)
+	if err != nil {
+		return ErrJSONUnmarshal
+	}
+
+	if network == nil {
+		return ErrJSONUnmarshal
+	}
+
+	p.IPNet = *network
+
+	return nil
+}
+
+// Ensure the type implements value.UnstructuredConverter.
+var _ = value.UnstructuredConverter(&IPv4Prefix{})
+
+func (p IPv4Prefix) MarshalJSON() ([]byte, error) {
+	return json.Marshal(p.IPNet.String())
+}
+
+func (p IPv4Prefix) ToUnstructured() interface{} {
+	return p.IP.String()
+}
+
+// There is no interface defined for these. See
+// https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+// for reference.
+func (IPv4Prefix) OpenAPISchemaType() []string {
+	return []string{"string"}
+}
+
+func (IPv4Prefix) OpenAPISchemaFormat() string {
+	return ""
+}
 
 // ProjectList is a typed list of projects.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -205,16 +333,6 @@ type KubernetesCluster struct {
 	Status            KubernetesClusterStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:validation:Pattern="^v(?:[0-9]+\\.){2}(?:[0-9]+)$"
-type SemanitcVersion string
-
-// +kubebuilder:validation:Pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$"
-type IPv4Address string
-
-// See https://regex101.com/r/QUfWrF/1
-// +kubebuilder:validation:Pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\/(?:3[0-2]|[1-2]?[0-9])$"
-type IPv4Prefix string
-
 // KubernetesClusterSpec defines the requested state of the Kubernetes cluster.
 type KubernetesClusterSpec struct {
 	// ProvisionerContolPlane is a reference to the ControlPlane object in this namespace
@@ -222,9 +340,9 @@ type KubernetesClusterSpec struct {
 	ProvisionerControlPlane string `json:"provisionerControlPlane"`
 	// Timeout is the maximum time to attempt to provision a cluster before aborting.
 	// +kubebuilder:default="20m"
-	TImeout metav1.Duration `json:"timeout"`
+	TImeout *metav1.Duration `json:"timeout"`
 	// KubernetesVersion is the Kubernetes version.
-	KubernetesVersion SemanitcVersion `json:"kubernetesVersion"`
+	KubernetesVersion *SemanticVersion `json:"kubernetesVersion"`
 	// Openstack defines global Openstack related configuration.
 	Openstack KubernetesClusterOpenstackSpec `json:"openstack"`
 	// Network defines the Kubernetes networking.
@@ -239,31 +357,31 @@ type KubernetesClusterSpec struct {
 
 type KubernetesClusterOpenstackSpec struct {
 	// CACert is the CA used to trust the Openstack endpoint.
-	CACert []byte `json:"caCert"`
+	CACert *[]byte `json:"caCert"`
 	// CloudConfig is a base64 encoded minimal clouds.yaml file for
 	// use by the ControlPlane to provision the IaaS bits.
-	CloudConfig []byte `json:"cloudConfig"`
+	CloudConfig *[]byte `json:"cloudConfig"`
 	// Cloud is the clouds.yaml key that identifes the configuration
 	// to use for provisioning.
-	Cloud string `json:"cloud"`
+	Cloud *string `json:"cloud"`
 	// SSHKeyName is the SSH key name to use to provide access to the VMs.
-	SSHKeyName string `json:"sshKeyName"`
+	SSHKeyName *string `json:"sshKeyName"`
 	// FailureDomain is the failure domain to use.
-	FailureDomain string `json:"failureDomain"`
+	FailureDomain *string `json:"failureDomain"`
 }
 
 type KubernetesClusterNetworkSpec struct {
 	// NodeNetwork is the IPv4 prefix for the node network.
-	NodeNetwork IPv4Prefix `json:"nodeNetwork"`
+	NodeNetwork *IPv4Prefix `json:"nodeNetwork"`
 	// PodNetwork is the IPv4 prefix for the pod network.
-	PodNetwork IPv4Prefix `json:"podNetwork"`
+	PodNetwork *IPv4Prefix `json:"podNetwork"`
 	// ServiceNetwork is the IPv4 prefix for the service network.
-	ServiceNetwork IPv4Prefix `json:"serviceNetwork"`
+	ServiceNetwork *IPv4Prefix `json:"serviceNetwork"`
 	// DNSNameservers sets the DNS nameservers for pods.
 	// If not specified it will default to 8.8.8.8.
 	DNSNameservers []IPv4Address `json:"dnsNameservers"`
 	// ExternalNetworkID is the Openstack external network ID.
-	ExternalNetworkID string `json:"externalNetworkId"`
+	ExternalNetworkID *string `json:"externalNetworkId"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {
@@ -273,29 +391,26 @@ type KubernetesClusterControlPlaneSpec struct {
 	Replicas *int `json:"replicas,omitempty"`
 	// Flavor is the Openstack machine type to use for control
 	// plane nodes.
-	Flavor string `json:"flavor"`
+	Flavor *string `json:"flavor"`
 	// Image is the Openstack image name to use for control
 	// plane nodes.
-	Image string `json:"image"`
+	Image *string `json:"image"`
 }
 
 type KubernetesClusterWorkloadSpec struct {
 	// Replicas is the number desired replicas for the workload nodes.
+	// When enabled, this will be the minimum cluster size for the
+	// cluster autoscaler.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=3
 	Replicas *int `json:"replicas,omitempty"`
 	// Flavor is the Openstack machine type to use for workload nodes.
-	Flavor string `json:"flavor"`
+	Flavor *string `json:"flavor"`
 	// Image is the Openstack image name to use for workload nodes.
-	Image string `json:"image"`
+	Image *string `json:"image"`
 }
 
 type KubernetesClusterAutoscalerSpec struct {
-	// MinimumReplicas defines the smallest a cluster should be scaled to.
-	// If not specified this will inherit from WorkloadReplicas.  Scale to
-	// zero is not supported yet.
-	// +kubebuilder:validation:Minimum=1
-	MinimumReplicas *int `json:"minimumReplicas,omitempty"`
 	// MaximumReplicas defines the largest a cluster should be scaled to.
 	MaximumReplicas *int `json:"maximumReplicas"`
 }

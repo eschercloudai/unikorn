@@ -60,12 +60,6 @@ spec:
                     description: MaximumReplicas defines the largest a cluster should
                       be scaled to.
                     type: integer
-                  minimumReplicas:
-                    description: MinimumReplicas defines the smallest a cluster should
-                      be scaled to. If not specified this will inherit from WorkloadReplicas.  Scale
-                      to zero is not supported yet.
-                    minimum: 1
-                    type: integer
                 required:
                 - maximumReplicas
                 type: object
@@ -181,7 +175,8 @@ spec:
                   replicas:
                     default: 3
                     description: Replicas is the number desired replicas for the workload
-                      nodes.
+                      nodes. When enabled, this will be the minimum cluster size for
+                      the cluster autoscaler.
                     minimum: 1
                     type: integer
                 required:

@@ -34,9 +34,6 @@ import (
 )
 
 type createControlPlaneOptions struct {
-	// f gives us access to clients.
-	f cmdutil.Factory
-
 	// name is the name of the control plane to create.
 	name string
 
@@ -62,8 +59,6 @@ func (o *createControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 
 // complete fills in any options not does automatically by flag parsing.
 func (o *createControlPlaneOptions) complete(f cmdutil.Factory, args []string) error {
-	o.f = f
-
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err

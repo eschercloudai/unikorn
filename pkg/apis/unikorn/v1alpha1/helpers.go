@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"errors"
+	"net"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +27,18 @@ import (
 var (
 	ErrStatusConditionLookup = errors.New("status condition not found")
 )
+
+// IPv4AddressSliceFromIPSlice is a simple converter from Go types
+// to API types.
+func IPv4AddressSliceFromIPSlice(in []net.IP) []IPv4Address {
+	out := make([]IPv4Address, len(in))
+
+	for i, ip := range in {
+		out[i] = IPv4Address{IP: ip}
+	}
+
+	return out
+}
 
 // LookupCondition scans the status conditions for an existing condition whose type
 // matches.  Returns the array index, or -1 if it doesn't exist.
