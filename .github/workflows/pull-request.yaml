@@ -40,3 +40,5 @@ jobs:
       run: make images
     - name: Generated Code Checked In
       run: '[[ -z $(git status --porcelain) ]]'
+    - name: Unit Test
+      run: make test-unit

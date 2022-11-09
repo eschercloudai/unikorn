@@ -111,6 +111,10 @@ images-push: images
 images-kind-load: images
 	for image in ${CONTROLLERS}; do kind load docker-image ${DOCKER_ORG}/$${image}:${VERSION}; done
 
+.PHONY: test-unit
+test-unit:
+	go test ./...
+
 # Build a binary and install it.
 $(PREFIX)/%: $(BINDIR)/%
 	install -m 750 $< $@
