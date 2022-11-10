@@ -165,7 +165,6 @@ type ProjectList struct {
 // +kubebuilder:resource:categories=all;eschercloud
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="projectid",type="string",JSONPath=".spec.projectId"
 // +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -178,9 +177,6 @@ type Project struct {
 
 // ProjectSpec defines project specific metadata.
 type ProjectSpec struct {
-	// ProjectID is the lobally unique project identifier. This is intended to be
-	// managed by an external system.
-	ProjectID string `json:"projectId"`
 }
 
 // ProjectStatus defines the status of the project.

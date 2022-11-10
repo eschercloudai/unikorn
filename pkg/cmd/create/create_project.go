@@ -37,23 +37,11 @@ type createProjectOptions struct {
 	// name is the name of the project to create.
 	name string
 
-	// projectID is the external management plane's project identifier.
-	projectID string
-
 	// client is the Kubernetes v1 client.
 	client kubernetes.Interface
 
 	// unikornClient gives access to our custom resources.
 	unikornClient unikorn.Interface
-}
-
-// addFlags registers create cluster options flags with the specified cobra command.
-func (o *createProjectOptions) addFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.projectID, "project", "", "management plane project identifier.")
-
-	if err := cmd.MarkFlagRequired("project"); err != nil {
-		panic(err)
-	}
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -104,9 +92,6 @@ func (o *createProjectOptions) run() error {
 				metav1.FinalizerDeleteDependents,
 			},
 		},
-		Spec: unikornv1alpha1.ProjectSpec{
-			ProjectID: o.projectID,
-		},
 	}
 
 	if _, err := o.unikornClient.UnikornV1alpha1().Projects().Create(context.TODO(), project, metav1.CreateOptions{}); err != nil {
@@ -156,8 +141,6 @@ func newCreateProjectCommand(f cmdutil.Factory) *cobra.Command {
 			util.AssertNilError(o.run())
 		},
 	}
-
-	o.addFlags(cmd)
 
 	return cmd
 }
