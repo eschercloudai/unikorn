@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
@@ -28,6 +29,29 @@ var (
 	// ErrParseFlag is raised when flag parsing fails.
 	ErrParseFlag = errors.New("flag was unable to be parsed")
 )
+
+// RequiredVar registers a generic flag marked as required.
+func RequiredVar(cmd *cobra.Command, p pflag.Value, name, usage string) {
+	cmd.Flags().Var(p, name, usage)
+
+	if err := cmd.MarkFlagRequired(name); err != nil {
+		panic(err)
+	}
+}
+
+// RequiredStringVarWithCompletion registers a string flag marked as required and
+// with a completion function.
+func RequiredStringVarWithCompletion(cmd *cobra.Command, p *string, name, value, usage string, f func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)) {
+	cmd.Flags().StringVar(p, name, value, usage)
+
+	if err := cmd.MarkFlagRequired(name); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc(name, f); err != nil {
+		panic(err)
+	}
+}
 
 // SemverFlag provides parsing and type checking of semantic versions.
 type SemverFlag struct {
