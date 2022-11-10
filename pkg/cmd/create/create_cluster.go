@@ -19,15 +19,11 @@ package create
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net"
 	"net/url"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/spf13/cobra"
 
@@ -43,26 +39,15 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	computil "k8s.io/kubectl/pkg/util/completion"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"sigs.k8s.io/yaml"
 )
 
 const (
-	defaultKubernetesVersion = "v1.25.3"
-
-	defaultControlPlaneImage = "ubuntu-2204-kube-v1.25.3"
-
-	defaultControlPlaneFlavor = "c.small"
-
 	defaultControlPlaneReplicas = 3
 
-	defaultWorkloadImage = "ubuntu-2204-kube-v1.25.3"
-
-	defaultWorkloadFlavor = "c.small"
-
 	defaultWorkloadReplicas = 3
-
-	defaultAvailabilityZone = "nova"
 )
 
 var (
@@ -117,91 +102,92 @@ type createClusterOptions struct {
 	// kubernetesVersion defines the Kubernetes version to install.
 	kubernetesVersion util.SemverFlag
 
+	// externalNetworkID is an internet facing Openstack network to provision
+	// VIPs on for load balancers and stuff.
 	externalNetworkID string
 
-	nodeNetwork    net.IPNet
-	podNetwork     net.IPNet
+	// nodeNetwork is the network prefix Kubernetes nodes live on.
+	nodeNetwork net.IPNet
+
+	// podNetwork is the network prefix Kubernetes pods live on.
+	podNetwork net.IPNet
+
+	// service Network is the network prefix Kubernetes services live on.
 	serviceNetwork net.IPNet
+
+	// dnsNameservers is a list of nameservers for pods and nodes to use.
 	dnsNameservers []net.IP
 
-	kubernetesControlPlaneImage    string
-	kubernetesControlPlaneFlavor   string
+	// kubernetesControlPlaneImage defines the Openstack image Kubernetes control
+	// planes use.
+	kubernetesControlPlaneImage string
+
+	// kubernetesControlPlaneFlavor defines the Openstack VM flavor Kubernetes control
+	// planes use.
+	kubernetesControlPlaneFlavor string
+
+	// kubernetesControlPlaneReplicas defines the number of replicas (nodes) for
+	// Kubernetes control planes.
 	kubernetesControlPlaneReplicas int
 
-	kubernetesWorkloadImage    string
-	kubernetesWorkloadFlavor   string
+	// kubernetesWorkloadImage defines the Openstack image Kubernetes workload
+	// clusters use.
+	kubernetesWorkloadImage string
+
+	// kubernetesWorkloadFlavor defines the Openstack VM flavor Kubernetes workload
+	// clusters use.
+	kubernetesWorkloadFlavor string
+
+	// kubernetesWorkloadReplicas defines the number of replicas (nodes) for
+	// Kubernetes workload clusters
 	kubernetesWorkloadReplicas int
 
+	// availabilityZone defines in what Openstack failure domain the Kubernetes
+	// cluster will be provisioned in.
 	availabilityZone string
 
+	// sshKeyName defines the SSH key to inject onto the Kubernetes cluster.
+	// TODO: this is a legacy thing, and a security hole.  I'm pretty sure
+	// cloud-init will do all the provisioning.  If we need access for support
+	// then there are better ways of achieving this.
 	sshKeyName string
 
 	// client gives access to our custom resources.
 	client unikorn.Interface
 }
 
-// newCreateClusterOptions returns a new set of cluster options with any flag.Value
-// type flags initialised with defaults.
-func newCreateClusterOptions() *createClusterOptions {
-	return &createClusterOptions{
-		kubernetesVersion: util.SemverFlag{
-			Semver: defaultKubernetesVersion,
-		},
-	}
-}
-
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.project, "project", "", "Kubernetes project name that contains the control plane.")
+	// Unikorn options.
+	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
+	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to provision the cluster in.", completion.ControlPlanesCompletionFunc(f, &o.project))
 
-	if err := cmd.MarkFlagRequired("project"); err != nil {
-		panic(err)
-	}
+	// Openstack configuration options.
+	util.RequiredStringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)
 
-	if err := cmd.RegisterFlagCompletionFunc("project", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)); err != nil {
-		panic(err)
-	}
+	// Kubernetes options.
+	util.RequiredVar(cmd, &o.kubernetesVersion, "kubernetes-version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --control-plane-image and --workload-image flags.")
 
-	cmd.Flags().StringVar(&o.controlPlane, "control-plane", "", "Control plane to provision the cluster in.")
-
-	if err := cmd.MarkFlagRequired("control-plane"); err != nil {
-		panic(err)
-	}
-
-	if err := cmd.RegisterFlagCompletionFunc("control-plane", completion.ControlPlanesCompletionFunc(f, &o.project)); err != nil {
-		panic(err)
-	}
-
-	cmd.Flags().StringVar(&o.cloud, "cloud", "", "Cloud config to use within clouds.yaml, must be specified if more than one exists in clouds.yaml.")
-
-	cmd.Flags().Var(&o.kubernetesVersion, "kubernetes-version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --control-plane-image and --workload-image flags.")
-
-	cmd.Flags().StringVar(&o.externalNetworkID, "external-network-id", "", "Openstack external network ID.  If not set, Openstack will be polled and if a single network is returned this is used.  Any other situation is considered an error and it must be manually specified (see: 'openstack network list --external'.)")
+	// Networking options.
+	util.RequiredStringVarWithCompletion(cmd, &o.externalNetworkID, "external-network", "", "Openstack external network (see: 'openstack network list --external'.)", completion.OpenstackExternalNetworkCompletionFunc(&o.cloud))
 	cmd.Flags().IPNetVar(&o.nodeNetwork, "node-network", defaultNodeNetwork, "Node network prefix.")
 	cmd.Flags().IPNetVar(&o.podNetwork, "pod-network", defaultPodNetwork, "Pod network prefix.")
 	cmd.Flags().IPNetVar(&o.serviceNetwork, "service-network", defaultServiceNetwork, "Service network prefix.")
 	cmd.Flags().IPSliceVar(&o.dnsNameservers, "dns-nameservers", defaultDNSNameservers, "DNS nameservers for pods.")
 
-	cmd.Flags().StringVar(&o.kubernetesControlPlaneImage, "kube-controlplane-image", defaultControlPlaneImage, "Kubernetes control plane Openstack image (see: 'openstack image list'.)")
-	cmd.Flags().StringVar(&o.kubernetesControlPlaneFlavor, "kube-controlplane-flavor", defaultControlPlaneFlavor, "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)")
+	// Kubernetes control plane options.
+	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesControlPlaneImage, "kube-controlplane-image", "", "Kubernetes control plane Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
+	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesControlPlaneFlavor, "kube-controlplane-flavor", "", "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
 	cmd.Flags().IntVar(&o.kubernetesControlPlaneReplicas, "kube-controlplane-replicas", defaultControlPlaneReplicas, "Kubernetes control plane replicas.")
 
-	cmd.Flags().StringVar(&o.kubernetesWorkloadImage, "kube-workload-image", defaultWorkloadImage, "Kubernetes workload Openstack image (see: 'openstack image list'.)")
-	cmd.Flags().StringVar(&o.kubernetesWorkloadFlavor, "kube-workload-flavor", defaultWorkloadFlavor, "Kubernetes workload Openstack flavor (see: 'openstack flavor list'.)")
+	// Kubernetes workload cluster options.
+	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesWorkloadImage, "kube-workload-image", "", "Kubernetes workload Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
+	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesWorkloadFlavor, "kube-workload-flavor", "", "Kubernetes workload Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
 	cmd.Flags().IntVar(&o.kubernetesWorkloadReplicas, "kube-workload-replicas", defaultWorkloadReplicas, "Kubernetes workload replicas.")
 
-	cmd.Flags().StringVar(&o.availabilityZone, "availability-zone", defaultAvailabilityZone, "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)")
-
-	// TODO: is this actually necessary?  Sounds like a security hole to me.
-	// It's a legacy part of this template:
-	// https://github.com/kubernetes-sigs/cluster-api-provider-openstack/blob/main/templates/cluster-template.yaml
-	// I'm guessing we should be able to remove it using a JSON patch applied to the
-	// manifest to override this requirement.
-	cmd.Flags().StringVar(&o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)")
-
-	if err := cmd.MarkFlagRequired("ssh-key-name"); err != nil {
-		panic(err)
-	}
+	// Openstack provisioning options.
+	util.RequiredStringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
+	util.RequiredStringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -216,10 +202,6 @@ func (o *createClusterOptions) complete(f cmdutil.Factory, args []string) error 
 	}
 
 	if err := o.completeOpenstackConfig(); err != nil {
-		return err
-	}
-
-	if err := o.completeOpenstackNetworking(); err != nil {
 		return err
 	}
 
@@ -238,16 +220,6 @@ func (o *createClusterOptions) completeOpenstackConfig() error {
 	clouds, err := clientconfig.LoadCloudsYAML()
 	if err != nil {
 		return err
-	}
-
-	// Do the automatic defaulting if only one cloud exists and it's not
-	// explicitly specified.
-	if len(clouds) == 1 && o.cloud == "" {
-		for k := range clouds {
-			o.cloud = k
-
-			break
-		}
 	}
 
 	// Ensure the cloud exists.
@@ -294,97 +266,6 @@ func (o *createClusterOptions) completeOpenstackConfig() error {
 	}
 
 	o.caCert = pem.EncodeToMemory(pemBlock)
-
-	return nil
-}
-
-// Network allows us to extend gophercloud to get access to more interesting
-// fields not available in the standard data types.
-type Network struct {
-	// Network is the gophercloud network type.  This needs to be a field,
-	// not an embedded type, lest its UnmarshalJSON function get promoted...
-	Network networks.Network
-
-	// External is the bit we care about, is it an external network ID?
-	External bool `json:"router:external"`
-}
-
-// UnmarshalJSON does magic quite frankly.  We unmarshal directly into the
-// gophercloud network type, easy peasy.  When un marshalling into our network
-// type, we need to define a temporary type to avoid an infinite loop...
-func (n *Network) UnmarshalJSON(b []byte) error {
-	if err := json.Unmarshal(b, &n.Network); err != nil {
-		return err
-	}
-
-	type tmp Network
-
-	var s struct {
-		tmp
-	}
-
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-
-	n.External = s.tmp.External
-
-	return nil
-}
-
-func (o *createClusterOptions) completeOpenstackNetworking() error {
-	if o.externalNetworkID != "" {
-		return nil
-	}
-
-	clientOpts := &clientconfig.ClientOpts{
-		Cloud: o.cloud,
-	}
-
-	authOpts, err := clientconfig.AuthOptions(clientOpts)
-	if err != nil {
-		return err
-	}
-
-	provider, err := openstack.AuthenticatedClient(*authOpts)
-	if err != nil {
-		return err
-	}
-
-	client, err := openstack.NewNetworkV2(provider, gophercloud.EndpointOpts{})
-	if err != nil {
-		return err
-	}
-
-	// This sucks, you cannot directly query for external networks...
-	pager := networks.List(client, &networks.ListOpts{})
-
-	page, err := pager.AllPages()
-	if err != nil {
-		return err
-	}
-
-	var results []Network
-
-	if err := networks.ExtractNetworksInto(page, &results); err != nil {
-		return err
-	}
-
-	var externalNetworks []Network
-
-	for _, network := range results {
-		if network.External {
-			externalNetworks = append(externalNetworks, network)
-		}
-	}
-
-	if len(externalNetworks) != 1 {
-		// TODO: temporary hack, we can add this all to a completion function.
-		//nolint:goerr113
-		return fmt.Errorf("unable to derive external network, specify it explicitly")
-	}
-
-	o.externalNetworkID = externalNetworks[0].Network.ID
 
 	return nil
 }
@@ -469,20 +350,34 @@ func (o *createClusterOptions) run() error {
 
 var (
 	//nolint:gochecknoglobals
+	createClusterLong = templates.LongDesc(`
+	Create a Kubernetes cluster
+
+	This command will use standard lookup rules to find a clouds.yaml file on
+	your local system.  You need to supply a --cloud parameter to select the
+	cloud and user account to provision with.  Only the selected cloud will be
+	passed to CAPI for security reasons.  It's also recommended that you use
+	the shell completion for --cloud first, as that'll allow further completion
+	functions to poll OpenStack to get images, flavors etc.
+
+	Tab completion is your friend here as it's a very chunky command, with lots
+	of required flags, let that be your shepherd.`)
+
+	//nolint:gochecknoglobals
 	createClusterExamples = util.TemplatedExample(`
         # Create a Kubernetes cluster
-        {{.Application}} create cluster --project foo --control-plane bar baz`)
+        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --ssh-key-name spjmurray --external-network c9d130bc-301d-45c0-9328-a6964af65579 --kube-controlplane-flavor c.small --kube-controlplane-image ubuntu-2004-kube-v1.24.7 --kube-workload-flavor g.medium_a100_MIG_2g.20gb --kube-workload-image ubuntu-2004-kube-v1.24.7 --kubernetes-version v1.24.7 --availability-zone nova baz`)
 )
 
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes
 // cluster with a Cluster API control plane.
 func newCreateClusterCommand(f cmdutil.Factory) *cobra.Command {
-	o := newCreateClusterOptions()
+	o := createClusterOptions{}
 
 	cmd := &cobra.Command{
 		Use:     "cluster",
 		Short:   "Create a Kubernetes cluster",
-		Long:    "Create a Kubernetes cluster",
+		Long:    createClusterLong,
 		Example: createClusterExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
