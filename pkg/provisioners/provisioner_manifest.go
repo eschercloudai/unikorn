@@ -56,6 +56,9 @@ const (
 
 	// ManifestClusterAPIProviderOpenstack is the cluster API OpenStack provider.
 	ManifestClusterAPIProviderOpenstack ManifestID = "cluster-api-provider-openstack"
+
+	// ManifestClusterAPIProviderOpenstack is the cluster API OpenStack provider.
+	ManifestClusterAPIAddonProvider ManifestID = "cluster-api-addon-provider"
 )
 
 const (
@@ -88,7 +91,7 @@ type manifestRegistryEntry struct {
 }
 
 var (
-	// manifestRegistry records a mpping from manifest ID to its metadata.
+	// manifestRegistry records a mapping from manifest ID to its metadata.
 	// At present this is global, but you could make a case for using build
 	// constraints at a later point.
 	//nolint:gochecknoglobals
@@ -114,6 +117,10 @@ var (
 		},
 		ManifestClusterAPIProviderOpenstack: {
 			path:              "/manifests/cluster-api-provider-openstack",
+			withSusbstitution: true,
+		},
+		ManifestClusterAPIAddonProvider: {
+			path:              "/manifests/cluster-api-addon-provider",
 			withSusbstitution: true,
 		},
 	}

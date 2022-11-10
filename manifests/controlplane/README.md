@@ -1,7 +1,7 @@
 # Control Plane Manifests
 
 When this was initially written, we delegated the installation to things like `helm` or `clusterctl`.
-WHy is this a bad idea?
+Why is this a bad idea?
 
 * Reliance on external tooling in containers could lead to a greater surface area for supply-chain attacks.
 * Tooling bloat.
@@ -21,4 +21,6 @@ The following are required at present, the links will tell you how to source the
 * [Cluster API Core](cluster-api-core/README.md)
 * [Cluster API Bootstrap](cluster-api-bootstrap/README.md)
 * [Cluster API Control Plane](cluster-api-control-plane/README.md)
-* [Cluster API Openstack Provider](cluster-api-provider-openstack/README.md)
+* [Cluster API OpenStack Provider](cluster-api-provider-openstack/README.md)
+* [Cluster API Addon Provider](cluster-api-addon-provider/README.md)
+
