@@ -70,10 +70,6 @@ spec:
                     description: Flavor is the Openstack machine type to use for control
                       plane nodes.
                     type: string
-                  image:
-                    description: Image is the Openstack image name to use for control
-                      plane nodes.
-                    type: string
                   replicas:
                     default: 3
                     description: Replicas is the number desired replicas for the control
@@ -82,7 +78,6 @@ spec:
                     type: integer
                 required:
                 - flavor
-                - image
                 type: object
               kubernetesVersion:
                 description: KubernetesVersion is the Kubernetes version.
@@ -93,11 +88,15 @@ spec:
                 properties:
                   dnsNameservers:
                     description: DNSNameservers sets the DNS nameservers for pods.
-                      If not specified it will default to 8.8.8.8.
+                      At present due to some technical challenges, this must contain
+                      only one DNS server.
                     items:
                       pattern: ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])$
                       type: string
+                    maxItems: 1
+                    minItems: 1
                     type: array
+                    x-kubernetes-list-type: set
                   externalNetworkId:
                     description: ExternalNetworkID is the Openstack external network
                       ID.
@@ -138,8 +137,17 @@ spec:
                       file for use by the ControlPlane to provision the IaaS bits.
                     format: byte
                     type: string
+                  cloudProviderConfig:
+                    description: CloudProviderConfig is a simple ini file that looks
+                      with a global section and a auth-url key.
+                    format: byte
+                    type: string
                   failureDomain:
                     description: FailureDomain is the failure domain to use.
+                    type: string
+                  image:
+                    description: Image is the Openstack image name to use for all
+                      nodes.
                     type: string
                   sshKeyName:
                     description: SSHKeyName is the SSH key name to use to provide
@@ -149,7 +157,9 @@ spec:
                 - caCert
                 - cloud
                 - cloudConfig
+                - cloudProviderConfig
                 - failureDomain
+                - image
                 - sshKeyName
                 type: object
               provisionerControlPlane:
@@ -168,10 +178,6 @@ spec:
                     description: Flavor is the Openstack machine type to use for workload
                       nodes.
                     type: string
-                  image:
-                    description: Image is the Openstack image name to use for workload
-                      nodes.
-                    type: string
                   replicas:
                     default: 3
                     description: Replicas is the number desired replicas for the workload
@@ -181,7 +187,6 @@ spec:
                     type: integer
                 required:
                 - flavor
-                - image
                 type: object
             required:
             - controlPlane

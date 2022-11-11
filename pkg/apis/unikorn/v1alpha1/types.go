@@ -340,7 +340,7 @@ type KubernetesClusterSpec struct {
 	ProvisionerControlPlane string `json:"provisionerControlPlane"`
 	// Timeout is the maximum time to attempt to provision a cluster before aborting.
 	// +kubebuilder:default="20m"
-	TImeout *metav1.Duration `json:"timeout"`
+	Timeout *metav1.Duration `json:"timeout"`
 	// KubernetesVersion is the Kubernetes version.
 	KubernetesVersion *SemanticVersion `json:"kubernetesVersion"`
 	// Openstack defines global Openstack related configuration.
@@ -361,6 +361,9 @@ type KubernetesClusterOpenstackSpec struct {
 	// CloudConfig is a base64 encoded minimal clouds.yaml file for
 	// use by the ControlPlane to provision the IaaS bits.
 	CloudConfig *[]byte `json:"cloudConfig"`
+	// CloudProviderConfig is a simple ini file that looks with a global
+	// section and a auth-url key.
+	CloudProviderConfig *[]byte `json:"cloudProviderConfig"`
 	// Cloud is the clouds.yaml key that identifes the configuration
 	// to use for provisioning.
 	Cloud *string `json:"cloud"`
@@ -368,6 +371,8 @@ type KubernetesClusterOpenstackSpec struct {
 	SSHKeyName *string `json:"sshKeyName"`
 	// FailureDomain is the failure domain to use.
 	FailureDomain *string `json:"failureDomain"`
+	// Image is the Openstack image name to use for all nodes.
+	Image *string `json:"image"`
 }
 
 type KubernetesClusterNetworkSpec struct {
@@ -378,7 +383,11 @@ type KubernetesClusterNetworkSpec struct {
 	// ServiceNetwork is the IPv4 prefix for the service network.
 	ServiceNetwork *IPv4Prefix `json:"serviceNetwork"`
 	// DNSNameservers sets the DNS nameservers for pods.
-	// If not specified it will default to 8.8.8.8.
+	// At present due to some technical challenges, this must contain
+	// only one DNS server.
+	// +listType=set
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=1
 	DNSNameservers []IPv4Address `json:"dnsNameservers"`
 	// ExternalNetworkID is the Openstack external network ID.
 	ExternalNetworkID *string `json:"externalNetworkId"`
@@ -392,9 +401,6 @@ type KubernetesClusterControlPlaneSpec struct {
 	// Flavor is the Openstack machine type to use for control
 	// plane nodes.
 	Flavor *string `json:"flavor"`
-	// Image is the Openstack image name to use for control
-	// plane nodes.
-	Image *string `json:"image"`
 }
 
 type KubernetesClusterWorkloadSpec struct {
@@ -406,8 +412,6 @@ type KubernetesClusterWorkloadSpec struct {
 	Replicas *int `json:"replicas,omitempty"`
 	// Flavor is the Openstack machine type to use for workload nodes.
 	Flavor *string `json:"flavor"`
-	// Image is the Openstack image name to use for workload nodes.
-	Image *string `json:"image"`
 }
 
 type KubernetesClusterAutoscalerSpec struct {

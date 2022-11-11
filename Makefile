@@ -13,7 +13,8 @@ REVISION := $(shell git rev-parse HEAD)
 COMMANDS = unikornctl
 CONTROLLERS = \
   unikorn-project-manager \
-  unikorn-control-plane-manager
+  unikorn-control-plane-manager \
+  unikorn-cluster-manager
 
 # Some constants to describe the repository.
 BINDIR = bin

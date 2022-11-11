@@ -1,0 +1,4 @@
+*
+!bin/amd64-linux-gnu/unikorn-cluster-manager
+!manifests/cluster
+!hack/passwd.nonroot
