@@ -141,5 +141,11 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	clusterAPIAddonProviderProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPIAddonProvider)
+
+	if err := clusterAPIAddonProviderProvisioner.Provision(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
