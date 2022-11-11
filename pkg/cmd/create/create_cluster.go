@@ -96,6 +96,10 @@ type createClusterOptions struct {
 	// only the specified cloud.
 	clouds []byte
 
+	// cloudProvider is set during completion, and is a really simple file containing
+	// the Keystone endpoint.
+	cloudProvider []byte
+
 	// caCert is derived from clouds during completion.
 	caCert []byte
 
@@ -118,9 +122,8 @@ type createClusterOptions struct {
 	// dnsNameservers is a list of nameservers for pods and nodes to use.
 	dnsNameservers []net.IP
 
-	// kubernetesControlPlaneImage defines the Openstack image Kubernetes control
-	// planes use.
-	kubernetesControlPlaneImage string
+	// image defines the Openstack image for Kubernetes nodes.
+	image string
 
 	// kubernetesControlPlaneFlavor defines the Openstack VM flavor Kubernetes control
 	// planes use.
@@ -129,10 +132,6 @@ type createClusterOptions struct {
 	// kubernetesControlPlaneReplicas defines the number of replicas (nodes) for
 	// Kubernetes control planes.
 	kubernetesControlPlaneReplicas int
-
-	// kubernetesWorkloadImage defines the Openstack image Kubernetes workload
-	// clusters use.
-	kubernetesWorkloadImage string
 
 	// kubernetesWorkloadFlavor defines the Openstack VM flavor Kubernetes workload
 	// clusters use.
@@ -176,16 +175,15 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	cmd.Flags().IPSliceVar(&o.dnsNameservers, "dns-nameservers", defaultDNSNameservers, "DNS nameservers for pods.")
 
 	// Kubernetes control plane options.
-	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesControlPlaneImage, "kube-controlplane-image", "", "Kubernetes control plane Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
 	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesControlPlaneFlavor, "kube-controlplane-flavor", "", "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
 	cmd.Flags().IntVar(&o.kubernetesControlPlaneReplicas, "kube-controlplane-replicas", defaultControlPlaneReplicas, "Kubernetes control plane replicas.")
 
 	// Kubernetes workload cluster options.
-	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesWorkloadImage, "kube-workload-image", "", "Kubernetes workload Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
 	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesWorkloadFlavor, "kube-workload-flavor", "", "Kubernetes workload Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
 	cmd.Flags().IntVar(&o.kubernetesWorkloadReplicas, "kube-workload-replicas", defaultWorkloadReplicas, "Kubernetes workload replicas.")
 
 	// Openstack provisioning options.
+	util.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Kubernetes Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
 	util.RequiredStringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
 	util.RequiredStringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
 }
@@ -241,6 +239,9 @@ func (o *createClusterOptions) completeOpenstackConfig() error {
 	}
 
 	o.clouds = filteredCloudsYaml
+
+	// Set the cloud provider config.
+	o.cloudProvider = []byte(fmt.Sprintf("[global]\nauth-url=%s", cloud.AuthInfo.AuthURL))
 
 	// Work out the correct CA to use.
 	// Screw private clouds, public is the future!
@@ -315,11 +316,13 @@ func (o *createClusterOptions) run() error {
 			ProvisionerControlPlane: controlPlane.Name,
 			KubernetesVersion:       &kubernetesVersion,
 			Openstack: unikornv1alpha1.KubernetesClusterOpenstackSpec{
-				CACert:        &o.caCert,
-				CloudConfig:   &o.clouds,
-				Cloud:         &o.cloud,
-				FailureDomain: &o.availabilityZone,
-				SSHKeyName:    &o.sshKeyName,
+				CACert:              &o.caCert,
+				CloudConfig:         &o.clouds,
+				CloudProviderConfig: &o.cloudProvider,
+				Cloud:               &o.cloud,
+				FailureDomain:       &o.availabilityZone,
+				SSHKeyName:          &o.sshKeyName,
+				Image:               &o.image,
 			},
 			Network: unikornv1alpha1.KubernetesClusterNetworkSpec{
 				NodeNetwork:       &unikornv1alpha1.IPv4Prefix{IPNet: o.nodeNetwork},
@@ -330,12 +333,10 @@ func (o *createClusterOptions) run() error {
 			},
 			ControlPlane: unikornv1alpha1.KubernetesClusterControlPlaneSpec{
 				Replicas: &o.kubernetesControlPlaneReplicas,
-				Image:    &o.kubernetesControlPlaneImage,
 				Flavor:   &o.kubernetesControlPlaneFlavor,
 			},
 			Workload: unikornv1alpha1.KubernetesClusterWorkloadSpec{
 				Replicas: &o.kubernetesWorkloadReplicas,
-				Image:    &o.kubernetesWorkloadImage,
 				Flavor:   &o.kubernetesWorkloadFlavor,
 			},
 		},
@@ -366,7 +367,7 @@ var (
 	//nolint:gochecknoglobals
 	createClusterExamples = util.TemplatedExample(`
         # Create a Kubernetes cluster
-        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --ssh-key-name spjmurray --external-network c9d130bc-301d-45c0-9328-a6964af65579 --kube-controlplane-flavor c.small --kube-controlplane-image ubuntu-2004-kube-v1.24.7 --kube-workload-flavor g.medium_a100_MIG_2g.20gb --kube-workload-image ubuntu-2004-kube-v1.24.7 --kubernetes-version v1.24.7 --availability-zone nova baz`)
+        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --ssh-key-name spjmurray --external-network c9d130bc-301d-45c0-9328-a6964af65579 --kube-controlplane-flavor c.small --kube-workload-flavor g.medium_a100_MIG_2g.20gb --kubernetes-version v1.24.7 --image ubuntu-2004-kube-v1.24.7 --availability-zone nova baz`)
 )
 
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes

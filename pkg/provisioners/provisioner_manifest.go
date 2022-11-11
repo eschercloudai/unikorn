@@ -18,13 +18,17 @@ package provisioners
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/drone/envsubst"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/go-logr/logr"
+
+	"github.com/eschercloudai/unikorn/pkg/util"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,6 +63,9 @@ const (
 
 	// ManifestClusterAPIProviderOpenstack is the cluster API OpenStack provider.
 	ManifestClusterAPIAddonProvider ManifestID = "cluster-api-addon-provider"
+
+	// ManifestProviderOpenstackKubernetesCluster is a Kubernetes cluster.
+	ManifestProviderOpenstackKubernetesCluster ManifestID = "cluster-api-cluster-openstack"
 )
 
 const (
@@ -84,10 +91,10 @@ type manifestRegistryEntry struct {
 	// multiple times in the same namespace.
 	templated bool
 
-	// withSusbstitution is a bit of a hack for manifests sourced from
+	// withSubstitution is a bit of a hack for manifests sourced from
 	// the cluster API project.  These feature "shell" variable expansion
 	// to inject values and need to be processed as such.
-	withSusbstitution bool
+	withSubstitution bool
 }
 
 var (
@@ -104,24 +111,28 @@ var (
 			path: "/manifests/cert-manager",
 		},
 		ManifestClusterAPICore: {
-			path:              "/manifests/cluster-api-core",
-			withSusbstitution: true,
+			path:             "/manifests/cluster-api-core",
+			withSubstitution: true,
 		},
 		ManifestClusterAPIControlPlane: {
-			path:              "/manifests/cluster-api-control-plane",
-			withSusbstitution: true,
+			path:             "/manifests/cluster-api-control-plane",
+			withSubstitution: true,
 		},
 		ManifestClusterAPIBootstrap: {
-			path:              "/manifests/cluster-api-bootstrap",
-			withSusbstitution: true,
+			path:             "/manifests/cluster-api-bootstrap",
+			withSubstitution: true,
 		},
 		ManifestClusterAPIProviderOpenstack: {
-			path:              "/manifests/cluster-api-provider-openstack",
-			withSusbstitution: true,
+			path:             "/manifests/cluster-api-provider-openstack",
+			withSubstitution: true,
 		},
 		ManifestClusterAPIAddonProvider: {
-			path:              "/manifests/cluster-api-addon-provider",
-			withSusbstitution: true,
+			path:             "/manifests/cluster-api-addon-provider",
+			withSubstitution: true,
+		},
+		ManifestProviderOpenstackKubernetesCluster: {
+			path:             "/manifests/cluster-api-cluster-openstack",
+			withSubstitution: true,
 		},
 	}
 )
@@ -152,6 +163,16 @@ type ManifestProvisioner struct {
 	// entry is set on provison with a cached copy of the registry
 	// metadata related to the manifest ID.
 	entry manifestRegistryEntry
+
+	// envMapper allows manifest with environment subsitution to
+	// map variables to values.
+	envMapper func(string) string
+}
+
+// nullEnvMapper is a dummy mapper for when none is specified, by the manifest
+// requires one.
+func nullEnvMapper(_ string) string {
+	return ""
 }
 
 // Ensure the Provisioner interface is implemented.
@@ -189,6 +210,13 @@ func (p *ManifestProvisioner) WithOwnerReferences(ownerReferences []metav1.Owner
 	return p
 }
 
+// WithEnvMapper associates a mapping function that substitutes variables with values.
+func (p *ManifestProvisioner) WithEnvMapper(f func(string) string) *ManifestProvisioner {
+	p.envMapper = f
+
+	return p
+}
+
 // readManifest loads the manifest file from the local filesystem.
 func (p *ManifestProvisioner) readManifest() (string, error) {
 	path := filepath.Join(p.entry.path, "manifest.yaml")
@@ -213,6 +241,8 @@ func (p *ManifestProvisioner) readManifest() (string, error) {
 
 // processTemplate optionally substitutes the name and namespace in a templated
 // manifest.
+// TODO: we can actually just do some magic here to make it look like it's a
+// substitution, generalise things etc.
 func (p *ManifestProvisioner) processTemplate(s string) string {
 	if !p.entry.templated {
 		return s
@@ -235,16 +265,129 @@ func (p *ManifestProvisioner) processTemplate(s string) string {
 	return strings.ReplaceAll(s, HelmNamespaceEyecatcher, p.namespace)
 }
 
+// patch allows us to take vendor provided manifests and do some custom
+// overrides.  This is safer in the long run, rather than manually hacking
+// stuff as we pick up the vendor changes for free, don't accidentally forget
+// to add some manual hacks.  Instead patches will fail to apply if things
+// go too far out of whack.
+type patch struct {
+	// APIVersion defines the resource group/version to apply the patches to.
+	APIVersion string `json:"apiVersion"`
+
+	// Kind defines the resource kind to apply the patches to.
+	Kind string `json:"kind"`
+
+	// Name defines the resource name to apply the patches to.
+	// This is optional, so by omitting it you can apply the patch to all
+	// resources that match the GVK only.
+	Name *string `json:"name"`
+
+	// Patch is the patchset, basically a valid array of JSON Patch objects.
+	Patch jsonpatch.Patch `json:"patches"`
+}
+
+// processPatches looks for a patch definition file to accompany a manifest.
+// If one exists, then parse the manifest into objects, if the object matches
+// any patch's constraints, then apply the patchset.  This should be called
+// before any environment variable subsitution, as the patches themselves may
+// contain variables.
+func (p *ManifestProvisioner) processPatches(s string) (string, error) {
+	path := filepath.Join(p.entry.path, "patches.json")
+
+	patchFile, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			p.log.V(1).Info("no patch file found for manifest")
+
+			return s, nil
+		}
+
+		return "", err
+	}
+
+	defer patchFile.Close()
+
+	p.log.V(1).Info("applying patches")
+
+	bytes, err := io.ReadAll(patchFile)
+	if err != nil {
+		return "", err
+	}
+
+	var patches []patch
+
+	if err := json.Unmarshal(bytes, &patches); err != nil {
+		return "", err
+	}
+
+	yamls := util.SplitYAML(s)
+
+	for i := range yamls {
+		patchedYAML, err := p.processPatchesYAML(yamls[i], patches)
+		if err != nil {
+			return "", err
+		}
+
+		yamls[i] = patchedYAML
+	}
+
+	return strings.Join(yamls, "\n---\n"), nil
+}
+
+// processPatchesYAML applies patches to a single YAML object.
+func (p *ManifestProvisioner) processPatchesYAML(s string, patches []patch) (string, error) {
+	var object unstructured.Unstructured
+
+	if err := yaml.Unmarshal([]byte(s), &object); err != nil {
+		return "", err
+	}
+
+	jsonObject, err := json.Marshal(object.Object)
+	if err != nil {
+		return "", err
+	}
+
+	for _, patch := range patches {
+		if object.GetAPIVersion() != patch.APIVersion || object.GetKind() != patch.Kind {
+			continue
+		}
+
+		patchedJSON, err := patch.Patch.Apply(jsonObject)
+		if err != nil {
+			return "", err
+		}
+
+		p.log.V(1).Info("applied patch", "object", string(jsonObject), "result", string(patchedJSON))
+
+		jsonObject = patchedJSON
+	}
+
+	patchedYAML, err := yaml.JSONToYAML(jsonObject)
+	if err != nil {
+		return "", err
+	}
+
+	return string(patchedYAML), nil
+}
+
 // processSubstitution optionally substitutes "shell" environment variables
 // in a manifest.
+// TODO: we should pre-process and ensure all environment subsitutions will
+// actual resolve to something.
 func (p *ManifestProvisioner) processSubstitution(s string) (string, error) {
-	if !p.entry.withSusbstitution {
+	if !p.entry.withSubstitution {
 		return s, nil
 	}
 
 	p.log.V(1).Info("applying environment substitution")
 
-	s, err := envsubst.EvalEnv(s)
+	envMapper := nullEnvMapper
+
+	if p.envMapper != nil {
+		envMapper = p.envMapper
+	}
+
+	s, err := envsubst.Eval(s, envMapper)
 	if err != nil {
 		return "", err
 	}
@@ -335,6 +478,11 @@ func (p *ManifestProvisioner) Provision(ctx context.Context) error {
 	}
 
 	contents = p.processTemplate(contents)
+
+	contents, err = p.processPatches(contents)
+	if err != nil {
+		return err
+	}
 
 	contents, err = p.processSubstitution(contents)
 	if err != nil {

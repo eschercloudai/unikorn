@@ -1,0 +1,19 @@
+[
+	{
+		"description": "Patches the cluster definition with dynamic network prefixes",
+		"apiVersion": "cluster.x-k8s.io/v1beta1",
+		"kind": "Cluster",
+		"patches": [
+			{"op":"replace","path":"/spec/clusterNetwork/pods/cidrBlocks/0","value":"${KUBERNETES_POD_NETWORK}"},
+			{"op":"add","path":"/spec/clusterNetwork/services","value":{"cidrBlocks":["${KUBERNETES_SERVICE_NETWORK}"]}}
+		]
+	},
+	{
+		"description": "Patches the openstack cluster with dynamic network prefixes",
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1alpha5",
+		"kind": "OpenStackCluster",
+		"patches": [
+			{"op":"replace","path":"/spec/nodeCidr","value":"${OPENSTACK_NODE_NETWORK}"}
+		]
+	}
+]
