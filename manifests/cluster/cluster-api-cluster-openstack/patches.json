@@ -15,5 +15,13 @@
 		"patches": [
 			{"op":"replace","path":"/spec/nodeCidr","value":"${OPENSTACK_NODE_NETWORK}"}
 		]
+	},
+	{
+		"description": "Remove the Kubeadm image repository",
+		"apiVersion": "controlplane.cluster.x-k8s.io/v1beta1",
+		"kind": "KubeadmControlPlane",
+		"patches": [
+			{"op":"remove","path":"/spec/kubeadmConfigSpec/clusterConfiguration/imageRepository"}
+		]
 	}
 ]

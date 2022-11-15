@@ -425,6 +425,14 @@ func (p *ManifestProvisioner) provision(ctx context.Context, objects []unstructu
 	for i := range objects {
 		object := &objects[i]
 
+		if object.GetNamespace() == "" {
+			if p.namespace == "" {
+				panic("object has no namespace and none provided")
+			}
+
+			object.SetNamespace(p.namespace)
+		}
+
 		if p.ownerReferences != nil {
 			object.SetOwnerReferences(p.ownerReferences)
 		}

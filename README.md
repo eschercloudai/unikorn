@@ -93,21 +93,6 @@ the CRs.
 kubectl apply -f crds
 ```
 
-#### Installing Cert Manager CRDs
-
-tl;dr do this.
-The long version is that dynamic clients will perform an API resource lookup on start up.
-This will initialse REST mapping from APIVersion/Kind to REST endpoints.
-Now, it transpires that you need to install Cert-Manager resources to provision Cluster API.
-In order to do that, the REST mapper needs to know about `Certificate` custom resources on startup.
-To facilitate this, just install them on the management cluster:
-
-```shell
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.10.0/cert-manager.crds.yaml
-```
-
-While it is possible to redo a discovery when a CRD is provisioned, the controller-runtime makes it practically impossible without forcing a container restart.
-
 #### Installing the Unikorn Controllers
 
 There are a couple manifests -- one per controller -- in the `manifests` directory.

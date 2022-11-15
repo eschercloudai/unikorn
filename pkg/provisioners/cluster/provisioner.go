@@ -56,7 +56,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	vclusterClient, err := client.New(vclusterConfig, client.Options{Scheme: p.client.Scheme(), Mapper: p.client.RESTMapper()})
+	// Do not inherit the scheme or REST mapper here, it's a different cluster!
+	vclusterClient, err := client.New(vclusterConfig, client.Options{})
 	if err != nil {
 		return err
 	}
@@ -91,7 +92,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return ""
 	}
 
-	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithEnvMapper(envMapper)
+	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace("default").WithEnvMapper(envMapper)
 
 	if err := provisioner.Provision(ctx); err != nil {
 		return err
