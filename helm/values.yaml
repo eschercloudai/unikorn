@@ -1,0 +1,22 @@
+replicaCount: 1
+
+clusterManager:
+  image:
+    repository: gcr.io/eschercloudai/unikorn/cluster-manager
+    pullPolicy: IfNotPresent
+    tag: "53721b7"
+
+projectManager:
+  image:
+    repository: gcr.io/eschercloudai/unikorn/project-manager
+    pullPolicy: IfNotPresent
+    tag: "53721b7"
+
+controlPlaneManager:
+  image:
+    repository: gcr.io/eschercloudai/unikorn/control-plane-manager
+    pullPolicy: IfNotPresent
+    tag: "53721b7"
+
+monitoring:
+  enabled: false

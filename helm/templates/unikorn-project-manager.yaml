@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: unikorn-project-manager
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: unikorn-project-manager
+rules:
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - projects
+  verbs:
+  - list
+  - get
+  - watch
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - projects/status
+  verbs:
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - create
+  - list
+  - watch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: unikorn-project-manager
+subjects:
+- kind: ServiceAccount
+  name: unikorn-project-manager
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: unikorn-project-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unikorn-project-manager
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unikorn-project-manager
+  template:
+    metadata:
+      labels:
+        app: unikorn-project-manager
+    spec:
+      containers:
+      - name: unikorn-project-manager
+        image: {{ .Values.projectManager.image.repository }}:{{ .Values.projectManager.image.tag }}
+        {{- if .Values.monitoring.enabled }}
+        ports:
+        - name: prometheus
+          containerPort: 8080
+        {{- end }}
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          readOnlyRootFilesystem: true
+      serviceAccountName: unikorn-project-manager
+      securityContext:
+        runAsNonRoot: true
+{{- if .Values.monitoring.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unikorn-project-manager
+  namespace: {{ .Release.namespace }}
+  labels:
+    service: unikorn-controller
+    unikorn-controller: unikorn-project-manager
+spec:
+  selector:
+    app: unikorn-project-manager
+  ports:
+  - name: prometheus
+    port: 8080
+    targetPort: prometheus
+{{- end }}
