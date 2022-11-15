@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/spf13/cobra"
@@ -241,7 +242,19 @@ func (o *createClusterOptions) completeOpenstackConfig() error {
 	o.clouds = filteredCloudsYaml
 
 	// Set the cloud provider config.
-	o.cloudProvider = []byte(fmt.Sprintf("[global]\nauth-url=%s", cloud.AuthInfo.AuthURL))
+	// TODO: this can use application credentials not user ones, see:
+	// https://github.com/kubernetes-sigs/cluster-api-provider-openstack/blob/main/templates/env.rc
+	cloudProvider := []string{
+		`[Global]`,
+		fmt.Sprintf(`auth-url="%s"`, cloud.AuthInfo.AuthURL),
+		fmt.Sprintf(`username="%s"`, cloud.AuthInfo.Username),
+		fmt.Sprintf(`password="%s"`, cloud.AuthInfo.Password),
+		fmt.Sprintf(`domain-name="%s"`, cloud.AuthInfo.DomainName),
+		fmt.Sprintf(`tenant-name="%s"`, cloud.AuthInfo.ProjectName),
+		fmt.Sprintf(`region="%s"`, cloud.RegionName),
+	}
+
+	o.cloudProvider = []byte(strings.Join(cloudProvider, "\n"))
 
 	// Work out the correct CA to use.
 	// Screw private clouds, public is the future!
