@@ -31,6 +31,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/util"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -420,17 +421,33 @@ func (p *ManifestProvisioner) parse(s string) ([]unstructured.Unstructured, erro
 	return objects, nil
 }
 
+// applyNamespace does any namespace defaulting required of the manifest object.
+func (p *ManifestProvisioner) applyNamespace(object *unstructured.Unstructured) error {
+	gvk := object.GroupVersionKind()
+
+	mapping, err := p.client.RESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return err
+	}
+
+	if mapping.Scope.Name() != meta.RESTScopeNameRoot && object.GetNamespace() == "" {
+		if p.namespace == "" {
+			panic("object has no namespace and none provided")
+		}
+
+		object.SetNamespace(p.namespace)
+	}
+
+	return nil
+}
+
 // provision creates any objects required by the manifest.
 func (p *ManifestProvisioner) provision(ctx context.Context, objects []unstructured.Unstructured) error {
 	for i := range objects {
 		object := &objects[i]
 
-		if object.GetNamespace() == "" {
-			if p.namespace == "" {
-				panic("object has no namespace and none provided")
-			}
-
-			object.SetNamespace(p.namespace)
+		if err := p.applyNamespace(object); err != nil {
+			return err
 		}
 
 		if p.ownerReferences != nil {
