@@ -16,9 +16,6 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.projectId
-      name: projectid
-      type: string
     - jsonPath: .status.namespace
       name: namespace
       type: string
@@ -48,13 +45,6 @@ spec:
             type: object
           spec:
             description: ProjectSpec defines project specific metadata.
-            properties:
-              projectId:
-                description: ProjectID is the lobally unique project identifier. This
-                  is intended to be managed by an external system.
-                type: string
-            required:
-            - projectId
             type: object
           status:
             description: ProjectStatus defines the status of the project.
