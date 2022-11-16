@@ -49,7 +49,11 @@ const (
 	// for them).  Metadata may be upgraded to a later version for any resource.
 	VersionLabel = "unikorn.eschercloud.ai/version"
 
-	// ControlPlaneLabel is a label applied to namespaces to indicate it is under
+	// ProjectLabel is a label applied to namespaces to indicate it is under
 	// control of this tool.  Useful for label selection.
-	ControlPlaneLabel = "namespace.unikorn.eschercloud.ai/control-plane"
+	ProjectLabel = "unikorn.eschercloud.ai/project"
+
+	// ControlPlaneLabel is a label applied to resources to indicate is belongs
+	// to a specific control plane.
+	ControlPlaneLabel = "unikorn.eschercloud.ai/controlplane"
 )

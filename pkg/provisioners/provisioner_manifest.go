@@ -471,7 +471,7 @@ func (p *ManifestProvisioner) provision(ctx context.Context, objects []unstructu
 				return err
 			}
 
-			p.log.Info("creating object", "key", objectKey)
+			p.log.Info("creating object", "key", objectKey, "gvk", object.GroupVersionKind())
 
 			if err := p.client.Create(ctx, object); err != nil {
 				return err

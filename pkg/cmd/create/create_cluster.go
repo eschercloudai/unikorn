@@ -319,15 +319,15 @@ func (o *createClusterOptions) run() error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.name,
 			Labels: map[string]string{
-				constants.VersionLabel: constants.Version,
+				constants.VersionLabel:      constants.Version,
+				constants.ControlPlaneLabel: controlPlane.Name,
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(controlPlane, *gvk),
 			},
 		},
 		Spec: unikornv1alpha1.KubernetesClusterSpec{
-			ProvisionerControlPlane: controlPlane.Name,
-			KubernetesVersion:       &kubernetesVersion,
+			KubernetesVersion: &kubernetesVersion,
 			Openstack: unikornv1alpha1.KubernetesClusterOpenstackSpec{
 				CACert:              &o.caCert,
 				CloudConfig:         &o.clouds,
