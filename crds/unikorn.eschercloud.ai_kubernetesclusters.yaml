@@ -16,7 +16,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.provisionerControlPlane
+    - jsonPath: .metadata.labels['unikorn\.eschercloud\.ai/controlplane']
       name: controlPlane
       type: string
     - jsonPath: .spec.kubernetesVersion
@@ -162,10 +162,6 @@ spec:
                 - image
                 - sshKeyName
                 type: object
-              provisionerControlPlane:
-                description: ProvisionerContolPlane is a reference to the ControlPlane
-                  object in this namespace that will provision the cluster.
-                type: string
               timeout:
                 default: 20m
                 description: Timeout is the maximum time to attempt to provision a
@@ -193,7 +189,6 @@ spec:
             - kubernetesVersion
             - network
             - openstack
-            - provisionerControlPlane
             - timeout
             - workload
             type: object

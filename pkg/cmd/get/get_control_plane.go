@@ -19,7 +19,6 @@ package get
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -29,10 +28,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	computil "k8s.io/kubectl/pkg/util/completion"
 )
@@ -50,11 +46,8 @@ type getControlPlaneOptions struct {
 	// f is the factory used to create clients.
 	f cmdutil.Factory
 
-	// client is the Kubernetes v1 client.
-	client kubernetes.Interface
-
-	// unikornClient gives access to our custom resources.
-	unikornClient unikorn.Interface
+	// client gives access to our custom resources.
+	client unikorn.Interface
 }
 
 // newGetControlPlaneOptions returns a correctly initialized set of options.
@@ -83,18 +76,12 @@ func (o *getControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command)
 func (o *getControlPlaneOptions) complete(f cmdutil.Factory, args []string) error {
 	o.f = f
 
-	var err error
-
-	if o.client, err = f.KubernetesClientSet(); err != nil {
-		return err
-	}
-
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
 
-	if o.unikornClient, err = unikorn.NewForConfig(config); err != nil {
+	if o.client, err = unikorn.NewForConfig(config); err != nil {
 		return err
 	}
 
@@ -125,7 +112,7 @@ func (o *getControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *getControlPlaneOptions) run() error {
-	project, err := o.unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
+	project, err := o.client.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -156,39 +143,7 @@ func (o *getControlPlaneOptions) run() error {
 		return err
 	}
 
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-
-	// Assume we have a single object, the r.Err above will crap out if no results are
-	// found.  We know all returned results will be projects.  If doing a human printable
-	// get, then a single table will be returned.  If getting by name, especially multiple
-	// names, then there may be multiple results.  Coalesce these into a single list
-	// as that's what is expected from standard tools.
-	object := infos[0].Object
-
-	if len(infos) > 1 {
-		list := &corev1.List{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "List",
-			},
-		}
-
-		for _, info := range infos {
-			list.Items = append(list.Items, runtime.RawExtension{Object: info.Object})
-		}
-
-		object = list
-	}
-
-	printer, err := o.getPrintFlags.toPrinter()
-	if err != nil {
-		return err
-	}
-
-	if err := printer.PrintObj(object, os.Stdout); err != nil {
+	if err := o.getPrintFlags.printResult(r); err != nil {
 		return err
 	}
 

@@ -23,8 +23,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -65,6 +68,58 @@ func ControlPlanesCompletionFunc(f cmdutil.Factory, project *string) func(*cobra
 		for _, cp := range controlPlanes.Items {
 			if strings.HasPrefix(cp.Name, toComplete) {
 				matches = append(matches, cp.Name)
+			}
+		}
+
+		return matches, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// ClustersCompletionFunc returns a list of clusters that belong to a control plane in
+// a project that match a prefix.
+func ClustersCompletionFunc(f cmdutil.Factory, project, controlPlane *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		config, err := f.ToRESTConfig()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		unikornClient, err := unikorn.NewForConfig(config)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		project, err := unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), *project, metav1.GetOptions{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		namespace := project.Status.Namespace
+		if len(namespace) == 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		selector := labels.Everything()
+
+		if *controlPlane != "" {
+			controlPlaneLabelRequirement, err := labels.NewRequirement(constants.ControlPlaneLabel, selection.Equals, []string{*controlPlane})
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			selector = selector.Add(*controlPlaneLabelRequirement)
+		}
+
+		clusters, err := unikornClient.UnikornV1alpha1().KubernetesClusters(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		var matches []string
+
+		for _, cluster := range clusters.Items {
+			if strings.HasPrefix(cluster.Name, toComplete) {
+				matches = append(matches, cluster.Name)
 			}
 		}
 

@@ -39,6 +39,15 @@ func RequiredVar(cmd *cobra.Command, p pflag.Value, name, usage string) {
 	}
 }
 
+// StringVarWithCompletion registers a string flag with a completion function.
+func StringVarWithCompletion(cmd *cobra.Command, p *string, name, value, usage string, f func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)) {
+	cmd.Flags().StringVar(p, name, value, usage)
+
+	if err := cmd.RegisterFlagCompletionFunc(name, f); err != nil {
+		panic(err)
+	}
+}
+
 // RequiredStringVarWithCompletion registers a string flag marked as required and
 // with a completion function.
 func RequiredStringVarWithCompletion(cmd *cobra.Command, p *string, name, value, usage string, f func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)) {

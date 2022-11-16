@@ -318,7 +318,7 @@ type KubernetesClusterList struct {
 // +kubebuilder:resource:categories=all;eschercloud
 // +kubebuilder:resource:scope=Namespaced
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="controlPlane",type="string",JSONPath=".spec.provisionerControlPlane"
+// +kubebuilder:printcolumn:name="controlPlane",type="string",JSONPath=".metadata.labels['unikorn\\.eschercloud\\.ai/controlplane']"
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.kubernetesVersion"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -331,9 +331,6 @@ type KubernetesCluster struct {
 
 // KubernetesClusterSpec defines the requested state of the Kubernetes cluster.
 type KubernetesClusterSpec struct {
-	// ProvisionerContolPlane is a reference to the ControlPlane object in this namespace
-	// that will provision the cluster.
-	ProvisionerControlPlane string `json:"provisionerControlPlane"`
 	// Timeout is the maximum time to attempt to provision a cluster before aborting.
 	// +kubebuilder:default="20m"
 	Timeout *metav1.Duration `json:"timeout"`

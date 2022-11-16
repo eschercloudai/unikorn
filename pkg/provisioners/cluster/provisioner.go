@@ -19,13 +19,23 @@ package cluster
 import (
 	"context"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"strconv"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	ErrLabelMissing = errors.New("expected label missing")
 )
 
 // Provisioner encapsulates control plane provisioning.
@@ -50,8 +60,13 @@ var _ provisioners.Provisioner = &Provisioner{}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
+	controlPlane, ok := p.cluster.Labels[constants.ControlPlaneLabel]
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrLabelMissing, constants.ControlPlaneLabel)
+	}
+
 	// Create a new client that's able to talk to the vcluster.
-	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace, p.cluster.Spec.ProvisionerControlPlane)
+	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace, controlPlane)
 	if err != nil {
 		return err
 	}
@@ -62,6 +77,21 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	// Create a namespace for the cluster definitions to reside in, we can just
+	// delete this to perform cleanup.
+	namespaceName := p.cluster.Name
+
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespaceName,
+		},
+	}
+
+	if err := provisioners.NewResourceProvisioner(p.client, namespace).Provision(ctx); err != nil {
+		return err
+	}
+
+	// Provision the actual cluster in the namespace.
 	envMapper := func(env string) string {
 		// TODO: the manifest looks broken as regards DNS nameservers...
 		mapping := map[string]string{
@@ -92,7 +122,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return ""
 	}
 
-	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace("default").WithEnvMapper(envMapper)
+	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace(namespaceName).WithEnvMapper(envMapper)
 
 	if err := provisioner.Provision(ctx); err != nil {
 		return err

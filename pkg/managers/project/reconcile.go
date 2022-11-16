@@ -69,7 +69,7 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	// See if the project namespace exists and if it doesn't, then create it.
 	// We label the namespace with the project name in order to filter the results
 	// and find a match.
-	projectLabelRequirement, err := labels.NewRequirement(constants.ControlPlaneLabel, selection.Equals, []string{request.NamespacedName.Name})
+	projectLabelRequirement, err := labels.NewRequirement(constants.ProjectLabel, selection.Equals, []string{request.NamespacedName.Name})
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -113,7 +113,7 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "project-",
 			Labels: map[string]string{
-				constants.ControlPlaneLabel: request.NamespacedName.Name,
+				constants.ProjectLabel: request.NamespacedName.Name,
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(project, *gvk),
