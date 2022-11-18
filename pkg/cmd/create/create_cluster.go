@@ -34,10 +34,8 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	uniutil "github.com/eschercloudai/unikorn/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	computil "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -292,23 +290,7 @@ func (o *createClusterOptions) validate() error {
 
 // run executes the command.
 func (o *createClusterOptions) run() error {
-	project, err := o.client.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	namespace := project.Status.Namespace
-
-	if len(namespace) == 0 {
-		panic("achtung!")
-	}
-
-	controlPlane, err := o.client.UnikornV1alpha1().ControlPlanes(namespace).Get(context.TODO(), o.controlPlane, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	gvk, err := uniutil.ObjectGroupVersionKind(scheme.Scheme, controlPlane)
+	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
 	if err != nil {
 		return err
 	}
@@ -319,11 +301,7 @@ func (o *createClusterOptions) run() error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.name,
 			Labels: map[string]string{
-				constants.VersionLabel:      constants.Version,
-				constants.ControlPlaneLabel: controlPlane.Name,
-			},
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(controlPlane, *gvk),
+				constants.VersionLabel: constants.Version,
 			},
 		},
 		Spec: unikornv1alpha1.KubernetesClusterSpec{

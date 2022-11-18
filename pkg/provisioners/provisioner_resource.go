@@ -19,11 +19,10 @@ package provisioners
 import (
 	"context"
 
-	"github.com/eschercloudai/unikorn/pkg/util"
+	"github.com/eschercloudai/unikorn/pkg/readiness"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -56,53 +55,57 @@ func NewResourceProvisioner(client client.Client, resource client.Object) *Resou
 func (p *ResourceProvisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	var object *unstructured.Unstructured
+	objectKey := client.ObjectKeyFromObject(p.resource)
 
-	switch t := p.resource.(type) {
-	case *unstructured.Unstructured:
-		object = t
-	default:
-		gvk, err := util.ObjectGroupVersionKind(p.client.Scheme(), p.resource)
-		if err != nil {
+	// The object may use a GenerateName, so only check for existence if
+	// it's a named resource.  It's up to the caller to work out whether
+	// to provision a resource with a generated name.
+	if objectKey.Name != "" {
+		// Provide somewhere for get to write into and extract the GVK.
+		var existing unstructured.Unstructured
+
+		if err := p.client.Scheme().Convert(p.resource, &existing, nil); err != nil {
 			return err
 		}
 
-		o, err := runtime.DefaultUnstructuredConverter.ToUnstructured(p.resource)
-		if err != nil {
+		// Object exists, leave it alone.
+		// TODO: we could diff the current and existing versions and do
+		// object updates here in future.
+		err := p.client.Get(ctx, objectKey, &existing)
+		if err == nil {
+			return nil
+		}
+
+		// If it genuninely doesn't exist, fall through to creation...
+		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-
-		u := &unstructured.Unstructured{
-			Object: o,
-		}
-
-		u.SetGroupVersionKind(*gvk)
-
-		object = u
 	}
 
-	// Create the object if it doesn't exist.
-	// TODO: the fallthrough case here should be update and upgrade,
-	// but that's a ways off!
-	objectKey := client.ObjectKeyFromObject(object)
+	log.Info("creating object", "key", objectKey /*, "gvk", object.GroupVersionKind()*/)
 
-	// NOTE: while we don't strictly need the existing resource yet, it'll
-	// moan if you don't provide something to store into.
-	existing, ok := object.NewEmptyInstance().(*unstructured.Unstructured)
-	if !ok {
-		panic("unstructured empty instance fail")
+	// This treats the resource as mutable, so updates will been seen by the caller.
+	// Especially useful if Kubenretes fills some things in for you, but just be
+	// aware the resource shouldn't be resued.
+	if err := p.client.Create(ctx, p.resource); err != nil {
+		return err
 	}
 
-	if err := p.client.Get(ctx, objectKey, existing); err != nil {
-		if !errors.IsNotFound(err) {
-			return err
+	return nil
+}
+
+// Deprovision implements the Provision interface.
+func (p *ResourceProvisioner) Deprovision(ctx context.Context) error {
+	if err := p.client.Delete(ctx, p.resource); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
 		}
 
-		log.Info("creating object", "key", objectKey, "gvk", object.GroupVersionKind())
+		return err
+	}
 
-		if err := p.client.Create(ctx, object); err != nil {
-			return err
-		}
+	if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, p.resource)).Check(ctx); err != nil {
+		return err
 	}
 
 	return nil

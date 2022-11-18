@@ -9,6 +9,9 @@ metadata:
 spec:
   group: unikorn.eschercloud.ai
   names:
+    categories:
+    - all
+    - unikorn
     kind: Project
     listKind: ProjectList
     plural: projects
@@ -19,7 +22,7 @@ spec:
     - jsonPath: .status.namespace
       name: namespace
       type: string
-    - jsonPath: .status.conditions[?(@.type=="Provisioned")].reason
+    - jsonPath: .status.conditions[?(@.type=="Available")].reason
       name: status
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -65,6 +68,12 @@ spec:
                     reason:
                       description: Unique, one-word, CamelCase reason for the condition's
                         last transition.
+                      enum:
+                      - Provisioning
+                      - Provisioned
+                      - Canceled
+                      - Timedout
+                      - Errored
                       type: string
                     status:
                       description: Status is the status of the condition. Can be True,
@@ -73,7 +82,7 @@ spec:
                     type:
                       description: Type is the type of the condition.
                       enum:
-                      - Provisioned
+                      - Available
                       type: string
                   required:
                   - lastTransitionTime

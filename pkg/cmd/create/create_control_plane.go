@@ -89,15 +89,9 @@ func (o *createControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *createControlPlaneOptions) run() error {
-	project, err := o.client.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
+	namespace, err := util.GetProjectNamespace(context.TODO(), o.client, o.project)
 	if err != nil {
 		return err
-	}
-
-	namespace := project.Status.Namespace
-
-	if len(namespace) == 0 {
-		panic("achtung!")
 	}
 
 	controlPlane := &unikornv1alpha1.ControlPlane{
@@ -105,9 +99,6 @@ func (o *createControlPlaneOptions) run() error {
 			Name: o.name,
 			Labels: map[string]string{
 				constants.VersionLabel: constants.Version,
-			},
-			Finalizers: []string{
-				metav1.FinalizerDeleteDependents,
 			},
 		},
 	}

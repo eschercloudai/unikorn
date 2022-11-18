@@ -39,13 +39,13 @@ var (
 	ErrLoadBalancerIngressMissing = errors.New("ingress address not found")
 )
 
-func RESTConfig(ctx context.Context, client client.Client, namespace, name string) (*rest.Config, error) {
-	return clientcmd.BuildConfigFromKubeconfigGetter("", KubeConfigGetter(ctx, client, namespace, name))
+func RESTConfig(ctx context.Context, client client.Client, namespace string) (*rest.Config, error) {
+	return clientcmd.BuildConfigFromKubeconfigGetter("", KubeConfigGetter(ctx, client, namespace))
 }
 
-func KubeConfigGetter(ctx context.Context, client client.Client, namespace, name string) clientcmd.KubeconfigGetter {
+func KubeConfigGetter(ctx context.Context, client client.Client, namespace string) clientcmd.KubeconfigGetter {
 	return func() (*clientcmdapi.Config, error) {
-		return GetConfig(ctx, NewControllerRuntimeGetter(client), namespace, name, false)
+		return GetConfig(ctx, NewControllerRuntimeGetter(client), namespace, false)
 	}
 }
 
@@ -115,11 +115,11 @@ func (g *KubectlGetter) GetService(ctx context.Context, namespace, name string) 
 // GetConfig acknowledges that vcluster configuration is synchronized by a side car, so it
 // performs a retry until the provided context expires.  It also acknowledges that load
 // balancer services may take a while to get a public IP.
-func GetConfig(ctx context.Context, getter ConfigGetter, namespace, name string, external bool) (*clientcmdapi.Config, error) {
+func GetConfig(ctx context.Context, getter ConfigGetter, namespace string, external bool) (*clientcmdapi.Config, error) {
 	var config *clientcmdapi.Config
 
 	callback := func() error {
-		secret, err := getter.GetSecret(ctx, namespace, "vc-"+name)
+		secret, err := getter.GetSecret(ctx, namespace, "vc-"+vclusterName)
 		if err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ func GetConfig(ctx context.Context, getter ConfigGetter, namespace, name string,
 			return err
 		}
 
-		service, err := getter.GetService(ctx, namespace, name)
+		service, err := getter.GetService(ctx, namespace, vclusterName)
 		if err != nil {
 			return err
 		}
@@ -175,8 +175,8 @@ func GetConfig(ctx context.Context, getter ConfigGetter, namespace, name string,
 
 // WriteConfig writes a vcluster config to a temporary location.  It returns a path to the config,
 // a cleanup callback that should be invoked via a defer in a non nil error.
-func WriteConfig(ctx context.Context, getter ConfigGetter, namespace, name string) (string, func(), error) {
-	config, err := GetConfig(ctx, getter, namespace, name, true)
+func WriteConfig(ctx context.Context, getter ConfigGetter, namespace string) (string, func(), error) {
+	config, err := GetConfig(ctx, getter, namespace, true)
 	if err != nil {
 		return "", nil, err
 	}
@@ -201,8 +201,8 @@ func WriteConfig(ctx context.Context, getter ConfigGetter, namespace, name strin
 	return tf.Name(), cleanup, nil
 }
 
-func WriteInClusterConfig(ctx context.Context, getter ConfigGetter, namespace, name string) (string, func(), error) {
-	config, err := GetConfig(ctx, getter, namespace, name, false)
+func WriteInClusterConfig(ctx context.Context, getter ConfigGetter, namespace string) (string, func(), error) {
+	config, err := GetConfig(ctx, getter, namespace, false)
 	if err != nil {
 		return "", nil, err
 	}

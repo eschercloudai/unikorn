@@ -23,14 +23,9 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
-	"github.com/eschercloudai/unikorn/pkg/constants"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	computil "k8s.io/kubectl/pkg/util/completion"
 )
@@ -67,7 +62,7 @@ func newGetClusterOptions() *getClusterOptions {
 // addFlags registers get cluster options flags with the specified cobra command.
 func (o *getClusterOptions) addFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
-	util.StringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to the cluster is in.", completion.ControlPlanesCompletionFunc(f, &o.project))
+	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to the cluster is in.", completion.ControlPlanesCompletionFunc(f, &o.project))
 
 	o.getPrintFlags.addFlags(cmd)
 }
@@ -94,25 +89,9 @@ func (o *getClusterOptions) complete(f cmdutil.Factory, args []string) error {
 
 // run executes the command.
 func (o *getClusterOptions) run() error {
-	project, err := o.client.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
+	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
 	if err != nil {
 		return err
-	}
-
-	namespace := project.Status.Namespace
-	if len(namespace) == 0 {
-		return errors.ErrProjectNamespaceUndefined
-	}
-
-	selector := labels.Everything()
-
-	if o.controlPlane != "" {
-		controlPlaneLabelRequirement, err := labels.NewRequirement(constants.ControlPlaneLabel, selection.Equals, []string{o.controlPlane})
-		if err != nil {
-			return err
-		}
-
-		selector = selector.Add(*controlPlaneLabelRequirement)
 	}
 
 	// We are using the "kubectl get" library to retrieve resources.  That command
@@ -126,7 +105,6 @@ func (o *getClusterOptions) run() error {
 		Unstructured().
 		NamespaceParam(namespace).
 		ResourceTypeOrNameArgs(true, args...).
-		LabelSelector(selector.String()).
 		ContinueOnError().
 		Latest().
 		Flatten().

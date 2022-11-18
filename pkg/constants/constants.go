@@ -56,4 +56,12 @@ const (
 	// ControlPlaneLabel is a label applied to resources to indicate is belongs
 	// to a specific control plane.
 	ControlPlaneLabel = "unikorn.eschercloud.ai/controlplane"
+
+	// KubernetesClusterLabel is applied to resources to indicate it belongs
+	// to a specific cluster.
+	KubernetesClusterLabel = "unikorn.eschercloud.ai/cluster"
+
+	// Finalizer is applied to resources that need to be deleted manually
+	// and do other complex logic.
+	Finalizer = "unikorn"
 )

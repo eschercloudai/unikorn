@@ -16,6 +16,16 @@ rules:
   - list
   - get
   - watch
+  - update
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - controlplanes
+  verbs:
+  - list
+  - get
+  - watch
+  - delete
 - apiGroups:
   - unikorn.eschercloud.ai
   resources:
@@ -36,6 +46,7 @@ rules:
   - namespaces
   verbs:
   - create
+  - get
   - list
   - watch
   - delete

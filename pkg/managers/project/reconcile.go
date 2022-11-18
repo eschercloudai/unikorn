@@ -18,16 +18,16 @@ package project
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"time"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/util"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/project"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -44,11 +44,10 @@ var _ reconcile.Reconciler = &reconciler{}
 func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 
-	// See if the resource exists or not, if not it's been deleted, but do nothing
-	// as cascading deletes will handle the cleanup.
-	project := &unikornv1alpha1.Project{}
-	if err := r.client.Get(ctx, request.NamespacedName, project); err != nil {
-		if errors.IsNotFound(err) {
+	// See if the resource exists or not, if not it's been deleted.
+	object := &unikornv1alpha1.Project{}
+	if err := r.client.Get(ctx, request.NamespacedName, object); err != nil {
+		if kerrors.IsNotFound(err) {
 			log.Info("resource deleted")
 
 			return reconcile.Result{}, nil
@@ -57,88 +56,114 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 
-	// If it's being deleted, ignore it, we don't need to take any additional action.
-	if project.DeletionTimestamp != nil {
-		log.V(1).Info("resource deleting")
+	provisioner := project.New(r.client, object)
+
+	// If it's being deleted, ignore if there are no finalizers, Kubernetes is in
+	// charge now.  If the finalizer is still in place, run the deprovisioning.
+	if object.DeletionTimestamp != nil {
+		if len(object.Finalizers) == 0 {
+			return reconcile.Result{}, nil
+		}
+
+		log.Info("deleting resource")
+
+		// TODO: we need to add a status condition to say we are deleting.
+		// And obviously report any errors of course.
+		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
+		if err := provisioner.Deprovision(timeoutCtx); err != nil {
+			return reconcile.Result{}, err
+		}
+
+		object.Finalizers = nil
+
+		if err := r.client.Update(ctx, object); err != nil {
+			return reconcile.Result{}, err
+		}
 
 		return reconcile.Result{}, nil
 	}
 
 	log.Info("reconciling resource")
 
-	// See if the project namespace exists and if it doesn't, then create it.
-	// We label the namespace with the project name in order to filter the results
-	// and find a match.
-	projectLabelRequirement, err := labels.NewRequirement(constants.ProjectLabel, selection.Equals, []string{request.NamespacedName.Name})
-	if err != nil {
+	// Check to see if this is (or appears to be) the first time we've seen a
+	// resource and do observability as appropriate.
+	if err := r.handleReconcileFirstVisit(ctx, object); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	selector := labels.Everything().Add(*projectLabelRequirement)
+	// Provision the resource.
+	if err := provisioner.Provision(ctx); err != nil {
+		if err := r.handleReconcileError(ctx, object, err); err != nil {
+			return reconcile.Result{}, err
+		}
 
-	namespaces := &corev1.NamespaceList{}
-	if err := r.client.List(ctx, namespaces, &client.ListOptions{LabelSelector: selector}); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	if len(namespaces.Items) != 0 {
-		// TODO: unlikely, but somehow we may have more than one!
-		// TODO: it's also possible the resource status has been "lost", e.g. due to
-		// velero backup, so we should resync.
-		return reconcile.Result{}, nil
-	}
-
-	log.Info("project namespace does not exist")
-
-	project.Status.Conditions = []unikornv1alpha1.ProjectCondition{
-		{
-			Type:               unikornv1alpha1.ProjectConditionProvisioned,
-			Status:             corev1.ConditionFalse,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "Provisioning",
-			Message:            "Provisioning of project has started",
-		},
-	}
-
-	if err := r.client.Status().Update(ctx, project); err != nil {
-		return reconcile.Result{}, err
-	}
-
-	gvk, err := util.ObjectGroupVersionKind(r.client.Scheme(), project)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "project-",
-			Labels: map[string]string{
-				constants.ProjectLabel: request.NamespacedName.Name,
-			},
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(project, *gvk),
-			},
-		},
-	}
-
-	if err := r.client.Create(ctx, namespace); err != nil {
-		return reconcile.Result{}, err
-	}
-
-	project.Status.Namespace = namespace.Name
-	project.Status.Conditions = []unikornv1alpha1.ProjectCondition{
-		{
-			Type:               unikornv1alpha1.ProjectConditionProvisioned,
-			Status:             corev1.ConditionFalse,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "Provisioned",
-			Message:            "Provisioning of project has completed",
-		},
-	}
-
-	if err := r.client.Status().Update(ctx, project); err != nil {
+	if err := r.handleReconcileComplete(ctx, object); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// handleReconcileFirstVisit checks to see if the Available condition is present in the
+// status, if not we assume it's the first time we've seen this an set the condition to
+// Provisioning.
+func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, project *unikornv1alpha1.Project) error {
+	if _, err := project.LookupCondition(unikornv1alpha1.ProjectConditionAvailable); err != nil {
+		project.Finalizers = []string{
+			constants.Finalizer,
+		}
+
+		project.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.ProjectConditionReasonProvisioning, "Provisioning of project has started")
+
+		if err := r.client.Update(ctx, project); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// handleReconcileComplete indicates that the reconcile is complete and the control
+// plane is ready to be used.
+func (r *reconciler) handleReconcileComplete(ctx context.Context, project *unikornv1alpha1.Project) error {
+	if ok := project.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1alpha1.ProjectConditionReasonProvisioned, "Provisioning of project has completed"); ok {
+		if err := r.client.Status().Update(ctx, project); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// handleReconcileError inspects the error type that halted the provisioning and reports
+// this as a ppropriate in the status.
+func (r *reconciler) handleReconcileError(ctx context.Context, project *unikornv1alpha1.Project, err error) error {
+	var reason unikornv1alpha1.ProjectConditionReason
+
+	var message string
+
+	switch {
+	case errors.Is(err, context.Canceled):
+		reason = unikornv1alpha1.ProjectConditionReasonCanceled
+		message = "Provisioning aborted due to controller shutdown"
+	case errors.Is(err, context.DeadlineExceeded):
+		reason = unikornv1alpha1.ProjectConditionReasonTimedout
+		message = fmt.Sprintf("Provisioning aborted due to a timeout: %v", err)
+	default:
+		reason = unikornv1alpha1.ProjectConditionReasonErrored
+		message = fmt.Sprintf("Provisioning failed due to an error: %v", err)
+	}
+
+	if ok := project.UpdateAvailableCondition(corev1.ConditionFalse, reason, message); ok {
+		if err := r.client.Status().Update(ctx, project); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -9,6 +9,9 @@ metadata:
 spec:
   group: unikorn.eschercloud.ai
   names:
+    categories:
+    - all
+    - unikorn
     kind: ControlPlane
     listKind: ControlPlaneList
     plural: controlplanes
@@ -16,6 +19,9 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .status.namespace
+      name: namespace
+      type: string
     - jsonPath: .status.conditions[?(@.type=="Available")].reason
       name: status
       type: string
@@ -93,6 +99,10 @@ spec:
                   - type
                   type: object
                 type: array
+              namespace:
+                description: Namespace defines the namespace a control plane resides
+                  in.
+                type: string
             type: object
         required:
         - spec

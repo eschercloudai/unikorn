@@ -9,6 +9,9 @@ metadata:
 spec:
   group: unikorn.eschercloud.ai
   names:
+    categories:
+    - all
+    - unikorn
     kind: KubernetesCluster
     listKind: KubernetesClusterList
     plural: kubernetesclusters
@@ -16,8 +19,8 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .metadata.labels['unikorn\.eschercloud\.ai/controlplane']
-      name: controlPlane
+    - jsonPath: .status.namespace
+      name: namespace
       type: string
     - jsonPath: .spec.kubernetesVersion
       name: version
@@ -236,6 +239,9 @@ spec:
                   - type
                   type: object
                 type: array
+              namespace:
+                description: Namespace defines the namespace a cluster resides in.
+                type: string
             type: object
         required:
         - spec
