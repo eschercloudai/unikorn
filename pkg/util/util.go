@@ -17,41 +17,8 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-var (
-	// ErrUnversionedGroupVersionKind is returned when the GVK is
-	// unversioned.
-	ErrUnversionedGroupVersionKind = errors.New("gvk is unversioned")
-
-	// ErrAmbiguousGroupVersionKind is returned when more than one GVK
-	// is returned for a type.
-	ErrAmbiguousGroupVersionKind = errors.New("gvk is ambiguous")
-)
-
-// ObjectGroupVersionKind returns a GVK from a Kubernetes typed resource using
-// scheme translation.
-func ObjectGroupVersionKind(s *runtime.Scheme, o runtime.Object) (*schema.GroupVersionKind, error) {
-	gvks, unversioned, err := s.ObjectKinds(o)
-	if err != nil {
-		return nil, err
-	}
-
-	if unversioned {
-		return nil, ErrUnversionedGroupVersionKind
-	}
-
-	if len(gvks) != 1 {
-		return nil, ErrAmbiguousGroupVersionKind
-	}
-
-	return &gvks[0], nil
-}
 
 // SplitYAML takes a yaml manifest and splits it into individual objects
 // discarding any empty sections.

@@ -23,11 +23,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
-	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -48,13 +46,8 @@ func ControlPlanesCompletionFunc(f cmdutil.Factory, project *string) func(*cobra
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		project, err := unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), *project, metav1.GetOptions{})
+		namespace, err := util.GetProjectNamespace(context.TODO(), unikornClient, *project)
 		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		namespace := project.Status.Namespace
-		if len(namespace) == 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
@@ -89,28 +82,12 @@ func ClustersCompletionFunc(f cmdutil.Factory, project, controlPlane *string) fu
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		project, err := unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), *project, metav1.GetOptions{})
+		namespace, err := util.GetControlPlaneNamespace(context.TODO(), unikornClient, *project, *controlPlane)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		namespace := project.Status.Namespace
-		if len(namespace) == 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		selector := labels.Everything()
-
-		if *controlPlane != "" {
-			controlPlaneLabelRequirement, err := labels.NewRequirement(constants.ControlPlaneLabel, selection.Equals, []string{*controlPlane})
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-
-			selector = selector.Add(*controlPlaneLabelRequirement)
-		}
-
-		clusters, err := unikornClient.UnikornV1alpha1().KubernetesClusters(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+		clusters, err := unikornClient.UnikornV1alpha1().KubernetesClusters(namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

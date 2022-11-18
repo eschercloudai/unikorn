@@ -31,7 +31,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	computil "k8s.io/kubectl/pkg/util/completion"
@@ -104,17 +103,12 @@ func (o *getKubeConfigOptions) validate() error {
 
 // run executes the command.
 func (o *getKubeConfigOptions) run() error {
-	project, err := o.unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
+	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.unikornClient, o.project, o.name)
 	if err != nil {
 		return err
 	}
 
-	namespace := project.Status.Namespace
-	if len(namespace) == 0 {
-		return errors.ErrProjectNamespaceUndefined
-	}
-
-	configPath, cleanup, err := vcluster.WriteConfig(context.TODO(), vcluster.NewKubectlGetter(o.client), namespace, o.name)
+	configPath, cleanup, err := vcluster.WriteConfig(context.TODO(), vcluster.NewKubectlGetter(o.client), namespace)
 	if err != nil {
 		return err
 	}

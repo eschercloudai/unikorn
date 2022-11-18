@@ -28,7 +28,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	computil "k8s.io/kubectl/pkg/util/completion"
 )
@@ -112,14 +111,9 @@ func (o *getControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *getControlPlaneOptions) run() error {
-	project, err := o.client.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
+	namespace, err := util.GetProjectNamespace(context.TODO(), o.client, o.project)
 	if err != nil {
 		return err
-	}
-
-	namespace := project.Status.Namespace
-	if len(namespace) == 0 {
-		return errors.ErrProjectNamespaceUndefined
 	}
 
 	// We are using the "kubectl get" library to retrieve resources.  That command

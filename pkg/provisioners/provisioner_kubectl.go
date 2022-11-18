@@ -77,3 +77,8 @@ func (p *KubectlProvisioner) Provision(_ context.Context) error {
 
 	return nil
 }
+
+// Deprovision implements the Provision interface.
+func (p *KubectlProvisioner) Deprovision(context.Context) error {
+	return nil
+}

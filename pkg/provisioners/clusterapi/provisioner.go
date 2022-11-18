@@ -149,3 +149,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	return nil
 }
+
+// Deprovision implements the Provision interface.
+func (p *Provisioner) Deprovision(context.Context) error {
+	return nil
+}

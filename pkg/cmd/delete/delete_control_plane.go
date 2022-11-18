@@ -93,14 +93,9 @@ func (o *deleteControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *deleteControlPlaneOptions) run() error {
-	project, err := o.unikornClient.UnikornV1alpha1().Projects().Get(context.TODO(), o.project, metav1.GetOptions{})
+	namespace, err := util.GetProjectNamespace(context.TODO(), o.unikornClient, o.project)
 	if err != nil {
 		return err
-	}
-
-	namespace := project.Status.Namespace
-	if len(namespace) == 0 {
-		return errors.ErrProjectNamespaceUndefined
 	}
 
 	if err := o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).Delete(context.TODO(), o.name, metav1.DeleteOptions{}); err != nil {

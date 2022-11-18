@@ -88,9 +88,6 @@ func (o *createProjectOptions) run() error {
 			Labels: map[string]string{
 				constants.VersionLabel: constants.Version,
 			},
-			Finalizers: []string{
-				metav1.FinalizerDeleteDependents,
-			},
 		},
 	}
 

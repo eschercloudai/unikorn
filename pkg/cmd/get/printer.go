@@ -17,6 +17,7 @@ limitations under the License.
 package get
 
 import (
+	"fmt"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,11 +34,16 @@ func (o *getPrintFlags) printResult(r *resource.Result) error {
 		return err
 	}
 
-	// Assume we have a single object, the r.Err above will crap out if no results are
-	// found.  We know all returned results will be projects.  If doing a human printable
-	// get, then a single table will be returned.  If getting by name, especially multiple
-	// names, then there may be multiple results.  Coalesce these into a single list
-	// as that's what is expected from standard tools.
+	if len(infos) == 0 {
+		fmt.Println("no resources found")
+
+		return nil
+	}
+
+	// If doing a human printable get, then a single table will be returned.
+	// If getting by name, especially multiple names, then there may be multiple
+	// results.  Coalesce these into a single list as that's what is expected from
+	// standard tools.
 	object := infos[0].Object
 
 	if len(infos) > 1 {

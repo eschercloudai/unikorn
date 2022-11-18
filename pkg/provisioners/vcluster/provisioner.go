@@ -21,17 +21,18 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/readiness"
-	"github.com/eschercloudai/unikorn/pkg/util"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+)
+
+const (
+	// vclusterName is a static name used for all resources.  Each CP has its own
+	// namespace, so this is safe for now.
+	vclusterName = "vcluster"
 )
 
 var (
@@ -58,16 +59,15 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
-	// controlPlane is the control plane resource this belongs to.
-	// Resource names and namespaces are derived from this object.
-	controlPlane *unikornv1alpha1.ControlPlane
+	// namespace is the namespace to provision in.
+	namespace string
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, controlPlane *unikornv1alpha1.ControlPlane) *Provisioner {
+func New(client client.Client, namespace string) *Provisioner {
 	return &Provisioner{
-		client:       client,
-		controlPlane: controlPlane,
+		client:    client,
+		namespace: namespace,
 	}
 }
 
@@ -83,21 +83,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("provisioning vcluster")
 
-	name := p.controlPlane.Name
-	namespace := p.controlPlane.Namespace
-
-	// Setup the provisioned with a reference to the control plane so it
-	// is torn down when the control plane is.
-	gvk, err := util.ObjectGroupVersionKind(p.client.Scheme(), p.controlPlane)
-	if err != nil {
-		return err
-	}
-
-	ownerReferences := []metav1.OwnerReference{
-		*metav1.NewControllerRef(p.controlPlane, *gvk),
-	}
-
-	provisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestVCluster).WithNamespace(namespace).WithName(name).WithOwnerReferences(ownerReferences)
+	provisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestVCluster).WithNamespace(p.namespace).WithName(vclusterName)
 
 	if err := provisioner.Provision(ctx); err != nil {
 		return err
@@ -105,30 +91,16 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.V(1).Info("waiting for stateful set to become ready")
 
-	statefulsetReadiness := readiness.NewStatefulSet(p.client, namespace, name)
+	statefulsetReadiness := readiness.NewStatefulSet(p.client, p.namespace, vclusterName)
 
 	if err := readiness.NewRetry(statefulsetReadiness).Check(ctx); err != nil {
 		return err
 	}
 
-	log.V(1).Info("applying statefulset volume claim clean up")
+	return nil
+}
 
-	// The stateful set will provision a PVC to contain the Kubernetes "etcd"
-	// database, and these don't get cleaned up, so reusing the same control
-	// plane name will then go off and provision a load of stuff due to persistence.
-	// There is an extension where you can cascade deletion, but as of writing (v1.25)
-	// it's still in alpha.  For now, we manually link the PVC to the control plane.
-	// TODO: we should inspect the stateful set for size, and also the volume name.
-	pvc := &corev1.PersistentVolumeClaim{}
-	if err := p.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: "data-" + name + "-0"}, pvc); err != nil {
-		return err
-	}
-
-	pvc.SetOwnerReferences(ownerReferences)
-
-	if err := p.client.Update(ctx, pvc); err != nil {
-		return err
-	}
-
+// Deprovision implements the Provision interface.
+func (p *Provisioner) Deprovision(context.Context) error {
 	return nil
 }

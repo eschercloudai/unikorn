@@ -20,12 +20,12 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"strconv"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
 	corev1 "k8s.io/api/core/v1"
@@ -60,13 +60,8 @@ var _ provisioners.Provisioner = &Provisioner{}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	controlPlane, ok := p.cluster.Labels[constants.ControlPlaneLabel]
-	if !ok {
-		return fmt.Errorf("%w: %s", ErrLabelMissing, constants.ControlPlaneLabel)
-	}
-
 	// Create a new client that's able to talk to the vcluster.
-	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace, controlPlane)
+	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
 	if err != nil {
 		return err
 	}
@@ -77,17 +72,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	// Create a namespace for the cluster definitions to reside in, we can just
-	// delete this to perform cleanup.
-	namespaceName := p.cluster.Name
-
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
-		},
-	}
-
-	if err := provisioners.NewResourceProvisioner(p.client, namespace).Provision(ctx); err != nil {
+	namespace, err := p.provisionNamespace(ctx, vclusterClient)
+	if err != nil {
 		return err
 	}
 
@@ -122,9 +108,98 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return ""
 	}
 
-	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace(namespaceName).WithEnvMapper(envMapper)
+	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace(namespace.Name).WithEnvMapper(envMapper)
 
 	if err := provisioner.Provision(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// provisionNamespace creates a namespace for the cluster.  This ensures people cannot
+// do nefarious things like provision stuff into kube-system etc.
+func (p *Provisioner) provisionNamespace(ctx context.Context, client client.Client) (*corev1.Namespace, error) {
+	namespace, err := util.GetResourceNamespace(ctx, client, constants.KubernetesClusterLabel, p.cluster.Name)
+	if err == nil {
+		return namespace, nil
+	}
+
+	// Some other error, propagate it back up the stack.
+	if !errors.Is(err, util.ErrNamespaceLookup) {
+		return nil, err
+	}
+
+	// Create a new control plane namespace.
+	namespace = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "cluster-",
+			Labels: map[string]string{
+				constants.KubernetesClusterLabel: p.cluster.Name,
+			},
+		},
+	}
+
+	if err := provisioners.NewResourceProvisioner(client, namespace).Provision(ctx); err != nil {
+		return nil, err
+	}
+
+	p.cluster.Status.Namespace = namespace.Name
+
+	if err := p.client.Status().Update(ctx, p.cluster); err != nil {
+		return nil, err
+	}
+
+	return namespace, nil
+}
+
+// Deprovision implements the Provision interface.
+func (p *Provisioner) Deprovision(ctx context.Context) error {
+	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
+	if err != nil {
+		return err
+	}
+
+	// Do not inherit the scheme or REST mapper here, it's a different cluster!
+	vclusterClient, err := client.New(vclusterConfig, client.Options{})
+	if err != nil {
+		return err
+	}
+
+	namespace, err := util.GetResourceNamespace(ctx, vclusterClient, constants.KubernetesClusterLabel, p.cluster.Name)
+	if err != nil {
+		// Already dead.
+		if errors.Is(err, util.ErrNamespaceLookup) {
+			return nil
+		}
+
+		return err
+	}
+
+	// Cluster API is "special".  In order to deprovision it needs all the secrets we provided
+	// to be still in place (in order to talk to Openstack).  So we need to remove all things
+	// we added with the exception of secrets.  Once that's done we can nuke the namespace.
+	// Like us, they use finalizers to do the cleanup.
+	envMapper := func(env string) string {
+		mapping := map[string]string{
+			"CLUSTER_NAME": p.cluster.Name,
+		}
+
+		if value, ok := mapping[env]; ok {
+			return value
+		}
+
+		return ""
+	}
+
+	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace(p.cluster.Name).WithEnvMapper(envMapper)
+
+	if err := provisioner.Deprovision(ctx); err != nil {
+		return err
+	}
+
+	// Deprovision the namespace and await deletion.
+	if err := provisioners.NewResourceProvisioner(vclusterClient, namespace).Deprovision(ctx); err != nil {
 		return err
 	}
 

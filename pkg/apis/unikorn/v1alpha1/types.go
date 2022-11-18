@@ -162,11 +162,10 @@ type ProjectList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:categories=all;eschercloud
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,categories=all;unikorn
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
-// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Provisioned\")].reason"
+// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type Project struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -188,15 +187,45 @@ type ProjectStatus struct {
 	Conditions []ProjectCondition `json:"conditions,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=Available
 type ProjectConditionType string
 
 const (
-	ProjectConditionProvisioned ProjectConditionType = "Provisioned"
+	// ProjectConditionAvailable if not defined or false means that the
+	// control plane is not ready, or is known to be in a bad state and should
+	// not be used.  When true, while not guaranteed to be fully functional, it
+	// will accept Kubernetes cluster creation requests that will be take care
+	// of by eventual consistency.
+	ProjectConditionAvailable ProjectConditionType = "Available"
+)
+
+// ProjectConditionReason defines the possible reasons of a control plane
+// condition.  These are generic and may be used by any condition.
+// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored
+type ProjectConditionReason string
+
+const (
+	// ProjectConditionReasonProvisioning is used for the Available condition
+	// to indicate that a resource has been seen, it has no pre-existing condition
+	// and we assume it's being provisioned for the first time.
+	ProjectConditionReasonProvisioning ProjectConditionReason = "Provisioning"
+	// ProjectConditionReasonProvisioned is used for the Available condition
+	// to mean that the control plane is ready to be used.
+	ProjectConditionReasonProvisioned ProjectConditionReason = "Provisioned"
+	// ProjectConditionReasonCanceled is used by a condition to
+	// indicate the controller was cancelled e.g. via a container shutdown.
+	ProjectConditionReasonCanceled ProjectConditionReason = "Canceled"
+	// ProjectConditionReasonTimedout is used by a condition to
+	// indicate the controller timed out e.g. OpenStack is slow or broken.
+	ProjectConditionReasonTimedout ProjectConditionReason = "Timedout"
+	// ProjectConditionReasonErrored is used by a condition to
+	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
+	// If we see these, consider formulating a fix, for example a retry loop.
+	ProjectConditionReasonErrored ProjectConditionReason = "Errored"
 )
 
 type ProjectCondition struct {
 	// Type is the type of the condition.
-	// +kubebuilder:validation:Enum=Provisioned
 	Type ProjectConditionType `json:"type"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
@@ -204,7 +233,7 @@ type ProjectCondition struct {
 	// Last time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 	// Unique, one-word, CamelCase reason for the condition's last transition.
-	Reason string `json:"reason"`
+	Reason ProjectConditionReason `json:"reason"`
 	// Human-readable message indicating details about last transition.
 	Message string `json:"message"`
 }
@@ -222,9 +251,9 @@ type ControlPlaneList struct {
 // resources.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:categories=all;eschercloud
-// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type ControlPlane struct {
@@ -244,6 +273,9 @@ type ControlPlaneSpec struct {
 
 // ControlPlaneStatus defines the status of the project.
 type ControlPlaneStatus struct {
+	// Namespace defines the namespace a control plane resides in.
+	Namespace string `json:"namespace,omitempty"`
+
 	// Current service state of a control plane.
 	Conditions []ControlPlaneCondition `json:"conditions,omitempty"`
 }
@@ -315,10 +347,9 @@ type KubernetesClusterList struct {
 // some other new starlet.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:categories=all;eschercloud
-// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="controlPlane",type="string",JSONPath=".metadata.labels['unikorn\\.eschercloud\\.ai/controlplane']"
+// +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.kubernetesVersion"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -414,6 +445,9 @@ type KubernetesClusterAutoscalerSpec struct {
 
 // KubernetesClusterStatus defines the observed state of the Kubernetes cluster.
 type KubernetesClusterStatus struct {
+	// Namespace defines the namespace a cluster resides in.
+	Namespace string `json:"namespace,omitempty"`
+
 	// Current service state of a Kubernetes cluster.
 	Conditions []KubernetesClusterCondition `json:"conditions,omitempty"`
 }

@@ -28,6 +28,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/go-logr/logr"
 
+	"github.com/eschercloudai/unikorn/pkg/readiness"
 	"github.com/eschercloudai/unikorn/pkg/util"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -484,6 +485,48 @@ func (p *ManifestProvisioner) provision(ctx context.Context, objects []unstructu
 	return nil
 }
 
+// deprovision removes any objects defined by the manifest.
+func (p *ManifestProvisioner) deprovision(ctx context.Context, objects []unstructured.Unstructured) error {
+	for i := range objects {
+		object := &objects[i]
+
+		if err := p.applyNamespace(object); err != nil {
+			return err
+		}
+
+		objectKey := client.ObjectKeyFromObject(object)
+
+		existing, ok := object.NewEmptyInstance().(*unstructured.Unstructured)
+		if !ok {
+			panic("unstructured empty instance fail")
+		}
+
+		if err := p.client.Get(ctx, objectKey, existing); err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+
+			continue
+		}
+
+		p.log.Info("deleting object", "key", objectKey, "gvk", object.GroupVersionKind())
+
+		if err := p.client.Delete(ctx, object); err != nil {
+			return err
+		}
+	}
+
+	for i := range objects {
+		object := &objects[i]
+
+		if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, object)).Check(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Provision implements the Provision interface.
 func (p *ManifestProvisioner) Provision(ctx context.Context) error {
 	p.log = log.FromContext(ctx).WithValues("manifest", p.id)
@@ -520,6 +563,41 @@ func (p *ManifestProvisioner) Provision(ctx context.Context) error {
 	}
 
 	if err := p.provision(ctx, objects); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Deprovision implements the Provision interface.
+func (p *ManifestProvisioner) Deprovision(ctx context.Context) error {
+	p.log = log.FromContext(ctx).WithValues("manifest", p.id)
+
+	// Find the manifest descriptor.
+	var ok bool
+
+	p.entry, ok = manifestRegistry[p.id]
+	if !ok {
+		panic("no registry entry")
+	}
+
+	// Do any processing filters.
+	contents, err := p.readManifest()
+	if err != nil {
+		return err
+	}
+
+	contents, err = p.processSubstitution(contents)
+	if err != nil {
+		return err
+	}
+
+	objects, err := p.parse(contents)
+	if err != nil {
+		return err
+	}
+
+	if err := p.deprovision(ctx, objects); err != nil {
 		return err
 	}
 

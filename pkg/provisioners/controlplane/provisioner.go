@@ -18,13 +18,19 @@ package controlplane
 
 import (
 	"context"
+	"errors"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusterapi"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -73,15 +79,20 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	timer := prometheus.NewTimer(durationMetric)
 	defer timer.ObserveDuration()
 
+	namespace, err := p.provisionNamespace(ctx)
+	if err != nil {
+		return err
+	}
+
 	// Provision a virtual cluster for CAPI to live in.
-	vclusterProvisioner := vcluster.New(p.client, p.controlPlane)
+	vclusterProvisioner := vcluster.New(p.client, namespace.Name)
 
 	if err := vclusterProvisioner.Provision(ctx); err != nil {
 		return err
 	}
 
 	// Create a new client that's able to talk to the vcluster.
-	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.controlPlane.Namespace, p.controlPlane.Name)
+	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, namespace.Name)
 	if err != nil {
 		return err
 	}
@@ -96,6 +107,76 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	clusterAPIProvisioner := clusterapi.New(vclusterClient)
 
 	if err := clusterAPIProvisioner.Provision(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// provisionNamespace creates a namespace for the control plane so that clusters
+// contained within have their own namespace and won't clash with others in the
+// same project.
+func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace, error) {
+	namespace, err := util.GetResourceNamespace(ctx, p.client, constants.ControlPlaneLabel, p.controlPlane.Name)
+	if err == nil {
+		return namespace, nil
+	}
+
+	// Some other error, propagate it back up the stack.
+	if !errors.Is(err, util.ErrNamespaceLookup) {
+		return nil, err
+	}
+
+	// Create a new control plane namespace.
+	namespace = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "controlplane-",
+			Labels: map[string]string{
+				constants.ControlPlaneLabel: p.controlPlane.Name,
+			},
+		},
+	}
+
+	if err := provisioners.NewResourceProvisioner(p.client, namespace).Provision(ctx); err != nil {
+		return nil, err
+	}
+
+	p.controlPlane.Status.Namespace = namespace.Name
+
+	if err := p.client.Status().Update(ctx, p.controlPlane); err != nil {
+		return nil, err
+	}
+
+	return namespace, nil
+}
+
+// Deprovision implements the Provision interface.
+func (p *Provisioner) Deprovision(ctx context.Context) error {
+	namespace, err := util.GetResourceNamespace(ctx, p.client, constants.ControlPlaneLabel, p.controlPlane.Name)
+	if err != nil {
+		// Already dead.
+		if errors.Is(err, util.ErrNamespaceLookup) {
+			return nil
+		}
+
+		return err
+	}
+
+	// Find any clusters and delete them and free any Openstack resources.
+	clusters := &unikornv1alpha1.KubernetesClusterList{}
+	if err := p.client.List(ctx, clusters, &client.ListOptions{Namespace: namespace.Name}); err != nil {
+		return err
+	}
+
+	for i := range clusters.Items {
+		if err := provisioners.NewResourceProvisioner(p.client, &clusters.Items[i]).Deprovision(ctx); err != nil {
+			return err
+		}
+	}
+
+	// Deprovision the namespace and await deletion.
+	// This will clean up all the vcluster gubbins and the CAPI stuff contained within.
+	if err := provisioners.NewResourceProvisioner(p.client, namespace).Deprovision(ctx); err != nil {
 		return err
 	}
 
