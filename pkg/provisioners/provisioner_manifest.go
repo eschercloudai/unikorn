@@ -139,6 +139,9 @@ var (
 	}
 )
 
+// FilterFunc allows resources to filtered out of a manifest.
+type FilterFunc func(*unstructured.Unstructured) bool
+
 // ManifestProvisioner is a provisioner that is able to parse and manage resources
 // sourced from a yaml manifest.
 type ManifestProvisioner struct {
@@ -169,6 +172,11 @@ type ManifestProvisioner struct {
 	// envMapper allows manifest with environment subsitution to
 	// map variables to values.
 	envMapper func(string) string
+
+	// filter allows resources to filtered out of a manifest, given a
+	// rendered unstructured object, returning true will allow it to be
+	// processed, false to ignore it.
+	filter FilterFunc
 }
 
 // nullEnvMapper is a dummy mapper for when none is specified, by the manifest
@@ -215,6 +223,12 @@ func (p *ManifestProvisioner) WithOwnerReferences(ownerReferences []metav1.Owner
 // WithEnvMapper associates a mapping function that substitutes variables with values.
 func (p *ManifestProvisioner) WithEnvMapper(f func(string) string) *ManifestProvisioner {
 	p.envMapper = f
+
+	return p
+}
+
+func (p *ManifestProvisioner) WithFilter(f FilterFunc) *ManifestProvisioner {
+	p.filter = f
 
 	return p
 }
@@ -442,6 +456,33 @@ func (p *ManifestProvisioner) applyNamespace(object *unstructured.Unstructured) 
 	return nil
 }
 
+// filterObjects allows the removeal of objects from a manifest programatically.
+func (p *ManifestProvisioner) filterObjects(objects []unstructured.Unstructured) []unstructured.Unstructured {
+	if p.filter == nil {
+		return objects
+	}
+
+	// False nagative :/
+	//nolint:prealloc
+	var result []unstructured.Unstructured
+
+	for i := range objects {
+		object := &objects[i]
+
+		if !p.filter(object) {
+			objectKey := client.ObjectKeyFromObject(object)
+
+			p.log.Info("filtering object", "key", objectKey, "gvk", object.GroupVersionKind())
+
+			continue
+		}
+
+		result = append(result, *object)
+	}
+
+	return result
+}
+
 // provision creates any objects required by the manifest.
 func (p *ManifestProvisioner) provision(ctx context.Context, objects []unstructured.Unstructured) error {
 	for i := range objects {
@@ -496,20 +537,22 @@ func (p *ManifestProvisioner) deprovision(ctx context.Context, objects []unstruc
 
 		objectKey := client.ObjectKeyFromObject(object)
 
+		p.log.Info("deleting object", "key", objectKey, "gvk", object.GroupVersionKind())
+
 		existing, ok := object.NewEmptyInstance().(*unstructured.Unstructured)
 		if !ok {
 			panic("unstructured empty instance fail")
 		}
 
 		if err := p.client.Get(ctx, objectKey, existing); err != nil {
-			if !errors.IsNotFound(err) {
-				return err
+			if errors.IsNotFound(err) {
+				p.log.Info("object doesn't exist", "key", objectKey, "gvk", object.GroupVersionKind())
+
+				continue
 			}
 
-			continue
+			return err
 		}
-
-		p.log.Info("deleting object", "key", objectKey, "gvk", object.GroupVersionKind())
 
 		if err := p.client.Delete(ctx, object); err != nil {
 			return err
@@ -518,6 +561,10 @@ func (p *ManifestProvisioner) deprovision(ctx context.Context, objects []unstruc
 
 	for i := range objects {
 		object := &objects[i]
+
+		objectKey := client.ObjectKeyFromObject(object)
+
+		p.log.Info("waiting for object deletion", "key", objectKey, "gvk", object.GroupVersionKind())
 
 		if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, object)).Check(ctx); err != nil {
 			return err
@@ -562,6 +609,8 @@ func (p *ManifestProvisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	objects = p.filterObjects(objects)
+
 	if err := p.provision(ctx, objects); err != nil {
 		return err
 	}
@@ -596,6 +645,8 @@ func (p *ManifestProvisioner) Deprovision(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	objects = p.filterObjects(objects)
 
 	if err := p.deprovision(ctx, objects); err != nil {
 		return err
