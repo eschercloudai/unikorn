@@ -30,6 +30,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -153,6 +154,16 @@ func (p *Provisioner) provisionNamespace(ctx context.Context, client client.Clie
 	return namespace, nil
 }
 
+// deprovisionFilter ensures deprovisioning deletes CAPI resources, but not the secrets
+// used to talk to OpenStack.
+func deprovisionFilter(object *unstructured.Unstructured) bool {
+	if object.GetAPIVersion() == "v1" && object.GetKind() == "Secret" {
+		return false
+	}
+
+	return true
+}
+
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
@@ -178,8 +189,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	// Cluster API is "special".  In order to deprovision it needs all the secrets we provided
 	// to be still in place (in order to talk to Openstack).  So we need to remove all things
-	// we added with the exception of secrets.  Once that's done we can nuke the namespace.
-	// Like us, they use finalizers to do the cleanup.
+	// we added with the exception of secrets, hence the filter.
 	envMapper := func(env string) string {
 		mapping := map[string]string{
 			"CLUSTER_NAME": p.cluster.Name,
@@ -192,7 +202,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return ""
 	}
 
-	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace(p.cluster.Name).WithEnvMapper(envMapper)
+	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace(namespace.Name).WithEnvMapper(envMapper).WithFilter(deprovisionFilter)
 
 	if err := provisioner.Deprovision(ctx); err != nil {
 		return err
