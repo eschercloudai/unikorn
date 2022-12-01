@@ -21,7 +21,7 @@ BINDIR = bin
 CMDDIR = cmd
 SRCDIR = src
 GENDIR = generated
-CRDDIR = crds
+CRDDIR = charts/unikorn/crds
 
 # Where to install things.
 PREFIX = $(HOME)/bin
@@ -147,6 +147,7 @@ touch:
 lint: $(GENDIR)
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(LINT_VERSION)
 	$(GOBIN)/golangci-lint run ./...
+	helm lint charts/unikorn
 
 # Perform license checking.
 # This must pass or you will be denied by CI.

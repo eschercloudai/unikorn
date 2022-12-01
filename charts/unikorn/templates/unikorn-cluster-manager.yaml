@@ -2,13 +2,16 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: unikorn-cluster-manager
-  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
 ---
 # Bad, bad Simon
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: unikorn-cluster-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - "*"
@@ -21,10 +24,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: unikorn-cluster-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
 subjects:
 - kind: ServiceAccount
+  namespace: default
   name: unikorn-cluster-manager
-  namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -34,9 +39,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: unikorn-cluster-manager
-  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: 1
   selector:
     matchLabels:
       app: unikorn-cluster-manager
@@ -47,12 +53,10 @@ spec:
     spec:
       containers:
       - name: unikorn-cluster-manager
-        image: {{ .Values.clusterManager.image.repository }}:{{ .Values.clusterManager.image.tag }}
-        {{- if .Values.monitoring.enabled }}
+        image: {{ include "unikorn.clusterManagerImage" . }}
         ports:
         - name: prometheus
           containerPort: 8080
-        {{- end }}
         resources:
           requests:
             cpu: 50m
@@ -65,16 +69,14 @@ spec:
       serviceAccountName: unikorn-cluster-manager
       securityContext:
         runAsNonRoot: true
-{{- if .Values.monitoring.enabled }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: unikorn-cluster-manager
-  namespace: {{ .Release.Namespace }}
   labels:
-    service: unikorn-controller
-    unikorn-controller: unikorn-cluster-manager
+    {{- include "unikorn.labels" . | nindent 4 }}
+    {{- include "unikorn.prometheusLabels" (dict "job" "unikorn-cluster-manager") | nindent 4 }}
 spec:
   selector:
     app: unikorn-cluster-manager
@@ -82,4 +84,3 @@ spec:
   - name: prometheus
     port: 8080
     targetPort: prometheus
-{{- end }}

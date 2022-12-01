@@ -60,3 +60,42 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create the container images
+*/}}
+{{- define "unikorn.defaultRepositoryPath" -}}
+{{- if .Values.repository }}
+{{- printf "%s/%s" .Values.repository .Values.organization }}
+{{- else }}
+{{- .Values.organization }}
+{{- end }}
+{{- end }}
+
+{{- define "unikorn.projectManagerImage" -}}
+{{- default (printf "%s/unikorn-project-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) .Values.projectManager.image }}
+{{- end }}
+
+{{- define "unikorn.controlPlaneManagerImage" -}}
+{{- default (printf "%s/unikorn-control-plane-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) .Values.controlPlaneManager.image }}
+{{- end }}
+
+{{- define "unikorn.clusterManagerImage" -}}
+{{- default (printf "%s/unikorn-cluster-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) .Values.clusterManager.image }}
+{{- end }}
+
+{{/*
+Create Prometheus labels
+*/}}
+{{- define "unikorn.prometheusServiceSelector" -}}
+prometheus.eschercloud.ai/app: unikorn
+{{- end }}
+
+{{- define "unikorn.prometheusJobLabel" -}}
+prometheus.eschercloud.ai/job
+{{- end }}
+
+{{- define "unikorn.prometheusLabels" -}}
+{{ include "unikorn.prometheusServiceSelector" . }}
+{{ include "unikorn.prometheusJobLabel" . }}: {{ .job }}
+{{- end }}
