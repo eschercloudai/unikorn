@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: unikorn-control-plane-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+---
+# Bad, bad Simon
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: unikorn-control-plane-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - "*"
+  resources:
+  - "*"
+  verbs:
+  - "*"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: unikorn-control-plane-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  namespace: default
+  name: unikorn-control-plane-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: unikorn-control-plane-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unikorn-control-plane-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unikorn-control-plane-manager
+  template:
+    metadata:
+      labels:
+        app: unikorn-control-plane-manager
+    spec:
+      containers:
+      - name: unikorn-control-plane-manager
+        image: {{ include "unikorn.controlPlaneManagerImage" . }}
+        ports:
+        - name: prometheus
+          containerPort: 8080
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          readOnlyRootFilesystem: true
+      serviceAccountName: unikorn-control-plane-manager
+      securityContext:
+        runAsNonRoot: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unikorn-control-plane-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+    {{- include "unikorn.prometheusLabels" (dict "job" "unikorn-control-plane-manager") | nindent 4 }}
+spec:
+  selector:
+    app: unikorn-control-plane-manager
+  ports:
+  - name: prometheus
+    port: 8080
+    targetPort: prometheus

@@ -8,10 +8,11 @@ A badass, opinionated, deployer of souls!
 
 Unikorn abstracts away installation of Cluster API.
 
-There are two resource types:
+There are three resource types:
 
 * Projects, that are a container for higher level abstractions.
 * ControlPlanes, that basically are instances of Cluster API that live in Projects.
+* Clusters, Kubernetes clusters.
 
 Control planes are actually contained themselves in virtual clusters, as CAPI is pretty terrible at cleaning things up on OpenStack errors, so we make these cattle.
 One Kubernetes cluster to one instance of Cluster API.
@@ -83,28 +84,22 @@ make images-kind-load
 
 ### Setting Up Kubernetes
 
-#### Installing CRDs
+#### Installing
 
-We use a few CRDs to make management easier, and long term, this command is likely to be
-an API server that creates resources, and a set of microservice controllers will act on
-the CRs.
-
-```shell
-kubectl apply -f crds
-```
-
-#### Installing the Unikorn Controllers
-
-There are a couple manifests -- one per controller -- in the `manifests` directory.
-To install them:
+Is all done via Helm, which means we can also deploy using ArgoCD.
+You can install using the local repo:
 
 ```shell
-kubectl apply -f manifests
+helm install unikorn charts/unikorn --namespace unikorn --create-namespace --set repository=null --set tag=0.0.0
 ```
 
 If you are installing this on a cloud somewhere, you will most likely need to update the images so that the registry and organization match what you are using.
+The above example shows how this works with the default images that are created.
 
-**NOTE**: Do not be alarmed if some manifests fail to apply, you may want to read the [monitoring](docs/monitoring.md) documentation first.
+#### Monitoring
+
+Can be enabled with the `--set monitoring.enabled=true` flag.
+See the [monitoring](docs/monitoring.md) documentation from more information.
 
 #### LoadBalancer Service Support
 

@@ -1,0 +1,39 @@
+# Set the global container repo.
+repository: ghcr.io
+
+# Set the global container repo organization.
+organization: eschercloudai
+
+# Set the global container tag.
+tag: v0.1.0
+
+# Project manager specific configuration.
+projectManager:
+  # Allows override of the global default image.
+  image:
+
+# Control plane manager specific configuration.
+controlPlaneManager:
+  # Allows override of the global default image.
+  image:
+
+# Cluster manager specific configuration.
+clusterManager:
+  # Allows override of the global default image.
+  image:
+
+# Defines Prometheus monitoring integration.
+monitoring:
+  # Enable monitoring, ensure Prometheus is installed first to define the CRDs.
+  enabled: false
+
+  # Set the namespace to generate the service monitor into.
+  namespace: monitoring
+
+  # Define service monitor configuration.
+  serviceMonitor:
+
+    # Labels required to be selected by Prometheus, this is compatible with
+    # kube-prometheus defaults.
+    labels:
+      release: prometheus
