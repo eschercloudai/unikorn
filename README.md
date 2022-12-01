@@ -87,14 +87,53 @@ make images-kind-load
 #### Installing
 
 Is all done via Helm, which means we can also deploy using ArgoCD.
-You can install using the local repo:
+You can install using the local repo, or with CD:
+
+<details>
+<summary>Helm</summary>
 
 ```shell
 helm install unikorn charts/unikorn --namespace unikorn --create-namespace --set repository=null --set tag=0.0.0
 ```
+</details>
+
+<details>
+<summary>ArgoCD</summary>
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: unikorn
+  namespace: argocd
+spec:
+  project: default
+  source:
+    helm:
+      parameters:
+      - name: repository
+        value: "null"
+      - name: tag
+        value: 0.0.0
+    path: charts/unikorn
+    repoURL: git@github.com:eschercloudai/unikorn
+    targetRevision: main
+  destination:
+    namespace: unikorn
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+```
+</details>
 
 If you are installing this on a cloud somewhere, you will most likely need to update the images so that the registry and organization match what you are using.
 The above example shows how this works with the default images that are created.
+
+ArgoCD users will need to configure a repository with an SSH private key associated with it so it can get to the goodies.
 
 #### Monitoring
 
