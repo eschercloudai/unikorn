@@ -1,0 +1,49 @@
+name: Release
+on:
+  push:
+    branches-ignore:
+    - '*'
+    tags:
+    - '*'
+env:
+  GO_VERSION: 1.19.1
+  REGISTRY: ghcr.io
+  ORGANIZATION: eschercloudai
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: checkout
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    - name: Build Binaries
+      run: make touch all -e VERSION=${{ github.ref_name }}
+    - name: Docker Login
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build and Push Images
+      run: make images-push -e VESRSION=${{ github.ref_name }} DOCKER_ORG=${{ env.REGISTRY }}/${{ env.ORGANIZATION }}
+    - name: Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release: Release ${{ github.ref_name }}
+    - name: Upload unikornctl-linux-amd64
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: bin/unikornctl
+        asset_name: unikornctl-linux-amd64
+        asset_content_type: application/octet-stream
