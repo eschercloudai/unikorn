@@ -104,10 +104,10 @@ prometheus.eschercloud.ai/job
 Create image pull secrets
 */}}
 {{- define "unikorn.imagePullSecrets" -}}
-{{- range .Values.imagePullSecrets -}}
-- name: {{ . }}
+{{- if .Values.imagePullSecret -}}
+- name: {{ .Values.imagePullSecret }}
 {{ end }}
-{{- range $index, $config := .Values.dockerConfigs -}}
-- name: docker-config-{{ $index }}
-{{ end }}
+{{- if .Values.dockerConfig -}}
+- name: docker-config
+{{- end }}
 {{- end }}
