@@ -73,15 +73,15 @@ Create the container images
 {{- end }}
 
 {{- define "unikorn.projectManagerImage" -}}
-{{- default (printf "%s/unikorn-project-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) .Values.projectManager.image }}
+{{- printf "%s/unikorn-project-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag | default .Values.projectManager.image }}
 {{- end }}
 
 {{- define "unikorn.controlPlaneManagerImage" -}}
-{{- default (printf "%s/unikorn-control-plane-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) .Values.controlPlaneManager.image }}
+{{- printf "%s/unikorn-control-plane-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag | default .Values.controlPlaneManager.image }}
 {{- end }}
 
 {{- define "unikorn.clusterManagerImage" -}}
-{{- default (printf "%s/unikorn-cluster-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) .Values.clusterManager.image }}
+{{- printf "%s/unikorn-cluster-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag | default .Values.clusterManager.image }}
 {{- end }}
 
 {{/*
@@ -98,4 +98,16 @@ prometheus.eschercloud.ai/job
 {{- define "unikorn.prometheusLabels" -}}
 {{ include "unikorn.prometheusServiceSelector" . }}
 {{ include "unikorn.prometheusJobLabel" . }}: {{ .job }}
+{{- end }}
+
+{{/*
+Create image pull secrets
+*/}}
+{{- define "unikorn.imagePullSecrets" -}}
+{{- range .Values.imagePullSecrets -}}
+- name: {{ . }}
+{{ end }}
+{{- range $index, $config := .Values.dockerConfigs -}}
+- name: docker-config-{{ $index }}
+{{ end }}
 {{- end }}

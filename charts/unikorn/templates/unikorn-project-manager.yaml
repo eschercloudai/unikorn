@@ -4,6 +4,10 @@ metadata:
   name: unikorn-project-manager
   labels:
     {{- include "unikorn.labels" . | nindent 4 }}
+{{- with ( include "unikorn.imagePullSecrets" . ) }}
+imagePullSecrets:
+{{ . }}
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

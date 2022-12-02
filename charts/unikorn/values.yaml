@@ -5,7 +5,17 @@ repository: ghcr.io
 organization: eschercloudai
 
 # Set the global container tag.
-tag: v0.1.0
+tag: 0.1.0
+
+# Set the docker configuration, doing so will create a secret and link it
+# to the service accounts of all the controllers.  You can do something like:
+# --set dockerConfigs[0]=$(cat ~/.docker/config.json | base64 -d)
+dockerConfigs: []
+
+# Set the image pull secret on the service accounts of all the controllers.
+# This is an alternative to dockerConfigs, but unlikely to play ball with
+# ArgoCD as it's a foreign object that needs pruning.
+imagePullSecrets: []
 
 # Project manager specific configuration.
 projectManager:
