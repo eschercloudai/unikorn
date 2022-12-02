@@ -75,7 +75,7 @@ GENCLIENTNAME = unikorn
 GENCLIENTS = $(MODULE)/$(GENDIR)/clientset
 
 # This defines how docker containers are tagged.
-DOCKER_ORG = eschercloudai
+DOCKER_ORG = ghcr.io/eschercloudai
 
 # Main target, builds all binaries.
 .PHONY: all

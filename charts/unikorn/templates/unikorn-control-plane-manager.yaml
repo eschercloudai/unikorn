@@ -4,6 +4,10 @@ metadata:
   name: unikorn-control-plane-manager
   labels:
     {{- include "unikorn.labels" . | nindent 4 }}
+{{- with ( include "unikorn.imagePullSecrets" . ) }}
+imagePullSecrets:
+{{ . }}
+{{- end }}
 ---
 # Bad, bad Simon
 apiVersion: rbac.authorization.k8s.io/v1
