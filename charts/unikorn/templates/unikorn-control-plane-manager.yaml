@@ -32,7 +32,7 @@ metadata:
     {{- include "unikorn.labels" . | nindent 4 }}
 subjects:
 - kind: ServiceAccount
-  namespace: default
+  namespace: {{ .Release.Namespace }}
   name: unikorn-control-plane-manager
 roleRef:
   apiGroup: rbac.authorization.k8s.io
