@@ -146,7 +146,7 @@ func GetConfig(ctx context.Context, getter ConfigGetter, namespace string, exter
 			return err
 		}
 
-		host := "https://" + service.Spec.ClusterIP + ":443"
+		host := "https://vcluster." + namespace + ":443"
 
 		if external {
 			if len(service.Status.LoadBalancer.Ingress) == 0 {

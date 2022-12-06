@@ -61,6 +61,10 @@ const (
 	// to a specific cluster.
 	KubernetesClusterLabel = "unikorn.eschercloud.ai/cluster"
 
+	// ApplicationLabel is applied to ArgoCD applications to differentiate
+	// between them.
+	ApplicationLabel = "unikorn.eschercloud.ai/application"
+
 	// Finalizer is applied to resources that need to be deleted manually
 	// and do other complex logic.
 	Finalizer = "unikorn"

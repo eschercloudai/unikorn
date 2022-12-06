@@ -81,6 +81,7 @@ spec:
                       - Canceled
                       - Timedout
                       - Errored
+                      - Deprovisioning
                       type: string
                     status:
                       description: Status is the status of the condition. Can be True,
