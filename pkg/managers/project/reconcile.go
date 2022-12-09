@@ -67,8 +67,10 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 		log.Info("deleting resource")
 
-		// TODO: we need to add a status condition to say we are deleting.
-		// And obviously report any errors of course.
+		if err := r.handleReconcileDeprovision(ctx, object); err != nil {
+			return reconcile.Result{}, err
+		}
+
 		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 		defer cancel()
 
@@ -118,9 +120,24 @@ func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, project *uni
 			constants.Finalizer,
 		}
 
+		if err := r.client.Update(ctx, project); err != nil {
+			return err
+		}
+
 		project.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.ProjectConditionReasonProvisioning, "Provisioning of project has started")
 
-		if err := r.client.Update(ctx, project); err != nil {
+		if err := r.client.Status().Update(ctx, project); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// handleReconcileDeprovision indicates the deprovision request has been picked up.
+func (r *reconciler) handleReconcileDeprovision(ctx context.Context, project *unikornv1alpha1.Project) error {
+	if ok := project.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.ProjectConditionReasonDeprovisioning, "Project is being deprovisioned"); ok {
+		if err := r.client.Status().Update(ctx, project); err != nil {
 			return err
 		}
 	}

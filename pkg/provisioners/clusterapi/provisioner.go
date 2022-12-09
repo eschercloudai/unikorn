@@ -21,10 +21,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/readiness"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -54,17 +56,141 @@ func init() {
 type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
+
+	server string
+
+	// labels is a set of labels to identify the applications.
+	labels map[string]string
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client) *Provisioner {
+func New(client client.Client, server string) *Provisioner {
 	return &Provisioner{
 		client: client,
+		server: server,
 	}
+}
+
+func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
+	p.labels = l
+
+	return p
+}
+
+func (p *Provisioner) getLabels(app string) map[string]string {
+	l := map[string]string{
+		constants.ApplicationLabel: app,
+	}
+
+	for k, v := range p.labels {
+		l[k] = v
+	}
+
+	return l
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
+
+func (p *Provisioner) generateCertManagerApplication() *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "Application",
+			"metadata": map[string]interface{}{
+				"generateName": "cert-manager-",
+				"namespace":    "argocd",
+				"labels":       p.getLabels("cert-manager"),
+			},
+			"spec": map[string]interface{}{
+				"project": "default",
+				"source": map[string]interface{}{
+					//TODO:  programmable
+					"repoURL":        "https://charts.jetstack.io",
+					"chart":          "cert-manager",
+					"targetRevision": "v1.10.1",
+					"helm": map[string]interface{}{
+						"releaseName": "cert-manager",
+						"parameters": []map[string]interface{}{
+							{
+								"name":  "installCRDs",
+								"value": "true",
+							},
+						},
+					},
+				},
+				"destination": map[string]interface{}{
+					"name":      p.server,
+					"namespace": "cert-manager",
+				},
+				"syncPolicy": map[string]interface{}{
+					"automated": map[string]interface{}{
+						"selfHeal": true,
+					},
+					"syncOptions": []string{
+						"CreateNamespace=true",
+					},
+				},
+			},
+		},
+	}
+}
+
+func (p *Provisioner) generateClusterAPIApplication() *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "Application",
+			"metadata": map[string]interface{}{
+				"generateName": "cluster-api-",
+				"namespace":    "argocd",
+				"labels":       p.getLabels("cluster-api"),
+			},
+			"spec": map[string]interface{}{
+				"project": "default",
+				"source": map[string]interface{}{
+					//TODO:  programmable
+					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
+					"chart":          "cluster-api",
+					"targetRevision": "v0.1.0",
+				},
+				"destination": map[string]interface{}{
+					"name": p.server,
+				},
+				"ignoreDifferences": []map[string]interface{}{
+					{
+						"group": "rbac.authorization.k8s.io",
+						"kind":  "ClusterRole",
+						"name":  "capi-aggregated-manager-role",
+						"jsonPointers": []interface{}{
+							"/rules",
+						},
+					},
+					{
+						"group": "rbac.authorization.k8s.io",
+						"kind":  "ClusterRole",
+						"name":  "capi-kubeadm-control-plane-aggregated-manager-role",
+						"jsonPointers": []interface{}{
+							"/rules",
+						},
+					},
+					{
+						"group": "apiextensions.k8s.io",
+						"kind":  "CustomResourceDefinition",
+						"jsonPointers": []interface{}{
+							"/spec/conversion/webhook/clientConfig/caBundle",
+						},
+					},
+				},
+				"syncPolicy": map[string]interface{}{
+					"automated": map[string]interface{}{
+						"selfHeal": true,
+					},
+				},
+			},
+		},
+	}
+}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
@@ -73,84 +199,61 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log := log.FromContext(ctx)
 
-	log.V(1).Info("provisioning cluster API")
+	// TODO: code repetition.
+	log.Info("provisioning cert manager")
 
-	log.V(1).Info("provisioning Cert Manager")
+	certManagerApp := p.generateCertManagerApplication()
 
-	certManagerProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestCertManager)
+	certManagerProvisioner := application.New(p.client, certManagerApp, labels.SelectorFromSet(p.getLabels("cert-manager")))
 
 	if err := certManagerProvisioner.Provision(ctx); err != nil {
 		return err
 	}
 
-	log.V(1).Info("waiting for Cert Manager webhook to be active")
+	log.Info("cert manager provisioned")
 
-	certManagerReady := readiness.NewDeployment(p.client, "cert-manager", "cert-manager-webhook")
+	log.Info("provisioning cluster API")
 
-	if err := readiness.NewRetry(certManagerReady).Check(ctx); err != nil {
+	clusterAPIApp := p.generateClusterAPIApplication()
+
+	clusterAPIProvisioner := application.New(p.client, clusterAPIApp, labels.SelectorFromSet(p.getLabels("cluster-api")))
+
+	if err := clusterAPIProvisioner.Provision(ctx); err != nil {
 		return err
 	}
 
-	log.V(1).Info("waiting for Cert Manager webhook to be functional")
-
-	certificate := &unstructured.Unstructured{}
-	certificate.SetAPIVersion("cert-manager.io/v1")
-	certificate.SetKind("Issuer")
-	certificate.SetName("test")
-	certificate.SetNamespace("default")
-
-	if err := unstructured.SetNestedField(certificate.Object, "foo", "spec", "ca", "secretName"); err != nil {
-		return err
-	}
-
-	certmanagerFunctional := readiness.NewWebhook(p.client, certificate)
-
-	if err := readiness.NewRetry(certmanagerFunctional).Check(ctx); err != nil {
-		return err
-	}
-
-	log.V(1).Info("provisioning Cluster API core")
-
-	clusterAPICoreProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPICore)
-
-	if err := clusterAPICoreProvisioner.Provision(ctx); err != nil {
-		return err
-	}
-
-	log.V(1).Info("provisioning Cluster API control plane")
-
-	clusterAPIControlPlaneProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPIControlPlane)
-
-	if err := clusterAPIControlPlaneProvisioner.Provision(ctx); err != nil {
-		return err
-	}
-
-	log.V(1).Info("provisioning Cluster API bootstrap")
-
-	clusterAPIBootstrapProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPIBootstrap)
-
-	if err := clusterAPIBootstrapProvisioner.Provision(ctx); err != nil {
-		return err
-	}
-
-	log.V(1).Info("provisioning Cluster API Openstack provider")
-
-	clusterAPIProviderOpenstackProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPIProviderOpenstack)
-
-	if err := clusterAPIProviderOpenstackProvisioner.Provision(ctx); err != nil {
-		return err
-	}
-
-	clusterAPIAddonProviderProvisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestClusterAPIAddonProvider)
-
-	if err := clusterAPIAddonProviderProvisioner.Provision(ctx); err != nil {
-		return err
-	}
+	log.Info("cluster API provisioned")
 
 	return nil
 }
 
 // Deprovision implements the Provision interface.
-func (p *Provisioner) Deprovision(context.Context) error {
+func (p *Provisioner) Deprovision(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	log.Info("deprovisioning cluster API")
+
+	clusterAPIApp := p.generateClusterAPIApplication()
+
+	clusterAPIProvisioner := application.New(p.client, clusterAPIApp, labels.SelectorFromSet(p.getLabels("cluster-api")))
+
+	if err := clusterAPIProvisioner.Deprovision(ctx); err != nil {
+		return err
+	}
+
+	log.Info("cluster API deprovisioned")
+
+	log.Info("deprovisioning cert manager")
+
+	certManagerApp := p.generateCertManagerApplication()
+
+	certManagerProvisioner := application.New(p.client, certManagerApp, labels.SelectorFromSet(p.getLabels("cert-manager")))
+
+	if err := certManagerProvisioner.Deprovision(ctx); err != nil {
+		return err
+	}
+
+	log.Info("cert manager deprovisioned")
+
 	return nil
 }

@@ -201,7 +201,7 @@ const (
 
 // ProjectConditionReason defines the possible reasons of a control plane
 // condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored
+// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored;Deprovisioning
 type ProjectConditionReason string
 
 const (
@@ -222,6 +222,9 @@ const (
 	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
 	// If we see these, consider formulating a fix, for example a retry loop.
 	ProjectConditionReasonErrored ProjectConditionReason = "Errored"
+	// ProjectConditionReasonDeprovisioning is used by a condition to
+	// indicate the controller has picked up a deprovision event.
+	ProjectConditionReasonDeprovisioning ProjectConditionReason = "Deprovisioning"
 )
 
 type ProjectCondition struct {
@@ -296,7 +299,7 @@ const (
 
 // ControlPlaneConditionReason defines the possible reasons of a control plane
 // condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored
+// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored;Deprovisioning
 type ControlPlaneConditionReason string
 
 const (
@@ -317,6 +320,9 @@ const (
 	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
 	// If we see these, consider formulating a fix, for example a retry loop.
 	ControlPlaneConditionReasonErrored ControlPlaneConditionReason = "Errored"
+	// ControlPlaneConditionReasonDeprovisioning is used by a condition to
+	// indicate the controller has picked up a deprovision event.
+	ControlPlaneConditionReasonDeprovisioning ControlPlaneConditionReason = "Deprovisioning"
 )
 
 type ControlPlaneCondition struct {
@@ -467,7 +473,7 @@ const (
 
 // KubernetesClusterConditionReason defines the possible reasons of a cluster
 // condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored
+// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored;Deprovisioning
 type KubernetesClusterConditionReason string
 
 const (
@@ -488,6 +494,9 @@ const (
 	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
 	// If we see these, consider formulating a fix, for example a retry loop.
 	KubernetesClusterConditionReasonErrored KubernetesClusterConditionReason = "Errored"
+	// KubernetesClusterConditionReasonDeprovisioning is used by a condition to
+	// indicate the controller has picked up a deprovision event.
+	KubernetesClusterConditionReasonDeprovisioning KubernetesClusterConditionReason = "Deprovisioning"
 )
 
 type KubernetesClusterCondition struct {

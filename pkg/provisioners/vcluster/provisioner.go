@@ -21,8 +21,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/readiness"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -61,6 +65,9 @@ type Provisioner struct {
 
 	// namespace is the namespace to provision in.
 	namespace string
+
+	// labels is a set of labels to identify the vcluster.
+	labels map[string]string
 }
 
 // New returns a new initialized provisioner object.
@@ -74,6 +81,73 @@ func New(client client.Client, namespace string) *Provisioner {
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
+	p.labels = l
+
+	return p
+}
+
+func (p *Provisioner) getLabels() map[string]string {
+	l := map[string]string{
+		constants.ApplicationLabel: "vcluster",
+	}
+
+	for k, v := range p.labels {
+		l[k] = v
+	}
+
+	return l
+}
+
+func (p *Provisioner) generateApplication() *unstructured.Unstructured {
+	// Okay, from this point on, things get a bit "meta" because whoever
+	// wrote ArgoCD for some reason imported kubernetes, not client-go to
+	// get access to the schema information...
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "Application",
+			"metadata": map[string]interface{}{
+				"generateName": "vcluster-",
+				"namespace":    "argocd",
+				"labels":       p.getLabels(),
+			},
+			"spec": map[string]interface{}{
+				"project": "default",
+				"source": map[string]interface{}{
+					//TODO:  programmable
+					"repoURL":        "https://charts.loft.sh",
+					"chart":          "vcluster",
+					"targetRevision": "0.12.1",
+					"helm": map[string]interface{}{
+						"releaseName": "vcluster",
+						// TODO: this is only required by unikornctl to get
+						// the kubeconfig (e.g. set a reachable address).  It
+						// wastes an IP and embiggens the attack vector.  If
+						// we change this to reqire port-forwarding it'll do
+						// the trick!
+						"parameters": []map[string]interface{}{
+							{
+								"name":  "service.type",
+								"value": "LoadBalancer",
+							},
+						},
+					},
+				},
+				"destination": map[string]interface{}{
+					"name":      "in-cluster",
+					"namespace": p.namespace,
+				},
+				"syncPolicy": map[string]interface{}{
+					"automated": map[string]interface{}{
+						"selfHeal": true,
+					},
+				},
+			},
+		},
+	}
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	timer := prometheus.NewTimer(durationMetric)
@@ -81,26 +155,30 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log := log.FromContext(ctx)
 
-	log.V(1).Info("provisioning vcluster")
+	log.Info("provisioning vcluster")
 
-	provisioner := provisioners.NewManifestProvisioner(p.client, provisioners.ManifestVCluster).WithNamespace(p.namespace).WithName(vclusterName)
+	app := p.generateApplication()
 
-	if err := provisioner.Provision(ctx); err != nil {
+	applicationProvisioner := application.New(p.client, app, labels.SelectorFromSet(p.getLabels()))
+
+	if err := applicationProvisioner.Provision(ctx); err != nil {
 		return err
 	}
 
-	log.V(1).Info("waiting for stateful set to become ready")
-
-	statefulsetReadiness := readiness.NewStatefulSet(p.client, p.namespace, vclusterName)
-
-	if err := readiness.NewRetry(statefulsetReadiness).Check(ctx); err != nil {
-		return err
-	}
+	log.Info("vcluster provisioned")
 
 	return nil
 }
 
 // Deprovision implements the Provision interface.
-func (p *Provisioner) Deprovision(context.Context) error {
+func (p *Provisioner) Deprovision(ctx context.Context) error {
+	app := p.generateApplication()
+
+	applicationProvisioner := application.New(p.client, app, labels.SelectorFromSet(p.getLabels()))
+
+	if err := applicationProvisioner.Deprovision(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }

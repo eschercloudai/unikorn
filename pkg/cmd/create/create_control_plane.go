@@ -99,6 +99,7 @@ func (o *createControlPlaneOptions) run() error {
 			Name: o.name,
 			Labels: map[string]string{
 				constants.VersionLabel: constants.Version,
+				constants.ProjectLabel: o.project,
 			},
 		},
 	}
