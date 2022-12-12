@@ -152,7 +152,7 @@ func (p *Provisioner) generateClusterAPIApplication() *unstructured.Unstructured
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api",
-					"targetRevision": "v0.1.0",
+					"targetRevision": "v0.1.1",
 				},
 				"destination": map[string]interface{}{
 					"name": p.server,

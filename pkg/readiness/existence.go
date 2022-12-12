@@ -43,7 +43,7 @@ func NewResourceNotExists(client client.Client, object client.Object) *ResourceN
 }
 
 // Ensure the Check interface is implemented.
-var _ Check = &Deployment{}
+var _ Check = &ResourceNotExists{}
 
 // Check implements the Check interface.
 func (r *ResourceNotExists) Check(ctx context.Context) error {
