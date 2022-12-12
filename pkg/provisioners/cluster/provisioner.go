@@ -25,14 +25,13 @@ import (
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -46,172 +45,184 @@ type Provisioner struct {
 
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1alpha1.KubernetesCluster
+
+	server string
+
+	labels map[string]string
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, cluster *unikornv1alpha1.KubernetesCluster) *Provisioner {
+func New(client client.Client, cluster *unikornv1alpha1.KubernetesCluster, server string) *Provisioner {
 	return &Provisioner{
 		client:  client,
 		cluster: cluster,
+		server:  server,
 	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
+	p.labels = l
+
+	return p
+}
+
+func (p *Provisioner) getLabels() map[string]string {
+	l := map[string]string{
+		constants.ApplicationLabel: "kubernetes-cluster",
+	}
+
+	for k, v := range p.labels {
+		l[k] = v
+	}
+
+	return l
+}
+
+func (p *Provisioner) generateApplication() *unstructured.Unstructured {
+	// Okay, from this point on, things get a bit "meta" because whoever
+	// wrote ArgoCD for some reason imported kubernetes, not client-go to
+	// get access to the schema information...
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "Application",
+			"metadata": map[string]interface{}{
+				"generateName": "kubernetes-cluster-",
+				"namespace":    "argocd",
+				"labels":       p.getLabels(),
+			},
+			"spec": map[string]interface{}{
+				"project": "default",
+				"source": map[string]interface{}{
+					//TODO:  programmable
+					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
+					"chart":          "cluster-api-cluster-openstack",
+					"targetRevision": "v0.1.2",
+					"helm": map[string]interface{}{
+						"releaseName": p.cluster.Name,
+						"parameters": []map[string]interface{}{
+							{
+								"name":  "openstack.cloudsYAML",
+								"value": base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
+							},
+							{
+								"name":  "openstack.cloud",
+								"value": *p.cluster.Spec.Openstack.Cloud,
+							},
+							{
+								"name":  "openstack.ca",
+								"value": base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
+							},
+							{
+								"name":  "openstack.image",
+								"value": *p.cluster.Spec.Openstack.Image,
+							},
+							{
+								"name":  "openstack.cloudProviderConfiguration",
+								"value": base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudProviderConfig),
+							},
+							{
+								"name":  "openstack.externalNetworkID",
+								"value": *p.cluster.Spec.Network.ExternalNetworkID,
+							},
+							{
+								"name":  "openstack.sshKeyName",
+								"value": *p.cluster.Spec.Openstack.SSHKeyName,
+							},
+							{
+								"name":  "openstack.failureDomain",
+								"value": *p.cluster.Spec.Openstack.FailureDomain,
+							},
+							{
+								"name":  "controlPlane.replicas",
+								"value": strconv.Itoa(*p.cluster.Spec.ControlPlane.Replicas),
+							},
+							{
+								"name":  "controlPlane.flavor",
+								"value": *p.cluster.Spec.ControlPlane.Flavor,
+							},
+							{
+								"name":  "workload.replicas",
+								"value": strconv.Itoa(*p.cluster.Spec.Workload.Replicas),
+							},
+							{
+								"name":  "workload.flavor",
+								"value": *p.cluster.Spec.Workload.Flavor,
+							},
+							{
+								"name":  "network.nodeCIDR",
+								"value": p.cluster.Spec.Network.NodeNetwork.IPNet.String(),
+							},
+							{
+								"name":  "network.serviceCIDRs[0]",
+								"value": p.cluster.Spec.Network.ServiceNetwork.IPNet.String(),
+							},
+							{
+								"name":  "network.podCIDRs[0]",
+								"value": p.cluster.Spec.Network.PodNetwork.IPNet.String(),
+							},
+							{
+								"name": "network.dnsNameservers[0]",
+								// TODO: make dynamic.
+								"value": p.cluster.Spec.Network.DNSNameservers[0].IP.String(),
+							},
+							{
+								"name":  "kubernetes.version",
+								"value": string(*p.cluster.Spec.KubernetesVersion),
+							},
+						},
+					},
+				},
+				"destination": map[string]interface{}{
+					"name":      p.server,
+					"namespace": p.cluster.Name,
+				},
+				"syncPolicy": map[string]interface{}{
+					"automated": map[string]interface{}{
+						"selfHeal": true,
+					},
+					"syncOptions": []string{
+						"CreateNamespace=true",
+					},
+				},
+			},
+		},
+	}
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	// Create a new client that's able to talk to the vcluster.
-	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
-	if err != nil {
+	log := log.FromContext(ctx)
+
+	log.Info("provisioning kubernetes cluster")
+
+	app := p.generateApplication()
+
+	if err := application.New(p.client, app, labels.SelectorFromSet(p.getLabels())).Provision(ctx); err != nil {
 		return err
 	}
 
-	// Do not inherit the scheme or REST mapper here, it's a different cluster!
-	vclusterClient, err := client.New(vclusterConfig, client.Options{})
-	if err != nil {
-		return err
-	}
-
-	namespace, err := p.provisionNamespace(ctx, vclusterClient)
-	if err != nil {
-		return err
-	}
-
-	// Provision the actual cluster in the namespace.
-	envMapper := func(env string) string {
-		// TODO: the manifest looks broken as regards DNS nameservers...
-		mapping := map[string]string{
-			"CLUSTER_NAME":                           p.cluster.Name,
-			"OPENSTACK_NODE_NETWORK":                 p.cluster.Spec.Network.NodeNetwork.IPNet.String(),
-			"KUBERNETES_POD_NETWORK":                 p.cluster.Spec.Network.PodNetwork.IPNet.String(),
-			"KUBERNETES_SERVICE_NETWORK":             p.cluster.Spec.Network.ServiceNetwork.IPNet.String(),
-			"OPENSTACK_CLOUD":                        *p.cluster.Spec.Openstack.Cloud,
-			"OPENSTACK_DNS_NAMESERVERS":              p.cluster.Spec.Network.DNSNameservers[0].IP.String(),
-			"OPENSTACK_EXTERNAL_NETWORK_ID":          *p.cluster.Spec.Network.ExternalNetworkID,
-			"CONTROL_PLANE_MACHINE_COUNT":            strconv.Itoa(*p.cluster.Spec.ControlPlane.Replicas),
-			"OPENSTACK_CLOUD_PROVIDER_CONF_B64":      base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudProviderConfig),
-			"OPENSTACK_CLOUD_YAML_B64":               base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
-			"OPENSTACK_CLOUD_CACERT_B64":             base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
-			"KUBERNETES_VERSION":                     string(*p.cluster.Spec.KubernetesVersion),
-			"OPENSTACK_CONTROL_PLANE_MACHINE_FLAVOR": *p.cluster.Spec.ControlPlane.Flavor,
-			"OPENSTACK_IMAGE_NAME":                   *p.cluster.Spec.Openstack.Image,
-			"OPENSTACK_SSH_KEY_NAME":                 *p.cluster.Spec.Openstack.SSHKeyName,
-			"WORKER_MACHINE_COUNT":                   strconv.Itoa(*p.cluster.Spec.Workload.Replicas),
-			"OPENSTACK_FAILURE_DOMAIN":               *p.cluster.Spec.Openstack.FailureDomain,
-			"OPENSTACK_NODE_MACHINE_FLAVOR":          *p.cluster.Spec.Workload.Flavor,
-		}
-
-		if value, ok := mapping[env]; ok {
-			return value
-		}
-
-		return ""
-	}
-
-	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace(namespace.Name).WithEnvMapper(envMapper)
-
-	if err := provisioner.Provision(ctx); err != nil {
-		return err
-	}
+	log.Info("kubernetes cluster provisioned")
 
 	return nil
 }
 
-// provisionNamespace creates a namespace for the cluster.  This ensures people cannot
-// do nefarious things like provision stuff into kube-system etc.
-func (p *Provisioner) provisionNamespace(ctx context.Context, client client.Client) (*corev1.Namespace, error) {
-	namespace, err := util.GetResourceNamespace(ctx, client, constants.KubernetesClusterLabel, p.cluster.Name)
-	if err == nil {
-		return namespace, nil
-	}
-
-	// Some other error, propagate it back up the stack.
-	if !errors.Is(err, util.ErrNamespaceLookup) {
-		return nil, err
-	}
-
-	// Create a new control plane namespace.
-	namespace = &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "cluster-",
-			Labels: map[string]string{
-				constants.KubernetesClusterLabel: p.cluster.Name,
-			},
-		},
-	}
-
-	if err := provisioners.NewResourceProvisioner(client, namespace).Provision(ctx); err != nil {
-		return nil, err
-	}
-
-	p.cluster.Status.Namespace = namespace.Name
-
-	if err := p.client.Status().Update(ctx, p.cluster); err != nil {
-		return nil, err
-	}
-
-	return namespace, nil
-}
-
-// deprovisionFilter ensures deprovisioning deletes CAPI resources, but not the secrets
-// used to talk to OpenStack.
-func deprovisionFilter(object *unstructured.Unstructured) bool {
-	if object.GetAPIVersion() == "v1" && object.GetKind() == "Secret" {
-		return false
-	}
-
-	return true
-}
-
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
-	if err != nil {
+	log := log.FromContext(ctx)
+
+	log.Info("deprovisioning kubernetes cluster")
+
+	app := p.generateApplication()
+
+	if err := application.New(p.client, app, labels.SelectorFromSet(p.getLabels())).Deprovision(ctx); err != nil {
 		return err
 	}
 
-	// Do not inherit the scheme or REST mapper here, it's a different cluster!
-	vclusterClient, err := client.New(vclusterConfig, client.Options{})
-	if err != nil {
-		return err
-	}
-
-	namespace, err := util.GetResourceNamespace(ctx, vclusterClient, constants.KubernetesClusterLabel, p.cluster.Name)
-	if err != nil {
-		// Already dead.
-		if errors.Is(err, util.ErrNamespaceLookup) {
-			return nil
-		}
-
-		return err
-	}
-
-	// Cluster API is "special".  In order to deprovision it needs all the secrets we provided
-	// to be still in place (in order to talk to Openstack).  So we need to remove all things
-	// we added with the exception of secrets, hence the filter.
-	envMapper := func(env string) string {
-		mapping := map[string]string{
-			"CLUSTER_NAME": p.cluster.Name,
-		}
-
-		if value, ok := mapping[env]; ok {
-			return value
-		}
-
-		return ""
-	}
-
-	provisioner := provisioners.NewManifestProvisioner(vclusterClient, provisioners.ManifestProviderOpenstackKubernetesCluster).WithNamespace(namespace.Name).WithEnvMapper(envMapper).WithFilter(deprovisionFilter)
-
-	if err := provisioner.Deprovision(ctx); err != nil {
-		return err
-	}
-
-	// Deprovision the namespace and await deletion.
-	if err := provisioners.NewResourceProvisioner(vclusterClient, namespace).Deprovision(ctx); err != nil {
-		return err
-	}
+	log.Info("kubernetes cluster deprovisioned")
 
 	return nil
 }

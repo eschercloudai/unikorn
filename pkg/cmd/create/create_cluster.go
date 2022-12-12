@@ -301,7 +301,9 @@ func (o *createClusterOptions) run() error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.name,
 			Labels: map[string]string{
-				constants.VersionLabel: constants.Version,
+				constants.VersionLabel:      constants.Version,
+				constants.ProjectLabel:      o.project,
+				constants.ControlPlaneLabel: o.controlPlane,
 			},
 		},
 		Spec: unikornv1alpha1.KubernetesClusterSpec{
