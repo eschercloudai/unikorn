@@ -42,17 +42,13 @@ type Provisioner struct {
 
 	// object is the object's required state.
 	object client.Object
-
-	// selector is the requested application's unique label selector.
-	selector labels.Selector
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, object client.Object, selector labels.Selector) *Provisioner {
+func New(client client.Client, object client.Object) *Provisioner {
 	return &Provisioner{
-		client:   client,
-		object:   object,
-		selector: selector,
+		client: client,
+		object: object,
 	}
 }
 
@@ -79,7 +75,7 @@ func (p *Provisioner) toUnstructured() (*unstructured.Unstructured, error) {
 // generated names here as it's a multi-tenant platform, argo enforces the use of a single
 // namespace, and we want users to be able to define their own names irrespective
 // of other users.
-func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstructured, error) {
+func (p *Provisioner) findApplication(ctx context.Context, u *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	resources := &unstructured.UnstructuredList{
 		Object: map[string]interface{}{
 			"apiVersion": "argoproj.io/v1alpha1",
@@ -87,7 +83,9 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 		},
 	}
 
-	if err := p.client.List(ctx, resources, &client.ListOptions{Namespace: "argocd", LabelSelector: p.selector}); err != nil {
+	selector := labels.SelectorFromSet(u.GetLabels())
+
+	if err := p.client.List(ctx, resources, &client.ListOptions{Namespace: "argocd", LabelSelector: selector}); err != nil {
 		return nil, err
 	}
 
@@ -119,7 +117,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	// Resource, after provisioning, should be set to either the existing resource
 	// or the newly created one.  The point here is the API will have filled in
 	// the name so we can perform readiness checks.
-	resource, err := p.findApplication(ctx)
+	resource, err := p.findApplication(ctx, required)
 	if err != nil {
 		return err
 	}
@@ -163,7 +161,13 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning application")
 
-	resource, err := p.findApplication(ctx)
+	// Convert the generic object type into unstructured for the next bit...
+	required, err := p.toUnstructured()
+	if err != nil {
+		return err
+	}
+
+	resource, err := p.findApplication(ctx, required)
 	if err != nil {
 		return err
 	}
