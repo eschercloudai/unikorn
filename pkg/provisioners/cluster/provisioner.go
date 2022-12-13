@@ -267,6 +267,7 @@ func (p *Provisioner) getKubernetesClusterConfig(ctx context.Context) (*clientcm
 		Name:      p.cluster.Name + "-kubeconfig",
 	}
 
+	// Retry getting the secret until it exists.
 	getSecret := func() error {
 		return vclusterClient.Get(ctx, secretKey, secret)
 	}
@@ -311,7 +312,17 @@ func (p *Provisioner) provisionCilium(ctx context.Context) error {
 		return err
 	}
 
-	if err := argocdcluster.Upsert(ctx, argocd, server, config); err != nil {
+	// Retry adding the cluster until ArgoCD deems it's ready, it'll 500 until that
+	// condition is met.
+	upsertCluster := func() error {
+		if err := argocdcluster.Upsert(ctx, argocd, server, config); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := retry.Forever().DoWithContext(ctx, upsertCluster); err != nil {
 		return err
 	}
 
