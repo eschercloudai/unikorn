@@ -26,7 +26,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -77,8 +76,8 @@ func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
 	return p
 }
 
-func (p *Provisioner) getLabels(app string) map[string]string {
-	l := map[string]string{
+func (p *Provisioner) getLabels(app string) map[string]interface{} {
+	l := map[string]interface{}{
 		constants.ApplicationLabel: app,
 	}
 
@@ -202,11 +201,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	// TODO: code repetition.
 	log.Info("provisioning cert manager")
 
-	certManagerApp := p.generateCertManagerApplication()
-
-	certManagerProvisioner := application.New(p.client, certManagerApp, labels.SelectorFromSet(p.getLabels("cert-manager")))
-
-	if err := certManagerProvisioner.Provision(ctx); err != nil {
+	if err := application.New(p.client, p.generateCertManagerApplication()).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -214,11 +209,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.Info("provisioning cluster API")
 
-	clusterAPIApp := p.generateClusterAPIApplication()
-
-	clusterAPIProvisioner := application.New(p.client, clusterAPIApp, labels.SelectorFromSet(p.getLabels("cluster-api")))
-
-	if err := clusterAPIProvisioner.Provision(ctx); err != nil {
+	if err := application.New(p.client, p.generateClusterAPIApplication()).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -233,11 +224,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning cluster API")
 
-	clusterAPIApp := p.generateClusterAPIApplication()
-
-	clusterAPIProvisioner := application.New(p.client, clusterAPIApp, labels.SelectorFromSet(p.getLabels("cluster-api")))
-
-	if err := clusterAPIProvisioner.Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p.generateClusterAPIApplication()).Deprovision(ctx); err != nil {
 		return err
 	}
 
@@ -245,11 +232,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning cert manager")
 
-	certManagerApp := p.generateCertManagerApplication()
-
-	certManagerProvisioner := application.New(p.client, certManagerApp, labels.SelectorFromSet(p.getLabels("cert-manager")))
-
-	if err := certManagerProvisioner.Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p.generateCertManagerApplication()).Deprovision(ctx); err != nil {
 		return err
 	}
 

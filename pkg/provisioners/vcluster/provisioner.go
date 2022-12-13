@@ -26,7 +26,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -87,8 +86,8 @@ func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
 	return p
 }
 
-func (p *Provisioner) getLabels() map[string]string {
-	l := map[string]string{
+func (p *Provisioner) getLabels() map[string]interface{} {
+	l := map[string]interface{}{
 		constants.ApplicationLabel: "vcluster",
 	}
 
@@ -157,11 +156,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.Info("provisioning vcluster")
 
-	app := p.generateApplication()
-
-	applicationProvisioner := application.New(p.client, app, labels.SelectorFromSet(p.getLabels()))
-
-	if err := applicationProvisioner.Provision(ctx); err != nil {
+	if err := application.New(p.client, p.generateApplication()).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -172,11 +167,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	app := p.generateApplication()
-
-	applicationProvisioner := application.New(p.client, app, labels.SelectorFromSet(p.getLabels()))
-
-	if err := applicationProvisioner.Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p.generateApplication()).Deprovision(ctx); err != nil {
 		return err
 	}
 

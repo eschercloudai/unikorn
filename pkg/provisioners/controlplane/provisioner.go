@@ -18,16 +18,14 @@ package controlplane
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/url"
 
-	argocdapi "github.com/eschercloudai/argocd-client-go/pkg/api"
 	"github.com/prometheus/client_golang/prometheus"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	argocdclient "github.com/eschercloudai/unikorn/pkg/argocd/client"
+	argocdcluster "github.com/eschercloudai/unikorn/pkg/argocd/cluster"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusterapi"
@@ -194,19 +192,7 @@ func (p *Provisioner) provisionArgoCDCluster(ctx context.Context, namespace stri
 		return err
 	}
 
-	tlsClientConfig := argocdapi.NewV1alpha1TLSClientConfig()
-	tlsClientConfig.SetCaData(base64.StdEncoding.EncodeToString(vclusterConfig.Clusters["my-vcluster"].CertificateAuthorityData))
-	tlsClientConfig.SetCertData(base64.StdEncoding.EncodeToString(vclusterConfig.AuthInfos["my-vcluster"].ClientCertificateData))
-	tlsClientConfig.SetKeyData(base64.StdEncoding.EncodeToString(vclusterConfig.AuthInfos["my-vcluster"].ClientKeyData))
-
-	clusterConfig := argocdapi.NewV1alpha1ClusterConfig()
-	clusterConfig.SetTlsClientConfig(*tlsClientConfig)
-
-	cluster := argocdapi.NewV1alpha1Cluster()
-	cluster.SetServer(argoCDClusterServer(namespace))
-	cluster.SetConfig(*clusterConfig)
-
-	if _, _, err := argocd.ClusterServiceApi.ClusterServiceCreate(ctx).Body(*cluster).Upsert(true).Execute(); err != nil {
+	if err := argocdcluster.Upsert(ctx, argocd, argoCDClusterServer(namespace), vclusterConfig); err != nil {
 		return err
 	}
 
@@ -282,25 +268,8 @@ func (p *Provisioner) deprovisionArgoCDCluster(ctx context.Context, namespace st
 		return err
 	}
 
-	clusterServer := argoCDClusterServer(namespace)
-
-	// Do a list here, not a get, Argo's schema is bobbins and doesn't handle 404s
-	// as described.
-	argoClusters, _, err := argocd.ClusterServiceApi.ClusterServiceList(ctx).Execute()
-	if err != nil {
+	if err := argocdcluster.Delete(ctx, argocd, argoCDClusterServer(namespace)); err != nil {
 		return err
-	}
-
-	for _, cluster := range argoClusters.Items {
-		if *cluster.Server != clusterServer {
-			continue
-		}
-
-		if _, _, err := argocd.ClusterServiceApi.ClusterServiceDelete(ctx, url.QueryEscape(clusterServer)).Execute(); err != nil {
-			return err
-		}
-
-		break
 	}
 
 	return nil

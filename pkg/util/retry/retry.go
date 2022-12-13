@@ -18,8 +18,15 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+)
+
+var (
+	// ErrNone is a sentinel for when no error is set by the callback
+	// and prevents a nil pointer dereference.
+	ErrNone = errors.New("no error")
 )
 
 // Callback is a callback that must return nil to escape the retry loop.
@@ -68,7 +75,7 @@ func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
 	t := time.NewTicker(r.period)
 	defer t.Stop()
 
-	var rerr error
+	rerr := ErrNone
 
 	for {
 		select {
