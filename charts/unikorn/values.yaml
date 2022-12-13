@@ -5,7 +5,7 @@ repository: ghcr.io
 organization: eschercloudai
 
 # Set the global container tag.
-tag: 0.1.0
+tag: 0.2.0
 
 # Set the docker configuration, doing so will create a secret and link it
 # to the service accounts of all the controllers.  You can do something like:

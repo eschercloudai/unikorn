@@ -33,7 +33,7 @@ Consult the [developer documentation](DEVELOPER.md) for local development instru
 Download the official binary (update the version as appropriate):
 
 ```shell
-wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.1.0/unikornctl-linux-amd64
+wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.2.0/unikornctl-linux-amd64
 ```
 
 Set up shell completion:
@@ -75,7 +75,7 @@ spec:
   source:
     path: charts/unikorn
     repoURL: git@github.com:eschercloudai/unikorn
-    targetRevision: v0.1.0
+    targetRevision: v0.2.0
   destination:
     namespace: unikorn
     server: https://kubernetes.default.svc
