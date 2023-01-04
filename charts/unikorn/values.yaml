@@ -15,7 +15,7 @@ dockerConfig:
 # Set the image pull secret on the service accounts of all the controllers.
 # This is an alternative to dockerConfigs, but unlikely to play ball with
 # ArgoCD as it's a foreign object that needs pruning.
-imagePullSecrets:
+imagePullSecret:
 
 # Project manager specific configuration.
 projectManager:
