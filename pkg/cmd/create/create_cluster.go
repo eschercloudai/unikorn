@@ -35,6 +35,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	uflags "github.com/eschercloudai/unikorn/pkg/util/flags"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -93,7 +94,7 @@ type createClusterOptions struct {
 	caCert []byte
 
 	// version defines the Kubernetes version to install.
-	version flags.SemverFlag
+	version uflags.SemverFlag
 
 	// externalNetworkID is an internet facing Openstack network to provision
 	// VIPs on for load balancers and stuff.
@@ -123,7 +124,7 @@ type createClusterOptions struct {
 	replicas int
 
 	// diskSize defines the persistent volume size to provision with.
-	diskSize flags.QuantityFlag
+	diskSize uflags.QuantityFlag
 
 	// availabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.

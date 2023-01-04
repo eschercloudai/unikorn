@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/managers/cluster"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -35,6 +36,8 @@ func main() {
 	log.SetLogger(zap.New(zap.UseFlagOptions(options)))
 
 	logger := log.Log.WithName("main")
+
+	logger.Info("service starting", "application", constants.Application, "version", constants.Version, "revision", constants.Revision)
 
 	if err := cluster.Run(); err != nil {
 		logger.Error(err, "controller error")

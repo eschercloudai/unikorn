@@ -34,6 +34,17 @@ clusterManager:
   # Allows override of the global default image.
   image:
 
+# REST server specific configuration.
+server:
+  # Temporarily block deployment until it's complete.
+  enabled: false
+  # Allows override of the global default image.
+  image:
+  # Sets the ingress class to use.
+  ingressClass: nginx
+  # Sets the DNS hosts/X.509 Certs.
+  host: kubernetes.eschercloud.com
+
 # Defines Prometheus monitoring integration.
 monitoring:
   # Enable monitoring, ensure Prometheus is installed first to define the CRDs.

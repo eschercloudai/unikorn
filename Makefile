@@ -14,7 +14,8 @@ COMMANDS = unikornctl
 CONTROLLERS = \
   unikorn-project-manager \
   unikorn-control-plane-manager \
-  unikorn-cluster-manager
+  unikorn-cluster-manager \
+  unikorn-server
 
 # Release will do cross compliation of all images for the 'all' target.
 # Note we aren't fucking about with docker here because that opens up a
@@ -40,6 +41,10 @@ CMDDIR = cmd
 SRCDIR = src
 GENDIR = generated
 CRDDIR = charts/unikorn/crds
+SRVBASE = pkg/server
+SRVSCHEMA = $(SRVBASE)/openapi/server.spec.yaml
+SRVGENPKG = generated
+SRVGENDIR = $(SRVBASE)/$(SRVGENPKG)
 
 # Where to install things.
 PREFIX = $(HOME)/bin
@@ -54,6 +59,8 @@ INSTALL_BINARIES := $(patsubst %,$(PREFIX)/%,$(COMMANDS))
 # List of sources to trigger a build.
 # TODO: Bazel may be quicker, but it's a massive hog, and a pain in the arse.
 SOURCES := $(shell find . -type f -name *.go)
+
+SERVER_COMPONENT_SOURCES := $(patsubst %,$(SRVGENDIR)/%,$(SERVER_COMPONENTS))
 
 # Source files defining custom resource APIs
 APISRC = $(shell find pkg/apis -name [^z]*.go -type f)
@@ -74,6 +81,8 @@ CONTROLLER_TOOLS_VERSION=v0.8.0
 # Defines the version of code generator tools to use.
 # This should be kept in sync with the Kubenetes library versions defined in go.mod.
 CODEGEN_VERSION=v0.25.2
+
+OPENAPI_CODEGEN_VERSION=v1.12.4
 
 # This is the base directory to generate kubernetes API primitives from e.g.
 # clients and CRDs.
@@ -104,10 +113,10 @@ $(BINDIR) $(BINDIR)/amd64-linux-gnu $(BINDIR)/arm64-linux-gnu:
 	mkdir -p $@
 
 # Create a binary from a command.
-$(BINDIR)/%: $(SOURCES) $(GENDIR) | $(BINDIR)
+$(BINDIR)/%: $(SOURCES) $(GENDIR) $(SRVGENDIR) | $(BINDIR)
 	CGO_ENABLED=0 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
 
-$(BINDIR)/amd64-linux-gnu/%: $(SOURCES) $(GENDIR) | $(BINDIR)/amd64-linux-gnu
+$(BINDIR)/amd64-linux-gnu/%: $(SOURCES) $(GENDIR) $(SRVGENDIR) | $(BINDIR)/amd64-linux-gnu
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
 
 $(BINDIR)/arm64-linux-gnu/%: $(SOURCES) $(GENDIR) | $(BINDIR)/arm64-linux-gnu
@@ -156,7 +165,16 @@ $(GENDIR): $(APISRC)
 	@go install k8s.io/code-generator/cmd/client-gen@$(CODEGEN_VERSION)
 	$(GOBIN)/deepcopy-gen --input-dirs $(GENAPIS) -O zz_generated.deepcopy --bounding-dirs $(GENAPIBASE) $(GENARGS)
 	$(GOBIN)/client-gen --clientset-name $(GENCLIENTNAME) --input-base "" --input $(GENAPIS) --output-package $(GENCLIENTS) $(GENARGS)
-	@touch $(GENDIR)
+	@touch $@
+
+# Generate the server schema, types and router boilerplate.
+$(SRVGENDIR): $(SRVSCHEMA)
+	@mkdir -p $@
+	@go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@$(OPENAPI_CODEGEN_VERSION)
+	oapi-codegen -generate spec -package $(SRVGENPKG) $< > $(SRVGENDIR)/schema.go
+	oapi-codegen -generate types -package $(SRVGENPKG) $< > $(SRVGENDIR)/types.go
+	oapi-codegen -generate chi-server -package $(SRVGENPKG) $< > $(SRVGENDIR)/router.go
+	@touch $@
 
 # When checking out, the files timestamps are pretty much random, and make cause
 # spurious rebuilds of generated content.  Call this to prevent that.
@@ -172,8 +190,13 @@ lint: $(GENDIR)
 	$(GOBIN)/golangci-lint run ./...
 	helm lint --strict charts/unikorn
 
+# Validate the server OpenAPI schema is legit.
+.PHONY: validate
+validate:
+	go run ./hack/validate_openapi
+
 # Perform license checking.
 # This must pass or you will be denied by CI.
 .PHONY: license
 license:
-	go run ./hack/check_license/main.go
+	go run ./hack/check_license -ignore $(PWD)/$(SRVGENDIR)

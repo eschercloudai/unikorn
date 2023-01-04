@@ -17,30 +17,22 @@ limitations under the License.
 package main
 
 import (
-	"flag"
+	"context"
+	"fmt"
 	"os"
 
-	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/managers/project"
-
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"github.com/eschercloudai/unikorn/pkg/server/generated"
 )
 
 func main() {
-	options := &zap.Options{}
-	options.BindFlags(flag.CommandLine)
+	spec, err := generated.GetSwagger()
+	if err != nil {
+		fmt.Println("failed to load spec", err)
+		os.Exit(1)
+	}
 
-	flag.Parse()
-
-	log.SetLogger(zap.New(zap.UseFlagOptions(options)))
-
-	logger := log.Log.WithName("main")
-
-	logger.Info("service starting", "application", constants.Application, "version", constants.Version, "revision", constants.Revision)
-
-	if err := project.Run(); err != nil {
-		logger.Error(err, "controller error")
+	if err := spec.Validate(context.Background()); err != nil {
+		fmt.Println("failed to validate spec", err)
 		os.Exit(1)
 	}
 }

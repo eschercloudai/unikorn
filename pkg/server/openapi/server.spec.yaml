@@ -1,0 +1,401 @@
+openapi: 3.0.3
+info:
+  title: Unikorn Server
+  description: RESTful API service for Unikorn custom resources and UI.
+  version: 0.2.0
+paths:
+  /api/v1/auth/tokens/password:
+    description: Password based authentication services.
+    post:
+      description: |-
+        Authenticates against Openstack, caches a scoped Keystone V3 token
+        in the local in-memory cache - so not leaked to the client - and returns
+        a Unikorn token, when it expires and the selected OpenStack project.
+        This token must be presented as a bearer authentication header in subsequent
+        requests to other endpoints. This is typically used for initial login via
+        a UI.
+      security:
+      - httpBasicAuthentication: []
+      requestBody:
+        $ref: '#/components/requestBodies/authenticationScopeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/tokenResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/auth/tokens/token:
+    description: Token based authentication services.
+    post:
+      description: |-
+        Authenticates against OpenStack, caches a scoped Keystone V3 token
+        in the local in-memory cache - so not leaked to the client - and returns
+        a Unikorn token, when it expires and the selected OpenStack project.
+        This token must be presented as a bearer authentication header in subsequent
+        requests to other endpoints. This is typically used to refresh an issued
+        token that is about to expire, or to change the scope of the OpenStack token.
+      security:
+      - oauth2Authentication: []
+      requestBody:
+        $ref: '#/components/requestBodies/authenticationScopeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/tokenResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/projects:
+    description: Unikorn project services.
+    get:
+      description: |-
+        Lists all Unikorn projects associated with the authenticated user's
+        OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+    post:
+      description: |-
+        Creates a new Unikorn project associated with the authenticated user's
+        OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/projects/{project}:
+    description: Unikorn project services.
+    parameters:
+    - $ref: '#/components/parameters/project'
+    get:
+      description: |-
+        Gets a Unikorn project associated with the authenticated user's
+        OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+    delete:
+      description: |-
+        Deletes a Unikorn project associated with the authenticated user's
+        OpenStack project.  This is a cascading operation and will delete all
+        contained control planes and clusters.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/projects/{project}/controlplanes:
+    description: Unikorn control plane services.
+    parameters:
+    - $ref: '#/components/parameters/project'
+    get:
+      description: |-
+        Lists all Unikorn control planes contained within the selected Unikorn
+        project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+    post:
+      description: |-
+        Creates a new Unikorn control plane within the selected Unikorn project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/projects/{project}/controlplanes/{controlPlane}:
+    description: Unikorn control plane services.
+    parameters:
+    - $ref: '#/components/parameters/project'
+    - $ref: '#/components/parameters/controlPlane'
+    get:
+      description: |-
+        Gets a Unikorn control plane from within the selected Unikorn project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+    put:
+      description: |-
+        Updates a Unikorn control plane within the selected Unikorn project.
+        This is typically used to modify software versions managed by the
+        underlying continuous delivery platform.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+    delete:
+      description: |-
+        Deletes a Unikorn control plane from within the selected Unikorn project.
+        This is a cascading operation and will delete all contained clusters.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters:
+    description: Unikorn cluster services.
+    parameters:
+    - $ref: '#/components/parameters/project'
+    - $ref: '#/components/parameters/controlPlane'
+    get:
+      description: |-
+        List all Unikorn clusters within the selected Unikorn control plane.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+    post:
+      description: |-
+        Create a new Unikorn cluster within the selected Unikorn control plane.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster}:
+    description: Unikorn cluster services.
+    parameters:
+    - $ref: '#/components/parameters/project'
+    - $ref: '#/components/parameters/controlPlane'
+    - $ref: '#/components/parameters/cluster'
+    get:
+      description: |-
+        Get a Unikorn cluster from within the selected Unikorn control plane.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+    put:
+      description: |-
+        Update a Unikorn cluster within the selected Unikorn control plane.
+        This is used to modify cluster paramters e.g. Kubernetes versions or
+        scaling (where automatic scaling is not employed), and to modify any
+        software componenets deployed within the cluster by the underlying
+        continuous deliver platform.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+    delete:
+      description: |-
+        Delete a Unikorn cluster from within a Unikorn control plane.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/providers/openstack/projects:
+    description: OpenStack identity project services.
+    get:
+      description: |-
+        Lists all OpenStack projects that the authenticated user is a member of.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/providers/openstack/flavors:
+    description: OpenStack compute flavor services.
+    get:
+      description: |-
+        Lists all OpenStack compute flavors that the authenticated user has access
+        to within the scope of the OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/providers/openstack/images:
+    description: OpenStack compute image services.
+    get:
+      description: |-
+        Lists all OpenStack compute images that the authenticated user has access
+        to within the scope of the OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/providers/openstack/availability-zones:
+    description: OpenStack compure availability zone services.
+    get:
+      description: |-
+        Lists all OpenStack compute availability zones the authenticated user has
+        access to within the scope of the OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/providers/openstack/external-networks:
+    description: OpenStack external network services.
+    get:
+      description: |-
+        Lists all OpenStack external networks the authenticated user has access to
+        within the scope of the OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+  /api/v1/providers/openstack/ssh-keys:
+    description: OpenStack SSH key services.
+    get:
+      description: |-
+        Lists all OpenStack SSH keys the authenticated user has access to within
+        the scope of the OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/nullResponse'
+components:
+  parameters:
+    project:
+      name: project
+      in: path
+      description: The Unikorn project name.
+      required: true
+      schema:
+        $ref: '#/components/schemas/stringParameter'
+    controlPlane:
+      name: controlPlane
+      in: path
+      description: The Unikorn control plane name.
+      required: true
+      schema:
+        $ref: '#/components/schemas/stringParameter'
+    cluster:
+      name: cluster
+      in: path
+      description: The Unikorn cluster name.
+      required: true
+      schema:
+        $ref: '#/components/schemas/stringParameter'
+  schemas:
+    stringParameter:
+      description: A basic string parameter.
+      type: string
+    genericError:
+      description: Generic error message.
+      type: object
+      required:
+      - description
+      properties:
+        description:
+          description: Verbose message describing the error.
+          type: string
+    authenticationScope:
+      description: Password authentication scope.
+      type: object
+      properties:
+        project:
+          description: Openstack project.
+          type: string
+    token:
+      desctiption: Authentication token result.
+      type: object
+      required:
+      - token
+      properties:
+        token:
+          description: Authentication token.
+          type: string
+  requestBodies:
+    authenticationScopeRequest:
+      description: Openstack authentication scoping information.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/authenticationScope'
+  responses:
+    nullResponse:
+      description: Delete Me
+      content:
+        application/json: {}
+    badRequestResponse:
+      description: Request body failed schema validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/genericError'
+    unauthorizedResponse:
+      description: Authentication failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/genericError'
+    unsupportedMediaTypeResponse:
+      description: Requested media type unspecified or unsupported.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/genericError'
+    internalServerErrorResponse:
+      description: An unexpected error occurred, please report.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/genericError'
+    tokenResponse:
+      description: Authentication was successful.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/token'
+  securitySchemes:
+    httpBasicAuthentication:
+      description: Operation requires HTTP basic authentication.
+      type: http
+      scheme: basic
+    oauth2Authentication:
+      description: Operation requires OAuth2 bearer token authentication.
+      type: oauth2
+      flows:
+        implicit:
+          authorizationUrl: https://kubernetes.eschercloud.com/api/v1/tokens/password"
+          tokenURL: https://kubernetes.eschercloud.com/api/v1/tokens/token"
+          scopes:
+            project: Token is scoped to an OpenStack project

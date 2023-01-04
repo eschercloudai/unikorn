@@ -18,12 +18,14 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -125,7 +127,7 @@ func checkGoLicenseFile(path string) error {
 
 // checkGoLicense finds all go source files in the working directory, then parses them
 // into an AST and checks there is a license header in there.
-func checkGoLicense() error {
+func checkGoLicense(ignores *stringSliceFlag) error {
 	paths, err := glob(".go")
 	if err != nil {
 		return err
@@ -134,6 +136,10 @@ func checkGoLicense() error {
 	var hasErrors bool
 
 	for _, path := range paths {
+		if hasPrefix(path, ignores.items) {
+			continue
+		}
+
 		if err := checkGoLicenseFile(path); err != nil {
 			fmt.Println(err)
 
@@ -148,9 +154,43 @@ func checkGoLicense() error {
 	return nil
 }
 
+// stringSliceFlag allows buffering of multiple strings with the same flag.
+type stringSliceFlag struct {
+	items []string
+}
+
+func (s *stringSliceFlag) Set(v string) error {
+	s.items = append(s.items, v)
+
+	return nil
+}
+
+func (s *stringSliceFlag) String() string {
+	return strings.Join(s.items, ",")
+}
+
+// hasPrefix returns true if the path contains a prefix in the specified list.
+func hasPrefix(path string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // main runs any license checkers over the code.
 func main() {
-	if err := checkGoLicense(); err != nil {
+	ignores := &stringSliceFlag{}
+
+	flag.Var(ignores, "ignore", "Directories to ignore")
+
+	flag.Parse()
+
+	if err := checkGoLicense(ignores); err != nil {
+		fmt.Println(err)
+
 		os.Exit(1)
 	}
 }
