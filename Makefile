@@ -147,7 +147,7 @@ touch:
 lint: $(GENDIR)
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(LINT_VERSION)
 	$(GOBIN)/golangci-lint run ./...
-	helm lint charts/unikorn
+	helm lint --strict charts/unikorn
 
 # Perform license checking.
 # This must pass or you will be denied by CI.

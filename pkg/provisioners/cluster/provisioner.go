@@ -21,8 +21,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"strconv"
 
+	"github.com/gophercloud/utils/openstack/clientconfig"
 	"golang.org/x/sync/errgroup"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
@@ -41,10 +41,17 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/yaml"
 )
 
 var (
+	// ErrLabelMissing is returned when a required label is not present on
+	// the cluster resource.
 	ErrLabelMissing = errors.New("expected label missing")
+
+	// ErrCloudConfiguration is returned when the cloud configuration is not
+	// correctly formatted.
+	ErrCloudConfiguration = errors.New("invalid cloud configuration")
 )
 
 // Provisioner encapsulates control plane provisioning.
@@ -90,11 +97,71 @@ func (p *Provisioner) getLabels(app string) map[string]interface{} {
 	return l
 }
 
-func (p *Provisioner) generateApplication() *unstructured.Unstructured {
+// generateApplication creates an ArgoCD application for a cluster.
+func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) {
+	nameservers := make([]interface{}, len(p.cluster.Spec.Network.DNSNameservers))
+
+	for i, nameserver := range p.cluster.Spec.Network.DNSNameservers {
+		nameservers[i] = nameserver.IP.String()
+	}
+
+	// TODO: generate types from the Helm values schema.
+	valuesRaw := map[string]interface{}{
+		"openstack": map[string]interface{}{
+			"cloud":             *p.cluster.Spec.Openstack.Cloud,
+			"cloudsYAML":        base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
+			"ca":                base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
+			"sshKeyName":        *p.cluster.Spec.Openstack.SSHKeyName,
+			"region":            "nl1",
+			"failureDomain":     *p.cluster.Spec.Openstack.FailureDomain,
+			"externalNetworkID": *p.cluster.Spec.Network.ExternalNetworkID,
+		},
+		"cluster": map[string]interface{}{
+			"taints": []interface{}{
+				map[string]interface{}{
+					"key":    "node.cilium.io/agent-not-ready",
+					"effect": "NoSchedule",
+					"value":  "true",
+				},
+			},
+		},
+		"controlPlane": map[string]interface{}{
+			"version":  string(*p.cluster.Spec.KubernetesVersion),
+			"image":    *p.cluster.Spec.Openstack.Image,
+			"flavor":   *p.cluster.Spec.ControlPlane.Flavor,
+			"diskSize": 40,
+			"replicas": *p.cluster.Spec.ControlPlane.Replicas,
+		},
+		"workloadPools": map[string]interface{}{
+			"default": map[string]interface{}{
+				"version":  string(*p.cluster.Spec.KubernetesVersion),
+				"image":    *p.cluster.Spec.Openstack.Image,
+				"flavor":   *p.cluster.Spec.Workload.Flavor,
+				"diskSize": 100,
+				"replicas": *p.cluster.Spec.Workload.Replicas,
+			},
+		},
+		"network": map[string]interface{}{
+			"nodeCIDR": p.cluster.Spec.Network.NodeNetwork.IPNet.String(),
+			"serviceCIDRs": []interface{}{
+				p.cluster.Spec.Network.ServiceNetwork.IPNet.String(),
+			},
+			"podCIDRs": []interface{}{
+				p.cluster.Spec.Network.PodNetwork.IPNet.String(),
+			},
+			"dnsNameservers": nameservers,
+		},
+	}
+
+	values, err := yaml.Marshal(valuesRaw)
+	if err != nil {
+		return nil, err
+	}
+
 	// Okay, from this point on, things get a bit "meta" because whoever
 	// wrote ArgoCD for some reason imported kubernetes, not client-go to
 	// get access to the schema information...
-	return &unstructured.Unstructured{
+	object := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
@@ -109,80 +176,10 @@ func (p *Provisioner) generateApplication() *unstructured.Unstructured {
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api-cluster-openstack",
-					"targetRevision": "v0.1.2",
+					"targetRevision": "v0.2.2",
 					"helm": map[string]interface{}{
 						"releaseName": p.cluster.Name,
-						"parameters": []map[string]interface{}{
-							{
-								"name":  "openstack.cloudsYAML",
-								"value": base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
-							},
-							{
-								"name":  "openstack.cloud",
-								"value": *p.cluster.Spec.Openstack.Cloud,
-							},
-							{
-								"name":  "openstack.ca",
-								"value": base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
-							},
-							{
-								"name":  "openstack.image",
-								"value": *p.cluster.Spec.Openstack.Image,
-							},
-							{
-								"name":  "openstack.cloudProviderConfiguration",
-								"value": base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudProviderConfig),
-							},
-							{
-								"name":  "openstack.externalNetworkID",
-								"value": *p.cluster.Spec.Network.ExternalNetworkID,
-							},
-							{
-								"name":  "openstack.sshKeyName",
-								"value": *p.cluster.Spec.Openstack.SSHKeyName,
-							},
-							{
-								"name":  "openstack.failureDomain",
-								"value": *p.cluster.Spec.Openstack.FailureDomain,
-							},
-							{
-								"name":  "controlPlane.replicas",
-								"value": strconv.Itoa(*p.cluster.Spec.ControlPlane.Replicas),
-							},
-							{
-								"name":  "controlPlane.flavor",
-								"value": *p.cluster.Spec.ControlPlane.Flavor,
-							},
-							{
-								"name":  "workload.replicas",
-								"value": strconv.Itoa(*p.cluster.Spec.Workload.Replicas),
-							},
-							{
-								"name":  "workload.flavor",
-								"value": *p.cluster.Spec.Workload.Flavor,
-							},
-							{
-								"name":  "network.nodeCIDR",
-								"value": p.cluster.Spec.Network.NodeNetwork.IPNet.String(),
-							},
-							{
-								"name":  "network.serviceCIDRs[0]",
-								"value": p.cluster.Spec.Network.ServiceNetwork.IPNet.String(),
-							},
-							{
-								"name":  "network.podCIDRs[0]",
-								"value": p.cluster.Spec.Network.PodNetwork.IPNet.String(),
-							},
-							{
-								"name": "network.dnsNameservers[0]",
-								// TODO: make dynamic.
-								"value": p.cluster.Spec.Network.DNSNameservers[0].IP.String(),
-							},
-							{
-								"name":  "kubernetes.version",
-								"value": string(*p.cluster.Spec.KubernetesVersion),
-							},
-						},
+						"values":      string(values),
 					},
 				},
 				"destination": map[string]interface{}{
@@ -200,8 +197,106 @@ func (p *Provisioner) generateApplication() *unstructured.Unstructured {
 			},
 		},
 	}
+
+	return object, nil
 }
 
+// generateOpenstackCloudProviderApplication creates an ArgoCD application for
+// the Openstack controller manager.
+func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (*unstructured.Unstructured, error) {
+	var clouds clientconfig.Clouds
+
+	if err := yaml.Unmarshal(*p.cluster.Spec.Openstack.CloudConfig, &clouds); err != nil {
+		return nil, err
+	}
+
+	cloud, ok := clouds.Clouds[*p.cluster.Spec.Openstack.Cloud]
+	if !ok {
+		return nil, fmt.Errorf("%w: cloud '%s' not found in clouds.yaml", ErrCloudConfiguration, *p.cluster.Spec.Openstack.Cloud)
+	}
+
+	valuesRaw := map[string]interface{}{
+		"cloudConfig": map[string]interface{}{
+			"global": map[string]interface{}{
+				"auth-url":    cloud.AuthInfo.AuthURL,
+				"username":    cloud.AuthInfo.Username,
+				"password":    cloud.AuthInfo.Password,
+				"domain-name": cloud.AuthInfo.DomainName,
+				"tenant-name": cloud.AuthInfo.ProjectName,
+			},
+			"loadBalancer": map[string]interface{}{
+				"floating-network-id": *p.cluster.Spec.Network.ExternalNetworkID,
+			},
+		},
+		"tolerations": []interface{}{
+			map[string]interface{}{
+				"key":    "node-role.kubernetes.io/master",
+				"effect": "NoSchedule",
+			},
+			map[string]interface{}{
+				"key":    "node-role.kubernetes.io/control-plane",
+				"effect": "NoSchedule",
+			},
+			map[string]interface{}{
+				"key":    "node.cloudprovider.kubernetes.io/uninitialized",
+				"effect": "NoSchedule",
+				"value":  "true",
+			},
+			map[string]interface{}{
+				"key":    "node.cilium.io/agent-not-ready",
+				"effect": "NoSchedule",
+				"value":  "true",
+			},
+		},
+	}
+
+	values, err := yaml.Marshal(valuesRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	object := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "Application",
+			"metadata": map[string]interface{}{
+				"generateName": "openstack-cloud-provider-",
+				"namespace":    "argocd",
+				"labels":       p.getLabels("openstack-cloud-provider"),
+			},
+			"spec": map[string]interface{}{
+				"project": "default",
+				"source": map[string]interface{}{
+					//TODO: programmable
+					//TODO: the revision does have a Kubernetes app version...
+					"repoURL":        "https://kubernetes.github.io/cloud-provider-openstack",
+					"chart":          "openstack-cloud-controller-manager",
+					"targetRevision": "1.4.0",
+					"helm": map[string]interface{}{
+						"values": string(values),
+					},
+				},
+				"destination": map[string]interface{}{
+					"name":      server,
+					"namespace": "ocp-system",
+				},
+				"syncPolicy": map[string]interface{}{
+					"automated": map[string]interface{}{
+						"selfHeal": true,
+					},
+					"syncOptions": []string{
+						"CreateNamespace=true",
+					},
+				},
+			},
+		},
+	}
+
+	return object, nil
+}
+
+// generateCiliumApplication creates an ArgoCD application for the
+// Cilium CNI plugin.
 func (p *Provisioner) generateCiliumApplication(server string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -240,7 +335,12 @@ func (p *Provisioner) provisionCluster(ctx context.Context) error {
 
 	log.Info("provisioning kubernetes cluster")
 
-	if err := application.New(p.client, p.generateApplication()).Provision(ctx); err != nil {
+	object, err := p.generateApplication()
+	if err != nil {
+		return err
+	}
+
+	if err := application.New(p.client, object).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -249,6 +349,8 @@ func (p *Provisioner) provisionCluster(ctx context.Context) error {
 	return nil
 }
 
+// getKubernetesClusterConfig retrieves the Kubernetes configuration from
+// a cluster API cluster.
 func (p *Provisioner) getKubernetesClusterConfig(ctx context.Context) (*clientcmdapi.Config, error) {
 	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
 	if err != nil {
@@ -289,16 +391,16 @@ func (p *Provisioner) getKubernetesClusterConfig(ctx context.Context) (*clientcm
 	return &rawConfig, nil
 }
 
-// provisionCilium runs in parallel with provisionCluster.  The cluster API machine
+// provisionAddOns runs in parallel with provisionCluster.  The cluster API machine
 // deployment will not become healthy until the Kubernetes nodes report as healty
-// and that requires a CNI to be installed.  Obviously this isn't made easy by
-// CAPI, many have tried, many have failed.  We need to poll the CAPI deployment
-// until the Kubernetes config is available, install it in ArgoCD, then deploy
-// the Cilium application on the remote.
-func (p *Provisioner) provisionCilium(ctx context.Context) error {
+// and that requires a CNI to be installed, and the cloud provider.  Obviously this
+// isn't made easy by CAPI, many have tried, many have failed.  We need to poll the
+// CAPI deployment until the Kubernetes config is available, install it in ArgoCD, then
+// deploy the Cilium and cloud provider applications on the remote.
+func (p *Provisioner) provisionAddOns(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning cilium")
+	log.Info("provisioning addons")
 
 	config, err := p.getKubernetesClusterConfig(ctx)
 	if err != nil {
@@ -326,6 +428,26 @@ func (p *Provisioner) provisionCilium(ctx context.Context) error {
 		return err
 	}
 
+	group, gctx := errgroup.WithContext(ctx)
+
+	group.Go(func() error { return p.provisionOpenstackCloudProvider(gctx, server) })
+	group.Go(func() error { return p.provisionCilium(gctx, server) })
+
+	if err := group.Wait(); err != nil {
+		return err
+	}
+
+	log.Info("addons provisioned")
+
+	return nil
+}
+
+// provisionCilium applies the Cilium CNI to the Kubnernetes cluster.
+func (p *Provisioner) provisionCilium(ctx context.Context, server string) error {
+	log := log.FromContext(ctx)
+
+	log.Info("provisioning cilium")
+
 	if err := application.New(p.client, p.generateCiliumApplication(server)).Provision(ctx); err != nil {
 		return err
 	}
@@ -335,12 +457,33 @@ func (p *Provisioner) provisionCilium(ctx context.Context) error {
 	return nil
 }
 
+// provisionOpenstackCloudProvider applies the openstack cloud controller
+// to the Kubnernetes cluster.
+func (p *Provisioner) provisionOpenstackCloudProvider(ctx context.Context, server string) error {
+	log := log.FromContext(ctx)
+
+	log.Info("provisioning openstack cloud provider")
+
+	object, err := p.generateOpenstackCloudProviderApplication(server)
+	if err != nil {
+		return err
+	}
+
+	if err := application.New(p.client, object).Provision(ctx); err != nil {
+		return err
+	}
+
+	log.Info("openstack cloud provider provisioned")
+
+	return nil
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	group, gctx := errgroup.WithContext(ctx)
 
 	group.Go(func() error { return p.provisionCluster(gctx) })
-	group.Go(func() error { return p.provisionCilium(gctx) })
+	group.Go(func() error { return p.provisionAddOns(gctx) })
 
 	if err := group.Wait(); err != nil {
 		return err
@@ -368,6 +511,19 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("cilium deprovisioned")
 
+	log.Info("deprovisioning openstack cloud provider")
+
+	object, err := p.generateOpenstackCloudProviderApplication(server)
+	if err != nil {
+		return err
+	}
+
+	if err := application.New(p.client, object).Deprovision(ctx); err != nil {
+		return err
+	}
+
+	log.Info("openstack cloud provider deprovisioned")
+
 	log.Info("deprovisioning kubernetes cluster")
 
 	argocd, err := argocdclient.NewInCluster(ctx, p.client, "argocd")
@@ -379,7 +535,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	if err := application.New(p.client, p.generateApplication()).Deprovision(ctx); err != nil {
+	object, err = p.generateApplication()
+	if err != nil {
+		return err
+	}
+
+	if err := application.New(p.client, object).Deprovision(ctx); err != nil {
 		return err
 	}
 
