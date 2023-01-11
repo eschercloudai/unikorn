@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"strings"
 
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/spf13/cobra"
@@ -95,10 +94,6 @@ type createClusterOptions struct {
 	// only the specified cloud.
 	clouds []byte
 
-	// cloudProvider is set during completion, and is a really simple file containing
-	// the Keystone endpoint.
-	cloudProvider []byte
-
 	// caCert is derived from clouds during completion.
 	caCert []byte
 
@@ -139,6 +134,9 @@ type createClusterOptions struct {
 	// kubernetesWorkloadReplicas defines the number of replicas (nodes) for
 	// Kubernetes workload clusters
 	kubernetesWorkloadReplicas int
+
+	// region is the OpenStack region the cluster exists in.
+	region string
 
 	// availabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.
@@ -183,6 +181,7 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 
 	// Openstack provisioning options.
 	util.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Kubernetes Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
+	util.RequiredStringVar(cmd, &o.region, "region", "", "Openstack region to provision into.")
 	util.RequiredStringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
 	util.RequiredStringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
 }
@@ -239,21 +238,6 @@ func (o *createClusterOptions) completeOpenstackConfig() error {
 
 	o.clouds = filteredCloudsYaml
 
-	// Set the cloud provider config.
-	// TODO: this can use application credentials not user ones, see:
-	// https://github.com/kubernetes-sigs/cluster-api-provider-openstack/blob/main/templates/env.rc
-	cloudProvider := []string{
-		`[Global]`,
-		fmt.Sprintf(`auth-url="%s"`, cloud.AuthInfo.AuthURL),
-		fmt.Sprintf(`username="%s"`, cloud.AuthInfo.Username),
-		fmt.Sprintf(`password="%s"`, cloud.AuthInfo.Password),
-		fmt.Sprintf(`domain-name="%s"`, cloud.AuthInfo.DomainName),
-		fmt.Sprintf(`tenant-name="%s"`, cloud.AuthInfo.ProjectName),
-		fmt.Sprintf(`region="%s"`, cloud.RegionName),
-	}
-
-	o.cloudProvider = []byte(strings.Join(cloudProvider, "\n"))
-
 	// Work out the correct CA to use.
 	// Screw private clouds, public is the future!
 	authURL, err := url.Parse(cloud.AuthInfo.AuthURL)
@@ -297,6 +281,26 @@ func (o *createClusterOptions) run() error {
 
 	kubernetesVersion := unikornv1alpha1.SemanticVersion(o.kubernetesVersion.Semver)
 
+	workloadPool := &unikornv1alpha1.KubernetesWorkloadPool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+			Labels: map[string]string{
+				constants.VersionLabel:           constants.Version,
+				constants.ProjectLabel:           o.project,
+				constants.ControlPlaneLabel:      o.controlPlane,
+				constants.KubernetesClusterLabel: o.name,
+			},
+		},
+		Spec: unikornv1alpha1.KubernetesWorkloadPoolSpec{
+			MachineGeneric: unikornv1alpha1.MachineGeneric{
+				Version:  &kubernetesVersion,
+				Image:    &o.image,
+				Flavor:   &o.kubernetesWorkloadFlavor,
+				Replicas: &o.kubernetesWorkloadReplicas,
+			},
+		},
+	}
+
 	cluster := &unikornv1alpha1.KubernetesCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.name,
@@ -307,32 +311,41 @@ func (o *createClusterOptions) run() error {
 			},
 		},
 		Spec: unikornv1alpha1.KubernetesClusterSpec{
-			KubernetesVersion: &kubernetesVersion,
-			Openstack: unikornv1alpha1.KubernetesClusterOpenstackSpec{
-				CACert:              &o.caCert,
-				CloudConfig:         &o.clouds,
-				CloudProviderConfig: &o.cloudProvider,
-				Cloud:               &o.cloud,
-				FailureDomain:       &o.availabilityZone,
-				SSHKeyName:          &o.sshKeyName,
-				Image:               &o.image,
-			},
-			Network: unikornv1alpha1.KubernetesClusterNetworkSpec{
-				NodeNetwork:       &unikornv1alpha1.IPv4Prefix{IPNet: o.nodeNetwork},
-				PodNetwork:        &unikornv1alpha1.IPv4Prefix{IPNet: o.podNetwork},
-				ServiceNetwork:    &unikornv1alpha1.IPv4Prefix{IPNet: o.serviceNetwork},
-				DNSNameservers:    unikornv1alpha1.IPv4AddressSliceFromIPSlice(o.dnsNameservers),
+			Openstack: &unikornv1alpha1.KubernetesClusterOpenstackSpec{
+				CACert:            &o.caCert,
+				CloudConfig:       &o.clouds,
+				Cloud:             &o.cloud,
+				Region:            &o.region,
+				FailureDomain:     &o.availabilityZone,
+				SSHKeyName:        &o.sshKeyName,
 				ExternalNetworkID: &o.externalNetworkID,
 			},
-			ControlPlane: unikornv1alpha1.KubernetesClusterControlPlaneSpec{
-				Replicas: &o.kubernetesControlPlaneReplicas,
-				Flavor:   &o.kubernetesControlPlaneFlavor,
+			Network: &unikornv1alpha1.KubernetesClusterNetworkSpec{
+				NodeNetwork:    &unikornv1alpha1.IPv4Prefix{IPNet: o.nodeNetwork},
+				PodNetwork:     &unikornv1alpha1.IPv4Prefix{IPNet: o.podNetwork},
+				ServiceNetwork: &unikornv1alpha1.IPv4Prefix{IPNet: o.serviceNetwork},
+				DNSNameservers: unikornv1alpha1.IPv4AddressSliceFromIPSlice(o.dnsNameservers),
 			},
-			Workload: unikornv1alpha1.KubernetesClusterWorkloadSpec{
-				Replicas: &o.kubernetesWorkloadReplicas,
-				Flavor:   &o.kubernetesWorkloadFlavor,
+			ControlPlane: &unikornv1alpha1.KubernetesClusterControlPlaneSpec{
+				MachineGeneric: unikornv1alpha1.MachineGeneric{
+					Version:  &kubernetesVersion,
+					Image:    &o.image,
+					Flavor:   &o.kubernetesControlPlaneFlavor,
+					Replicas: &o.kubernetesControlPlaneReplicas,
+				},
+			},
+			WorkloadPools: &unikornv1alpha1.KubernetesClusterWorkloadPoolsSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						constants.KubernetesClusterLabel: o.name,
+					},
+				},
 			},
 		},
+	}
+
+	if _, err := o.client.UnikornV1alpha1().KubernetesWorkloadPools(namespace).Create(context.TODO(), workloadPool, metav1.CreateOptions{}); err != nil {
+		return err
 	}
 
 	if _, err := o.client.UnikornV1alpha1().KubernetesClusters(namespace).Create(context.TODO(), cluster, metav1.CreateOptions{}); err != nil {

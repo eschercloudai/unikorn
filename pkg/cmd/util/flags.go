@@ -23,6 +23,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var (
@@ -33,6 +35,15 @@ var (
 // RequiredVar registers a generic flag marked as required.
 func RequiredVar(cmd *cobra.Command, p pflag.Value, name, usage string) {
 	cmd.Flags().Var(p, name, usage)
+
+	if err := cmd.MarkFlagRequired(name); err != nil {
+		panic(err)
+	}
+}
+
+// RequireStringdVar registers a string flag marked as required.
+func RequiredStringVar(cmd *cobra.Command, p *string, name, value, usage string) {
+	cmd.Flags().StringVar(p, name, value, usage)
 
 	if err := cmd.MarkFlagRequired(name); err != nil {
 		panic(err)
@@ -87,4 +98,34 @@ func (s *SemverFlag) Set(in string) error {
 // Type returns the human readable type information.
 func (s SemverFlag) Type() string {
 	return "semver"
+}
+
+// QuantityFlag provides parsing and type checking of quanities.
+type QuantityFlag struct {
+	Quantity resource.Quantity
+}
+
+// Ensure the pflag.Value interface is implemented.
+var _ = pflag.Value(&QuantityFlag{})
+
+// String returns the current value.
+func (s QuantityFlag) String() string {
+	return s.Quantity.String()
+}
+
+// Set sets the value and does any error checking.
+func (s *QuantityFlag) Set(in string) error {
+	quantity, err := resource.ParseQuantity(in)
+	if err != nil {
+		return err
+	}
+
+	s.Quantity = quantity
+
+	return nil
+}
+
+// Type returns the human readable type information.
+func (s QuantityFlag) Type() string {
+	return "quantity"
 }
