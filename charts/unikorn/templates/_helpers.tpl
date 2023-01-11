@@ -73,15 +73,15 @@ Create the container images
 {{- end }}
 
 {{- define "unikorn.projectManagerImage" -}}
-{{- printf "%s/unikorn-project-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag | default .Values.projectManager.image }}
+{{- .Values.projectManager.image | default (printf "%s/unikorn-project-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) }}
 {{- end }}
 
 {{- define "unikorn.controlPlaneManagerImage" -}}
-{{- printf "%s/unikorn-control-plane-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag | default .Values.controlPlaneManager.image }}
+{{- .Values.controlPlaneManager.image | default (printf "%s/unikorn-control-plane-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) }}
 {{- end }}
 
 {{- define "unikorn.clusterManagerImage" -}}
-{{- printf "%s/unikorn-cluster-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag | default .Values.clusterManager.image }}
+{{- .Values.clusterManager.image | default (printf "%s/unikorn-cluster-manager:%s" (include "unikorn.defaultRepositoryPath" .) .Values.tag) }}
 {{- end }}
 
 {{/*
