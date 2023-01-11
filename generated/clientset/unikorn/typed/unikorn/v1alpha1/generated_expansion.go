@@ -22,4 +22,6 @@ type ControlPlaneExpansion interface{}
 
 type KubernetesClusterExpansion interface{}
 
+type KubernetesWorkloadPoolExpansion interface{}
+
 type ProjectExpansion interface{}

@@ -19,11 +19,17 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.namespace
-      name: namespace
-      type: string
-    - jsonPath: .spec.kubernetesVersion
+    - jsonPath: .spec.controlPlane.version
       name: version
+      type: string
+    - jsonPath: .spec.controlPlane.image
+      name: image
+      type: string
+    - jsonPath: .spec.controlPlane.flavor
+      name: flavor
+      type: string
+    - jsonPath: .spec.controlPlane.replicas
+      name: replicas
       type: string
     - jsonPath: .status.conditions[?(@.type=="Available")].reason
       name: status
@@ -55,37 +61,91 @@ spec:
             description: KubernetesClusterSpec defines the requested state of the
               Kubernetes cluster.
             properties:
-              clusterAutoscaler:
-                description: ClusterAutoscaler, if specified, provisions a cluster
-                  autoscaler.
+              api:
+                description: API defines Kubernetes API specific options.
                 properties:
-                  maximumReplicas:
-                    description: MaximumReplicas defines the largest a cluster should
-                      be scaled to.
-                    type: integer
-                required:
-                - maximumReplicas
+                  allowedPrefixes:
+                    description: AllowedPrefixes is a list of all IPv4 prefixes that
+                      are allowed to access the API.
+                    items:
+                      pattern: ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\/(?:3[0-2]|[1-2]?[0-9])$
+                      type: string
+                    type: array
+                  subjectAlternativeNames:
+                    description: SubjectAlternativeNames is a list of X.509 SANs to
+                      add to the API certificate.
+                    items:
+                      type: string
+                    type: array
                 type: object
               controlPlane:
                 description: ControlPlane defines the control plane topology.
                 properties:
-                  flavor:
-                    description: Flavor is the Openstack machine type to use for control
-                      plane nodes.
+                  diskSize:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: DiskSize is the persistent root disk size to deploy
+                      with.  This overrides the default ephemeral disk size defined
+                      in the flavor.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  failureDomain:
+                    description: FailureDomain is the failure domain to use for the
+                      pool.
                     type: string
+                  files:
+                    description: Files are a set of files that can be installed onto
+                      the node on initialisation/join.
+                    items:
+                      description: File is a file that can be deployed to a cluster
+                        node on creation.
+                      properties:
+                        content:
+                          description: Content is the file contents.
+                          format: byte
+                          type: string
+                        path:
+                          description: Path is the absolute path to create the file
+                            in.
+                          type: string
+                      required:
+                      - content
+                      - path
+                      type: object
+                    type: array
+                  flavor:
+                    description: Flavor is the OpenStack Nova flavor to deploy with.
+                    type: string
+                  image:
+                    description: Image is the OpenStack Glance image to deploy with.
+                    type: string
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels is the set of node labels to apply to the
+                      pool on initialisation/join.
+                    type: object
                   replicas:
                     default: 3
-                    description: Replicas is the number desired replicas for the control
-                      plane.
-                    minimum: 1
+                    description: Replicas is the initial pool size to deploy.
+                    minimum: 0
                     type: integer
+                  version:
+                    description: Version is the Kubernetes version to install.  For
+                      performance reasons this should match what is already pre-installed
+                      on the provided image.
+                    pattern: ^v(?:[0-9]+\.){2}(?:[0-9]+)$
+                    type: string
                 required:
                 - flavor
+                - image
+                - version
                 type: object
-              kubernetesVersion:
-                description: KubernetesVersion is the Kubernetes version.
-                pattern: ^v(?:[0-9]+\.){2}(?:[0-9]+)$
-                type: string
+              enableAutoscaling:
+                description: EnableAutoscaling , if specified, provisions a cluster
+                  autoscaler and allows workload pools to specify autoscaling configuration.
+                type: boolean
               network:
                 description: Network defines the Kubernetes networking.
                 properties:
@@ -100,10 +160,6 @@ spec:
                     minItems: 1
                     type: array
                     x-kubernetes-list-type: set
-                  externalNetworkId:
-                    description: ExternalNetworkID is the Openstack external network
-                      ID.
-                    type: string
                   nodeNetwork:
                     description: NodeNetwork is the IPv4 prefix for the node network.
                     pattern: ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\/(?:3[0-2]|[1-2]?[0-9])$
@@ -119,7 +175,6 @@ spec:
                     type: string
                 required:
                 - dnsNameservers
-                - externalNetworkId
                 - nodeNetwork
                 - podNetwork
                 - serviceNetwork
@@ -140,17 +195,18 @@ spec:
                       file for use by the ControlPlane to provision the IaaS bits.
                     format: byte
                     type: string
-                  cloudProviderConfig:
-                    description: CloudProviderConfig is a simple ini file that looks
-                      with a global section and a auth-url key.
-                    format: byte
+                  externalNetworkId:
+                    description: ExternalNetworkID is the Openstack external network
+                      ID.
                     type: string
                   failureDomain:
-                    description: FailureDomain is the failure domain to use.
+                    description: FailureDomain is the global failure domain to use.  The
+                      control plane will always be deployed in this region.  Individual
+                      worload pools will default to this, but can override it.
                     type: string
-                  image:
-                    description: Image is the Openstack image name to use for all
-                      nodes.
+                  region:
+                    description: Region is the region that the cluster is provisioned
+                      in.
                     type: string
                   sshKeyName:
                     description: SSHKeyName is the SSH key name to use to provide
@@ -160,9 +216,9 @@ spec:
                 - caCert
                 - cloud
                 - cloudConfig
-                - cloudProviderConfig
+                - externalNetworkId
                 - failureDomain
-                - image
+                - region
                 - sshKeyName
                 type: object
               timeout:
@@ -170,30 +226,64 @@ spec:
                 description: Timeout is the maximum time to attempt to provision a
                   cluster before aborting.
                 type: string
-              workload:
-                description: Workload defines the workload cluster topology.
+              workloadPools:
+                description: WorkloadPools defines the workload cluster topology.
                 properties:
-                  flavor:
-                    description: Flavor is the Openstack machine type to use for workload
-                      nodes.
-                    type: string
-                  replicas:
-                    default: 3
-                    description: Replicas is the number desired replicas for the workload
-                      nodes. When enabled, this will be the minimum cluster size for
-                      the cluster autoscaler.
-                    minimum: 1
-                    type: integer
+                  selector:
+                    description: Selector is a label selector to collect KubernetesClusterWorkloadPool
+                      resources.  If not specified all KubernetesClusterWorkloadPool
+                      resources will be considered a member of this cluster.
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: A label selector requirement is a selector
+                            that contains values, a key, and an operator that relates
+                            the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: operator represents a key's relationship
+                                to a set of values. Valid operators are In, NotIn,
+                                Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: values is an array of string values. If
+                                the operator is In or NotIn, the values array must
+                                be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced
+                                during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: matchLabels is a map of {key,value} pairs. A
+                          single {key,value} in the matchLabels map is equivalent
+                          to an element of matchExpressions, whose key field is "key",
+                          the operator is "In", and the values array contains only
+                          "value". The requirements are ANDed.
+                        type: object
+                    type: object
                 required:
-                - flavor
+                - selector
                 type: object
             required:
             - controlPlane
-            - kubernetesVersion
             - network
             - openstack
             - timeout
-            - workload
+            - workloadPools
             type: object
           status:
             description: KubernetesClusterStatus defines the observed state of the

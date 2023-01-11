@@ -30,6 +30,7 @@ type UnikornV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	ControlPlanesGetter
 	KubernetesClustersGetter
+	KubernetesWorkloadPoolsGetter
 	ProjectsGetter
 }
 
@@ -44,6 +45,10 @@ func (c *UnikornV1alpha1Client) ControlPlanes(namespace string) ControlPlaneInte
 
 func (c *UnikornV1alpha1Client) KubernetesClusters(namespace string) KubernetesClusterInterface {
 	return newKubernetesClusters(c, namespace)
+}
+
+func (c *UnikornV1alpha1Client) KubernetesWorkloadPools(namespace string) KubernetesWorkloadPoolInterface {
+	return newKubernetesWorkloadPools(c, namespace)
 }
 
 func (c *UnikornV1alpha1Client) Projects() ProjectInterface {

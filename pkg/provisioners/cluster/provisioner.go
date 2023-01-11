@@ -35,7 +35,9 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
@@ -79,12 +81,17 @@ func New(client client.Client, cluster *unikornv1alpha1.KubernetesCluster, serve
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+// WithLabels associates set of labels with the provisioner to uniquely identify
+// the provisioner instance.
+// TODO: this is fairly common, share it using interface aggregation.
 func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
 	p.labels = l
 
 	return p
 }
 
+// getLabels returns an application specific set of labels to uniquely identify the
+// application.
 func (p *Provisioner) getLabels(app string) map[string]interface{} {
 	l := map[string]interface{}{
 		constants.ApplicationLabel: app,
@@ -97,8 +104,86 @@ func (p *Provisioner) getLabels(app string) map[string]interface{} {
 	return l
 }
 
+// generateMachineHelmValues translates the API's idea of a machine into what's
+// expected by the underlying Helm chart.
+func (p *Provisioner) generateMachineHelmValues(machine *unikornv1alpha1.MachineGeneric) map[string]interface{} {
+	object := map[string]interface{}{
+		"version":  string(*machine.Version),
+		"image":    *machine.Image,
+		"flavor":   *machine.Flavor,
+		"replicas": *machine.Replicas,
+	}
+
+	if machine.DiskSize != nil {
+		object["diskSize"] = fmt.Sprintf("%vG", machine.DiskSize.Value()>>30)
+	}
+
+	if len(machine.Labels) != 0 {
+		labels := map[string]interface{}{}
+
+		for key, value := range machine.Labels {
+			labels[key] = value
+		}
+
+		object["labels"] = labels
+	}
+
+	if len(machine.Files) != 0 {
+		files := make([]interface{}, len(machine.Files))
+
+		for i, file := range machine.Files {
+			files[i] = map[string]interface{}{
+				"path":    *file.Path,
+				"content": base64.StdEncoding.EncodeToString(file.Content),
+			}
+		}
+
+		object["files"] = files
+	}
+
+	return object
+}
+
+// generateWorloadPoolHelmValues translates the API's idea of a workload pool into
+// what's expected by the underlying Helm chart.
+func (p *Provisioner) generateWorloadPoolHelmValues(ctx context.Context) (map[string]interface{}, error) {
+	// Gather all workload pools that belong to this cluster.  By default
+	// that's all the things, in reality most sane people will add label
+	// selectors.
+	workloadSelector := labels.Everything()
+
+	if p.cluster.Spec.WorkloadPools != nil && p.cluster.Spec.WorkloadPools.Selector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(p.cluster.Spec.WorkloadPools.Selector)
+		if err != nil {
+			return nil, err
+		}
+
+		workloadSelector = selector
+	}
+
+	var workloadPoolResources unikornv1alpha1.KubernetesWorkloadPoolList
+
+	if err := p.client.List(ctx, &workloadPoolResources, &client.ListOptions{LabelSelector: workloadSelector}); err != nil {
+		return nil, err
+	}
+
+	workloadPools := map[string]interface{}{}
+
+	for _, workloadPool := range workloadPoolResources.Items {
+		// TODO: scheduling.
+		workloadPools[workloadPool.Name] = p.generateMachineHelmValues(&workloadPool.Spec.MachineGeneric)
+	}
+
+	return workloadPools, nil
+}
+
 // generateApplication creates an ArgoCD application for a cluster.
-func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) {
+func (p *Provisioner) generateApplication(ctx context.Context) (*unstructured.Unstructured, error) {
+	workloadPools, err := p.generateWorloadPoolHelmValues(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	nameservers := make([]interface{}, len(p.cluster.Spec.Network.DNSNameservers))
 
 	for i, nameserver := range p.cluster.Spec.Network.DNSNameservers {
@@ -106,18 +191,21 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 	}
 
 	// TODO: generate types from the Helm values schema.
+	// TODO: add in API configuration.
 	valuesRaw := map[string]interface{}{
 		"openstack": map[string]interface{}{
 			"cloud":             *p.cluster.Spec.Openstack.Cloud,
 			"cloudsYAML":        base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
 			"ca":                base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
 			"sshKeyName":        *p.cluster.Spec.Openstack.SSHKeyName,
-			"region":            "nl1",
+			"region":            *p.cluster.Spec.Openstack.Region,
 			"failureDomain":     *p.cluster.Spec.Openstack.FailureDomain,
-			"externalNetworkID": *p.cluster.Spec.Network.ExternalNetworkID,
+			"externalNetworkID": *p.cluster.Spec.Openstack.ExternalNetworkID,
 		},
 		"cluster": map[string]interface{}{
 			"taints": []interface{}{
+				// This prevents things like coreDNS from coming up until
+				// the CNI is installed.
 				map[string]interface{}{
 					"key":    "node.cilium.io/agent-not-ready",
 					"effect": "NoSchedule",
@@ -125,22 +213,8 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 				},
 			},
 		},
-		"controlPlane": map[string]interface{}{
-			"version":  string(*p.cluster.Spec.KubernetesVersion),
-			"image":    *p.cluster.Spec.Openstack.Image,
-			"flavor":   *p.cluster.Spec.ControlPlane.Flavor,
-			"diskSize": 40,
-			"replicas": *p.cluster.Spec.ControlPlane.Replicas,
-		},
-		"workloadPools": map[string]interface{}{
-			"default": map[string]interface{}{
-				"version":  string(*p.cluster.Spec.KubernetesVersion),
-				"image":    *p.cluster.Spec.Openstack.Image,
-				"flavor":   *p.cluster.Spec.Workload.Flavor,
-				"diskSize": 100,
-				"replicas": *p.cluster.Spec.Workload.Replicas,
-			},
-		},
+		"controlPlane":  p.generateMachineHelmValues(&p.cluster.Spec.ControlPlane.MachineGeneric),
+		"workloadPools": workloadPools,
 		"network": map[string]interface{}{
 			"nodeCIDR": p.cluster.Spec.Network.NodeNetwork.IPNet.String(),
 			"serviceCIDRs": []interface{}{
@@ -225,7 +299,7 @@ func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (
 				"tenant-name": cloud.AuthInfo.ProjectName,
 			},
 			"loadBalancer": map[string]interface{}{
-				"floating-network-id": *p.cluster.Spec.Network.ExternalNetworkID,
+				"floating-network-id": *p.cluster.Spec.Openstack.ExternalNetworkID,
 			},
 		},
 		"tolerations": []interface{}{
@@ -335,7 +409,7 @@ func (p *Provisioner) provisionCluster(ctx context.Context) error {
 
 	log.Info("provisioning kubernetes cluster")
 
-	object, err := p.generateApplication()
+	object, err := p.generateApplication(ctx)
 	if err != nil {
 		return err
 	}
@@ -535,7 +609,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	object, err = p.generateApplication()
+	object, err = p.generateApplication(ctx)
 	if err != nil {
 		return err
 	}

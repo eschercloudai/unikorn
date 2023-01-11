@@ -22,6 +22,7 @@ import (
 	"net"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/structured-merge-diff/v4/value"
@@ -339,6 +340,117 @@ type ControlPlaneCondition struct {
 	Message string `json:"message"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type KubernetesWorkloadPoolList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []KubernetesWorkloadPool `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
+// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.version"
+// +kubebuilder:printcolumn:name="image",type="string",JSONPath=".spec.image"
+// +kubebuilder:printcolumn:name="flavor",type="string",JSONPath=".spec.flavor"
+// +kubebuilder:printcolumn:name="replicas",type="string",JSONPath=".spec.replicas"
+type KubernetesWorkloadPool struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              KubernetesWorkloadPoolSpec   `json:"spec"`
+	Status            KubernetesWorkloadPoolStatus `json:"status,omitempty"`
+}
+
+// MachineGeneric contains common things across all pool types, including
+// Kubernetes control plane nodes and workload pools.
+type MachineGeneric struct {
+	// Version is the Kubernetes version to install.  For performance
+	// reasons this should match what is already pre-installed on the
+	// provided image.
+	Version *SemanticVersion `json:"version"`
+	// Image is the OpenStack Glance image to deploy with.
+	Image *string `json:"image"`
+	// Flavor is the OpenStack Nova flavor to deploy with.
+	Flavor *string `json:"flavor"`
+	// DiskSize is the persistent root disk size to deploy with.  This
+	// overrides the default ephemeral disk size defined in the flavor.
+	DiskSize *resource.Quantity `json:"diskSize,omitempty"`
+	// Replicas is the initial pool size to deploy.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=3
+	Replicas *int `json:"replicas,omitempty"`
+	// FailureDomain is the failure domain to use for the pool.
+	FailureDomain *string `json:"failureDomain,omitempty"`
+	// Labels is the set of node labels to apply to the pool on
+	// initialisation/join.
+	Labels map[string]string `json:"labels,omitempty"`
+	// Files are a set of files that can be installed onto the node
+	// on initialisation/join.
+	Files []File `json:"files,omitempty"`
+}
+
+// File is a file that can be deployed to a cluster node on creation.
+type File struct {
+	// Path is the absolute path to create the file in.
+	Path *string `json:"path"`
+	// Content is the file contents.
+	Content []byte `json:"content"`
+}
+
+// MachineGenericAutoscaling defines generic autoscaling configuration.
+type MachineGenericAutoscaling struct {
+	// MimumumReplicas defines the minimum number of replicas that
+	// this pool can be scaled down to.
+	// +kubebuilder:validation:Minimum=0
+	MimumumReplicas *int `json:"minimumReplicas"`
+	// MaximumReplicas defines the maximum numer of replicas that
+	// this pool can be scaled up to.
+	// +kubebuilder:validation:Minimum=1
+	MaximumReplicas *int `json:"maximumReplicas"`
+	// Scheduler is required when scale-from-zero support is requested
+	// i.e. MimumumReplicas is 0.  This provides scheduling hints to
+	// the autoscaler as it cannot derive CPU/memory constraints from
+	// the machine flavor.
+	Scheduler *MachineGenericAutoscalingScheduler `json:"scheduler,omitempty"`
+}
+
+// MachineGenericAutoscalingScheduler defines generic autoscaling scheduling
+// constraints.
+type MachineGenericAutoscalingScheduler struct {
+	// CPU defines the number of CPUs for the pool flavor.
+	// +kubebuilder:validation:Minimum=1
+	CPU *int `json:"cpu"`
+	// Memory defines the amount of memory for the pool flavor.
+	// Internally this will be rounded down to the nearest Gi.
+	Memory *resource.Quantity `json:"memory"`
+	// GPU needs to be set when the pool contains GPU resources so
+	// the autoscaler can make informed choices when scaling up.
+	GPU *MachineGenericAutoscalingSchedulerGPU `json:"gpu,omitempty"`
+}
+
+// MachineGenericAutoscalingSchedulerGPU defines generic autoscaling
+// scheduling constraints for GPUs.
+type MachineGenericAutoscalingSchedulerGPU struct {
+	// Type is the type of GPU.
+	// +kubebuilder:validation:Enum=nvidia.com/gpu
+	Type *string `json:"type"`
+	// Count is the number of GPUs for the pool flavor.
+	// +kubebuilder:validation:Minimum=1
+	Count *int `json:"count"`
+}
+
+// KubernetesWorkloadPoolSpec defines the requested machine pool
+// state.
+type KubernetesWorkloadPoolSpec struct {
+	MachineGeneric `json:",inline"`
+	// Autoscaling contains optional sclaing limits and scheduling
+	// hints for autoscaling.
+	Autoscaling *MachineGenericAutoscaling `json:"autoscaling,omitempty"`
+}
+
+type KubernetesWorkloadPoolStatus struct {
+}
+
 // KubernetesClusterList is a typed list of kubernetes clusters.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type KubernetesClusterList struct {
@@ -355,8 +467,10 @@ type KubernetesClusterList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
-// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.kubernetesVersion"
+// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.controlPlane.version"
+// +kubebuilder:printcolumn:name="image",type="string",JSONPath=".spec.controlPlane.image"
+// +kubebuilder:printcolumn:name="flavor",type="string",JSONPath=".spec.controlPlane.flavor"
+// +kubebuilder:printcolumn:name="replicas",type="string",JSONPath=".spec.controlPlane.replicas"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type KubernetesCluster struct {
@@ -371,18 +485,19 @@ type KubernetesClusterSpec struct {
 	// Timeout is the maximum time to attempt to provision a cluster before aborting.
 	// +kubebuilder:default="20m"
 	Timeout *metav1.Duration `json:"timeout"`
-	// KubernetesVersion is the Kubernetes version.
-	KubernetesVersion *SemanticVersion `json:"kubernetesVersion"`
 	// Openstack defines global Openstack related configuration.
-	Openstack KubernetesClusterOpenstackSpec `json:"openstack"`
+	Openstack *KubernetesClusterOpenstackSpec `json:"openstack"`
 	// Network defines the Kubernetes networking.
-	Network KubernetesClusterNetworkSpec `json:"network"`
+	Network *KubernetesClusterNetworkSpec `json:"network"`
+	// API defines Kubernetes API specific options.
+	API *KubernetesClusterAPISpec `json:"api,omitempty"`
 	// ControlPlane defines the control plane topology.
-	ControlPlane KubernetesClusterControlPlaneSpec `json:"controlPlane"`
-	// Workload defines the workload cluster topology.
-	Workload KubernetesClusterWorkloadSpec `json:"workload"`
-	// ClusterAutoscaler, if specified, provisions a cluster autoscaler.
-	ClusterAutoscaler *KubernetesClusterAutoscalerSpec `json:"clusterAutoscaler,omitempty"`
+	ControlPlane *KubernetesClusterControlPlaneSpec `json:"controlPlane"`
+	// WorkloadPools defines the workload cluster topology.
+	WorkloadPools *KubernetesClusterWorkloadPoolsSpec `json:"workloadPools"`
+	// EnableAutoscaling , if specified, provisions a cluster autoscaler
+	// and allows workload pools to specify autoscaling configuration.
+	EnableAutoscaling *bool `json:"enableAutoscaling,omitempty"`
 }
 
 type KubernetesClusterOpenstackSpec struct {
@@ -391,18 +506,28 @@ type KubernetesClusterOpenstackSpec struct {
 	// CloudConfig is a base64 encoded minimal clouds.yaml file for
 	// use by the ControlPlane to provision the IaaS bits.
 	CloudConfig *[]byte `json:"cloudConfig"`
-	// CloudProviderConfig is a simple ini file that looks with a global
-	// section and a auth-url key.
-	CloudProviderConfig *[]byte `json:"cloudProviderConfig"`
 	// Cloud is the clouds.yaml key that identifes the configuration
 	// to use for provisioning.
 	Cloud *string `json:"cloud"`
 	// SSHKeyName is the SSH key name to use to provide access to the VMs.
 	SSHKeyName *string `json:"sshKeyName"`
-	// FailureDomain is the failure domain to use.
+	// Region is the region that the cluster is provisioned in.
+	Region *string `json:"region"`
+	// FailureDomain is the global failure domain to use.  The control plane
+	// will always be deployed in this region.  Individual worload pools will
+	// default to this, but can override it.
 	FailureDomain *string `json:"failureDomain"`
-	// Image is the Openstack image name to use for all nodes.
-	Image *string `json:"image"`
+	// ExternalNetworkID is the Openstack external network ID.
+	ExternalNetworkID *string `json:"externalNetworkId"`
+}
+
+type KubernetesClusterAPISpec struct {
+	// SubjectAlternativeNames is a list of X.509 SANs to add to the API
+	// certificate.
+	SubjectAlternativeNames []string `json:"subjectAlternativeNames,omitempty"`
+	// AllowedPrefixes is a list of all IPv4 prefixes that are allowed to access
+	// the API.
+	AllowedPrefixes []IPv4Prefix `json:"allowedPrefixes,omitempty"`
 }
 
 type KubernetesClusterNetworkSpec struct {
@@ -419,34 +544,17 @@ type KubernetesClusterNetworkSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=1
 	DNSNameservers []IPv4Address `json:"dnsNameservers"`
-	// ExternalNetworkID is the Openstack external network ID.
-	ExternalNetworkID *string `json:"externalNetworkId"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {
-	// Replicas is the number desired replicas for the control plane.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=3
-	Replicas *int `json:"replicas,omitempty"`
-	// Flavor is the Openstack machine type to use for control
-	// plane nodes.
-	Flavor *string `json:"flavor"`
+	MachineGeneric `json:",inline"`
 }
 
-type KubernetesClusterWorkloadSpec struct {
-	// Replicas is the number desired replicas for the workload nodes.
-	// When enabled, this will be the minimum cluster size for the
-	// cluster autoscaler.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=3
-	Replicas *int `json:"replicas,omitempty"`
-	// Flavor is the Openstack machine type to use for workload nodes.
-	Flavor *string `json:"flavor"`
-}
-
-type KubernetesClusterAutoscalerSpec struct {
-	// MaximumReplicas defines the largest a cluster should be scaled to.
-	MaximumReplicas *int `json:"maximumReplicas"`
+type KubernetesClusterWorkloadPoolsSpec struct {
+	// Selector is a label selector to collect KubernetesClusterWorkloadPool
+	// resources.  If not specified all KubernetesClusterWorkloadPool resources
+	// will be considered a member of this cluster.
+	Selector *metav1.LabelSelector `json:"selector"`
 }
 
 // KubernetesClusterStatus defines the observed state of the Kubernetes cluster.
