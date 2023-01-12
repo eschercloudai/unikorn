@@ -189,3 +189,12 @@ func (c *KubernetesCluster) UpdateCondition(t KubernetesClusterConditionType, st
 func (c *KubernetesCluster) UpdateAvailableCondition(status corev1.ConditionStatus, reason KubernetesClusterConditionReason, message string) bool {
 	return c.UpdateCondition(KubernetesClusterConditionAvailable, status, reason, message)
 }
+
+// GetName is the name passed down to Helm.
+func (w *KubernetesWorkloadPool) GetName() string {
+	if w.Spec.Name != nil {
+		return *w.Spec.Name
+	}
+
+	return w.Name
+}

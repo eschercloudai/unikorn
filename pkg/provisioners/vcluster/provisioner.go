@@ -140,6 +140,7 @@ func (p *Provisioner) generateApplication() *unstructured.Unstructured {
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
+						"prune":    true,
 					},
 				},
 			},

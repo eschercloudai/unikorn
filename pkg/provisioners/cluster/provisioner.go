@@ -113,7 +113,7 @@ func (p *Provisioner) generateMachineHelmValues(machine *unikornv1alpha1.Machine
 	}
 
 	if machine.DiskSize != nil {
-		object["diskSize"] = fmt.Sprintf("%vG", machine.DiskSize.Value()>>30)
+		object["diskSize"] = machine.DiskSize.Value() >> 30
 	}
 
 	return object
@@ -183,14 +183,8 @@ func (p *Provisioner) generateWorloadPoolHelmValues(ctx context.Context) (map[st
 			object["files"] = files
 		}
 
-		name := workloadPool.Name
-
-		if workloadPool.Spec.Name != nil {
-			name = *workloadPool.Spec.Name
-		}
-
 		// TODO: scheduling.
-		workloadPools[name] = object
+		workloadPools[workloadPool.GetName()] = object
 	}
 
 	return workloadPools, nil
@@ -286,6 +280,7 @@ func (p *Provisioner) generateApplication(ctx context.Context) (*unstructured.Un
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
+						"prune":    true,
 					},
 					"syncOptions": []string{
 						"CreateNamespace=true",
@@ -380,6 +375,7 @@ func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
+						"prune":    true,
 					},
 					"syncOptions": []string{
 						"CreateNamespace=true",
@@ -419,11 +415,122 @@ func (p *Provisioner) generateCiliumApplication(server string) *unstructured.Uns
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
+						"prune":    true,
 					},
 				},
 			},
 		},
 	}
+}
+
+// getWorkloadPoolMachineDeploymentNames gets a list of machine deployments that should
+// exist for this cluster.
+// TODO: this is horrific and relies on knowing the internal workings of the Helm chart
+// not just the public API!!!
+func (p *Provisioner) getWorkloadPoolMachineDeploymentNames(ctx context.Context) ([]string, error) {
+	pools, err := p.getWorkloadPools(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, len(pools.Items))
+
+	for i, pool := range pools.Items {
+		names[i] = fmt.Sprintf("%s-pool-%s", p.cluster.Name, pool.GetName())
+	}
+
+	return names, nil
+}
+
+// getMachineDeployments gets all live machine deployments for the cluster.
+func (p *Provisioner) getMachineDeployments(ctx context.Context, c client.Client) ([]unstructured.Unstructured, error) {
+	deployments := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": "cluster.x-k8s.io/v1beta1",
+			"kind":       "MachineDeployment",
+		},
+	}
+
+	options := &client.ListOptions{
+		Namespace: p.cluster.Name,
+	}
+
+	if err := c.List(ctx, deployments, options); err != nil {
+		return nil, err
+	}
+
+	var filtered []unstructured.Unstructured
+
+	for _, deployment := range deployments.Items {
+		ownerReferences := deployment.GetOwnerReferences()
+
+		for _, ownerReference := range ownerReferences {
+			if ownerReference.Kind != "Cluster" || ownerReference.Name != p.cluster.Name {
+				continue
+			}
+
+			filtered = append(filtered, deployment)
+		}
+	}
+
+	return filtered, nil
+}
+
+// machineDeploymentExists tells whether the deployment exists in the
+// expected list of names.
+func machineDeploymentExists(deployment *unstructured.Unstructured, names []string) bool {
+	for _, name := range names {
+		if name == deployment.GetName() {
+			return true
+		}
+	}
+
+	return false
+}
+
+// deleteOrphanedMachineDeployments does just that. So what happens when you
+// delete a workload pool is that the application notes it's no longer in the
+// manifest, BUT, and I like big buts, cluster-api has added an owner reference,
+// so Argo thinks it's an implicitly created resource now.  So, what we need to
+// do is manually delete any orphaned MachineDeployments.
+func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
+	if err != nil {
+		return fmt.Errorf("%w: failed to get cluster kubeconfig", err)
+	}
+
+	vclusterClient, err := client.New(vclusterConfig, client.Options{})
+	if err != nil {
+		return fmt.Errorf("%w: failed to create cluster client", err)
+	}
+
+	names, err := p.getWorkloadPoolMachineDeploymentNames(ctx)
+	if err != nil {
+		return err
+	}
+
+	deployments, err := p.getMachineDeployments(ctx, vclusterClient)
+	if err != nil {
+		return err
+	}
+
+	for i := range deployments {
+		deployment := &deployments[i]
+
+		if machineDeploymentExists(deployment, names) {
+			continue
+		}
+
+		log.Info("deleting orphaned machine deployment", "name", deployment.GetName())
+
+		if err := vclusterClient.Delete(ctx, deployment); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // provisionCluster creates a Kubernetes cluster application.
@@ -438,6 +545,10 @@ func (p *Provisioner) provisionCluster(ctx context.Context) error {
 	}
 
 	if err := application.New(p.client, object).Provision(ctx); err != nil {
+		return err
+	}
+
+	if err := p.deleteOrphanedMachineDeployments(ctx); err != nil {
 		return err
 	}
 

@@ -50,6 +50,15 @@ func RequiredStringVar(cmd *cobra.Command, p *string, name, value, usage string)
 	}
 }
 
+// StringVarWithCompletion registers a string flag with a completion function.
+func StringVarWithCompletion(cmd *cobra.Command, p *string, name, value, usage string, f func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)) {
+	cmd.Flags().StringVar(p, name, value, usage)
+
+	if err := cmd.RegisterFlagCompletionFunc(name, f); err != nil {
+		panic(err)
+	}
+}
+
 // RequiredStringVarWithCompletion registers a string flag marked as required and
 // with a completion function.
 func RequiredStringVarWithCompletion(cmd *cobra.Command, p *string, name, value, usage string, f func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)) {
@@ -102,7 +111,7 @@ func (s SemverFlag) Type() string {
 
 // QuantityFlag provides parsing and type checking of quanities.
 type QuantityFlag struct {
-	Quantity resource.Quantity
+	Quantity *resource.Quantity
 }
 
 // Ensure the pflag.Value interface is implemented.
@@ -110,6 +119,10 @@ var _ = pflag.Value(&QuantityFlag{})
 
 // String returns the current value.
 func (s QuantityFlag) String() string {
+	if s.Quantity == nil {
+		return ""
+	}
+
 	return s.Quantity.String()
 }
 
@@ -120,7 +133,7 @@ func (s *QuantityFlag) Set(in string) error {
 		return err
 	}
 
-	s.Quantity = quantity
+	s.Quantity = &quantity
 
 	return nil
 }
