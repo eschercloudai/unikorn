@@ -44,8 +44,6 @@ import (
 
 const (
 	defaultControlPlaneReplicas = 3
-
-	defaultWorkloadReplicas = 3
 )
 
 var (
@@ -97,8 +95,8 @@ type createClusterOptions struct {
 	// caCert is derived from clouds during completion.
 	caCert []byte
 
-	// kubernetesVersion defines the Kubernetes version to install.
-	kubernetesVersion util.SemverFlag
+	// version defines the Kubernetes version to install.
+	version util.SemverFlag
 
 	// externalNetworkID is an internet facing Openstack network to provision
 	// VIPs on for load balancers and stuff.
@@ -119,21 +117,16 @@ type createClusterOptions struct {
 	// image defines the Openstack image for Kubernetes nodes.
 	image string
 
-	// kubernetesControlPlaneFlavor defines the Openstack VM flavor Kubernetes control
+	// flavor defines the Openstack VM flavor Kubernetes control
 	// planes use.
-	kubernetesControlPlaneFlavor string
+	flavor string
 
-	// kubernetesControlPlaneReplicas defines the number of replicas (nodes) for
+	// replicas defines the number of replicas (nodes) for
 	// Kubernetes control planes.
-	kubernetesControlPlaneReplicas int
+	replicas int
 
-	// kubernetesWorkloadFlavor defines the Openstack VM flavor Kubernetes workload
-	// clusters use.
-	kubernetesWorkloadFlavor string
-
-	// kubernetesWorkloadReplicas defines the number of replicas (nodes) for
-	// Kubernetes workload clusters
-	kubernetesWorkloadReplicas int
+	// diskSize defines the persistent volume size to provision with.
+	diskSize util.QuantityFlag
 
 	// region is the OpenStack region the cluster exists in.
 	region string
@@ -162,7 +155,7 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	util.RequiredStringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)
 
 	// Kubernetes options.
-	util.RequiredVar(cmd, &o.kubernetesVersion, "kubernetes-version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --control-plane-image and --workload-image flags.")
+	util.RequiredVar(cmd, &o.version, "kubernetes-version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --control-plane-image and --workload-image flags.")
 
 	// Networking options.
 	util.RequiredStringVarWithCompletion(cmd, &o.externalNetworkID, "external-network", "", "Openstack external network (see: 'openstack network list --external'.)", completion.OpenstackExternalNetworkCompletionFunc(&o.cloud))
@@ -172,12 +165,9 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	cmd.Flags().IPSliceVar(&o.dnsNameservers, "dns-nameservers", defaultDNSNameservers, "DNS nameservers for pods.")
 
 	// Kubernetes control plane options.
-	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesControlPlaneFlavor, "kube-controlplane-flavor", "", "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
-	cmd.Flags().IntVar(&o.kubernetesControlPlaneReplicas, "kube-controlplane-replicas", defaultControlPlaneReplicas, "Kubernetes control plane replicas.")
-
-	// Kubernetes workload cluster options.
-	util.RequiredStringVarWithCompletion(cmd, &o.kubernetesWorkloadFlavor, "kube-workload-flavor", "", "Kubernetes workload Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
-	cmd.Flags().IntVar(&o.kubernetesWorkloadReplicas, "kube-workload-replicas", defaultWorkloadReplicas, "Kubernetes workload replicas.")
+	util.RequiredStringVarWithCompletion(cmd, &o.flavor, "flavor", "", "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
+	cmd.Flags().IntVar(&o.replicas, "replicas", defaultControlPlaneReplicas, "Kubernetes control plane replicas.")
+	cmd.Flags().Var(&o.diskSize, "disk-size", "Kubernetes control plane disk size, defaults to that of the machine flavor.")
 
 	// Openstack provisioning options.
 	util.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Kubernetes Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
@@ -279,27 +269,7 @@ func (o *createClusterOptions) run() error {
 		return err
 	}
 
-	kubernetesVersion := unikornv1alpha1.SemanticVersion(o.kubernetesVersion.Semver)
-
-	workloadPool := &unikornv1alpha1.KubernetesWorkloadPool{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: o.name + "-default",
-			Labels: map[string]string{
-				constants.VersionLabel:           constants.Version,
-				constants.ProjectLabel:           o.project,
-				constants.ControlPlaneLabel:      o.controlPlane,
-				constants.KubernetesClusterLabel: o.name,
-			},
-		},
-		Spec: unikornv1alpha1.KubernetesWorkloadPoolSpec{
-			MachineGeneric: unikornv1alpha1.MachineGeneric{
-				Version:  &kubernetesVersion,
-				Image:    &o.image,
-				Flavor:   &o.kubernetesWorkloadFlavor,
-				Replicas: &o.kubernetesWorkloadReplicas,
-			},
-		},
-	}
+	version := unikornv1alpha1.SemanticVersion(o.version.Semver)
 
 	cluster := &unikornv1alpha1.KubernetesCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -328,10 +298,11 @@ func (o *createClusterOptions) run() error {
 			},
 			ControlPlane: &unikornv1alpha1.KubernetesClusterControlPlaneSpec{
 				MachineGeneric: unikornv1alpha1.MachineGeneric{
-					Version:  &kubernetesVersion,
+					Version:  &version,
 					Image:    &o.image,
-					Flavor:   &o.kubernetesControlPlaneFlavor,
-					Replicas: &o.kubernetesControlPlaneReplicas,
+					Flavor:   &o.flavor,
+					Replicas: &o.replicas,
+					DiskSize: o.diskSize.Quantity,
 				},
 			},
 			WorkloadPools: &unikornv1alpha1.KubernetesClusterWorkloadPoolsSpec{
@@ -342,10 +313,6 @@ func (o *createClusterOptions) run() error {
 				},
 			},
 		},
-	}
-
-	if _, err := o.client.UnikornV1alpha1().KubernetesWorkloadPools(namespace).Create(context.TODO(), workloadPool, metav1.CreateOptions{}); err != nil {
-		return err
 	}
 
 	if _, err := o.client.UnikornV1alpha1().KubernetesClusters(namespace).Create(context.TODO(), cluster, metav1.CreateOptions{}); err != nil {
@@ -373,7 +340,7 @@ var (
 	//nolint:gochecknoglobals
 	createClusterExamples = util.TemplatedExample(`
         # Create a Kubernetes cluster
-        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --ssh-key-name spjmurray --external-network c9d130bc-301d-45c0-9328-a6964af65579 --kube-controlplane-flavor c.small --kube-workload-flavor g.medium_a100_MIG_2g.20gb --kubernetes-version v1.24.7 --image ubuntu-2004-kube-v1.24.7 --availability-zone nova baz`)
+        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --ssh-key-name spjmurray --external-network c9d130bc-301d-45c0-9328-a6964af65579 --flavor c.small --version v1.24.7 --image ubuntu-2004-kube-v1.24.7 --availability-zone nova baz`)
 )
 
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes

@@ -125,6 +125,7 @@ func (p *Provisioner) generateCertManagerApplication() *unstructured.Unstructure
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
+						"prune":    true,
 					},
 					"syncOptions": []string{
 						"CreateNamespace=true",
@@ -184,6 +185,7 @@ func (p *Provisioner) generateClusterAPIApplication() *unstructured.Unstructured
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
+						"prune":    true,
 					},
 				},
 			},
