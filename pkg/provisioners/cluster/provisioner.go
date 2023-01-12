@@ -108,70 +108,89 @@ func (p *Provisioner) getLabels(app string) map[string]interface{} {
 // expected by the underlying Helm chart.
 func (p *Provisioner) generateMachineHelmValues(machine *unikornv1alpha1.MachineGeneric) map[string]interface{} {
 	object := map[string]interface{}{
-		"version":  string(*machine.Version),
-		"image":    *machine.Image,
-		"flavor":   *machine.Flavor,
-		"replicas": *machine.Replicas,
+		"image":  *machine.Image,
+		"flavor": *machine.Flavor,
 	}
 
 	if machine.DiskSize != nil {
 		object["diskSize"] = fmt.Sprintf("%vG", machine.DiskSize.Value()>>30)
 	}
 
-	if len(machine.Labels) != 0 {
-		labels := map[string]interface{}{}
-
-		for key, value := range machine.Labels {
-			labels[key] = value
-		}
-
-		object["labels"] = labels
-	}
-
-	if len(machine.Files) != 0 {
-		files := make([]interface{}, len(machine.Files))
-
-		for i, file := range machine.Files {
-			files[i] = map[string]interface{}{
-				"path":    *file.Path,
-				"content": base64.StdEncoding.EncodeToString(file.Content),
-			}
-		}
-
-		object["files"] = files
-	}
-
 	return object
+}
+
+// getWorkloadPools athers all workload pools that belong to this cluster.
+// By default that's all the things, in reality most sane people will add label
+// selectors.
+func (p *Provisioner) getWorkloadPools(ctx context.Context) (*unikornv1alpha1.KubernetesWorkloadPoolList, error) {
+	selector := labels.Everything()
+
+	if p.cluster.Spec.WorkloadPools != nil && p.cluster.Spec.WorkloadPools.Selector != nil {
+		s, err := metav1.LabelSelectorAsSelector(p.cluster.Spec.WorkloadPools.Selector)
+		if err != nil {
+			return nil, err
+		}
+
+		selector = s
+	}
+
+	workloadPools := &unikornv1alpha1.KubernetesWorkloadPoolList{}
+
+	if err := p.client.List(ctx, workloadPools, &client.ListOptions{LabelSelector: selector}); err != nil {
+		return nil, err
+	}
+
+	return workloadPools, nil
 }
 
 // generateWorloadPoolHelmValues translates the API's idea of a workload pool into
 // what's expected by the underlying Helm chart.
 func (p *Provisioner) generateWorloadPoolHelmValues(ctx context.Context) (map[string]interface{}, error) {
-	// Gather all workload pools that belong to this cluster.  By default
-	// that's all the things, in reality most sane people will add label
-	// selectors.
-	workloadSelector := labels.Everything()
-
-	if p.cluster.Spec.WorkloadPools != nil && p.cluster.Spec.WorkloadPools.Selector != nil {
-		selector, err := metav1.LabelSelectorAsSelector(p.cluster.Spec.WorkloadPools.Selector)
-		if err != nil {
-			return nil, err
-		}
-
-		workloadSelector = selector
-	}
-
-	var workloadPoolResources unikornv1alpha1.KubernetesWorkloadPoolList
-
-	if err := p.client.List(ctx, &workloadPoolResources, &client.ListOptions{LabelSelector: workloadSelector}); err != nil {
+	workloadPoolResources, err := p.getWorkloadPools(ctx)
+	if err != nil {
 		return nil, err
 	}
 
 	workloadPools := map[string]interface{}{}
 
 	for _, workloadPool := range workloadPoolResources.Items {
+		object := map[string]interface{}{
+			"version":  string(*workloadPool.Spec.Version),
+			"replicas": *workloadPool.Spec.Replicas,
+			"machine":  p.generateMachineHelmValues(&workloadPool.Spec.MachineGeneric),
+		}
+
+		if len(workloadPool.Spec.Labels) != 0 {
+			labels := map[string]interface{}{}
+
+			for key, value := range workloadPool.Spec.Labels {
+				labels[key] = value
+			}
+
+			object["labels"] = labels
+		}
+
+		if len(workloadPool.Spec.Files) != 0 {
+			files := make([]interface{}, len(workloadPool.Spec.Files))
+
+			for i, file := range workloadPool.Spec.Files {
+				files[i] = map[string]interface{}{
+					"path":    *file.Path,
+					"content": base64.StdEncoding.EncodeToString(file.Content),
+				}
+			}
+
+			object["files"] = files
+		}
+
+		name := workloadPool.Name
+
+		if workloadPool.Spec.Name != nil {
+			name = *workloadPool.Spec.Name
+		}
+
 		// TODO: scheduling.
-		workloadPools[workloadPool.Name] = p.generateMachineHelmValues(&workloadPool.Spec.MachineGeneric)
+		workloadPools[name] = object
 	}
 
 	return workloadPools, nil
@@ -213,7 +232,11 @@ func (p *Provisioner) generateApplication(ctx context.Context) (*unstructured.Un
 				},
 			},
 		},
-		"controlPlane":  p.generateMachineHelmValues(&p.cluster.Spec.ControlPlane.MachineGeneric),
+		"controlPlane": map[string]interface{}{
+			"version":  string(*p.cluster.Spec.ControlPlane.Version),
+			"replicas": *p.cluster.Spec.ControlPlane.Replicas,
+			"machine":  p.generateMachineHelmValues(&p.cluster.Spec.ControlPlane.MachineGeneric),
+		},
 		"workloadPools": workloadPools,
 		"network": map[string]interface{}{
 			"nodeCIDR": p.cluster.Spec.Network.NodeNetwork.IPNet.String(),
@@ -250,7 +273,7 @@ func (p *Provisioner) generateApplication(ctx context.Context) (*unstructured.Un
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api-cluster-openstack",
-					"targetRevision": "v0.2.2",
+					"targetRevision": "v0.3.1",
 					"helm": map[string]interface{}{
 						"releaseName": p.cluster.Name,
 						"values":      string(values),

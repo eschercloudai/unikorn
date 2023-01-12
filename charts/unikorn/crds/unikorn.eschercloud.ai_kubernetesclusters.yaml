@@ -90,42 +90,12 @@ spec:
                       in the flavor.
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
-                  failureDomain:
-                    description: FailureDomain is the failure domain to use for the
-                      pool.
-                    type: string
-                  files:
-                    description: Files are a set of files that can be installed onto
-                      the node on initialisation/join.
-                    items:
-                      description: File is a file that can be deployed to a cluster
-                        node on creation.
-                      properties:
-                        content:
-                          description: Content is the file contents.
-                          format: byte
-                          type: string
-                        path:
-                          description: Path is the absolute path to create the file
-                            in.
-                          type: string
-                      required:
-                      - content
-                      - path
-                      type: object
-                    type: array
                   flavor:
                     description: Flavor is the OpenStack Nova flavor to deploy with.
                     type: string
                   image:
                     description: Image is the OpenStack Glance image to deploy with.
                     type: string
-                  labels:
-                    additionalProperties:
-                      type: string
-                    description: Labels is the set of node labels to apply to the
-                      pool on initialisation/join.
-                    type: object
                   replicas:
                     default: 3
                     description: Replicas is the initial pool size to deploy.

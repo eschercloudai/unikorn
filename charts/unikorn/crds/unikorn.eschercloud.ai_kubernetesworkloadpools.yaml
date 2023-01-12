@@ -153,6 +153,11 @@ spec:
                 description: Labels is the set of node labels to apply to the pool
                   on initialisation/join.
                 type: object
+              name:
+                description: Name allows overriding the pool name.  Workload pool
+                  resources in the same namespace need unique names, but may apply
+                  to different clusters which exist in their own "namespace".
+                type: string
               replicas:
                 default: 3
                 description: Replicas is the initial pool size to deploy.
