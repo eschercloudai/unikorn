@@ -67,6 +67,8 @@ type Provisioner struct {
 	server string
 
 	labels map[string]string
+
+	workloadPools *unikornv1alpha1.KubernetesWorkloadPoolList
 }
 
 // New returns a new initialized provisioner object.
@@ -140,20 +142,25 @@ func (p *Provisioner) getWorkloadPools(ctx context.Context) (*unikornv1alpha1.Ku
 		return nil, err
 	}
 
-	return workloadPools, nil
-}
+	// The inherent problem here is a race condition, with us picking something up
+	// even though it's marked for deletion, so it stays around.
+	filtered := &unikornv1alpha1.KubernetesWorkloadPoolList{}
 
-// generateWorloadPoolHelmValues translates the API's idea of a workload pool into
-// what's expected by the underlying Helm chart.
-func (p *Provisioner) generateWorloadPoolHelmValues(ctx context.Context) (map[string]interface{}, error) {
-	workloadPoolResources, err := p.getWorkloadPools(ctx)
-	if err != nil {
-		return nil, err
+	for _, pool := range workloadPools.Items {
+		if pool.DeletionTimestamp == nil {
+			filtered.Items = append(filtered.Items, pool)
+		}
 	}
 
+	return filtered, nil
+}
+
+// generateWorkloadPoolHelmValues translates the API's idea of a workload pool into
+// what's expected by the underlying Helm chart.
+func (p *Provisioner) generateWorkloadPoolHelmValues() map[string]interface{} {
 	workloadPools := map[string]interface{}{}
 
-	for _, workloadPool := range workloadPoolResources.Items {
+	for _, workloadPool := range p.workloadPools.Items {
 		object := map[string]interface{}{
 			"version":  string(*workloadPool.Spec.Version),
 			"replicas": *workloadPool.Spec.Replicas,
@@ -187,15 +194,12 @@ func (p *Provisioner) generateWorloadPoolHelmValues(ctx context.Context) (map[st
 		workloadPools[workloadPool.GetName()] = object
 	}
 
-	return workloadPools, nil
+	return workloadPools
 }
 
 // generateApplication creates an ArgoCD application for a cluster.
-func (p *Provisioner) generateApplication(ctx context.Context) (*unstructured.Unstructured, error) {
-	workloadPools, err := p.generateWorloadPoolHelmValues(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) {
+	workloadPools := p.generateWorkloadPoolHelmValues()
 
 	nameservers := make([]interface{}, len(p.cluster.Spec.Network.DNSNameservers))
 
@@ -427,27 +431,42 @@ func (p *Provisioner) generateCiliumApplication(server string) *unstructured.Uns
 // exist for this cluster.
 // TODO: this is horrific and relies on knowing the internal workings of the Helm chart
 // not just the public API!!!
-func (p *Provisioner) getWorkloadPoolMachineDeploymentNames(ctx context.Context) ([]string, error) {
-	pools, err := p.getWorkloadPools(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (p *Provisioner) getWorkloadPoolMachineDeploymentNames() []string {
+	names := make([]string, len(p.workloadPools.Items))
 
-	names := make([]string, len(pools.Items))
-
-	for i, pool := range pools.Items {
+	for i, pool := range p.workloadPools.Items {
 		names[i] = fmt.Sprintf("%s-pool-%s", p.cluster.Name, pool.GetName())
 	}
 
-	return names, nil
+	return names
 }
 
-// getMachineDeployments gets all live machine deployments for the cluster.
-func (p *Provisioner) getMachineDeployments(ctx context.Context, c client.Client) ([]unstructured.Unstructured, error) {
-	deployments := &unstructured.UnstructuredList{
+// filterOwnedResources removes any resources that aren't owned by the cluster.
+func (p *Provisioner) filterOwnedResources(resources []unstructured.Unstructured) []unstructured.Unstructured {
+	var filtered []unstructured.Unstructured
+
+	for _, resource := range resources {
+		ownerReferences := resource.GetOwnerReferences()
+
+		for _, ownerReference := range ownerReferences {
+			if ownerReference.Kind != "Cluster" || ownerReference.Name != p.cluster.Name {
+				continue
+			}
+
+			filtered = append(filtered, resource)
+		}
+	}
+
+	return filtered
+}
+
+// getOwnedResource returns resources of the specified API version/kind that belong
+// to the cluster.
+func (p *Provisioner) getOwnedResource(ctx context.Context, c client.Client, apiVersion, kind string) ([]unstructured.Unstructured, error) {
+	objects := &unstructured.UnstructuredList{
 		Object: map[string]interface{}{
-			"apiVersion": "cluster.x-k8s.io/v1beta1",
-			"kind":       "MachineDeployment",
+			"apiVersion": apiVersion,
+			"kind":       kind,
 		},
 	}
 
@@ -455,37 +474,115 @@ func (p *Provisioner) getMachineDeployments(ctx context.Context, c client.Client
 		Namespace: p.cluster.Name,
 	}
 
-	if err := c.List(ctx, deployments, options); err != nil {
+	if err := c.List(ctx, objects, options); err != nil {
 		return nil, err
 	}
 
-	var filtered []unstructured.Unstructured
-
-	for _, deployment := range deployments.Items {
-		ownerReferences := deployment.GetOwnerReferences()
-
-		for _, ownerReference := range ownerReferences {
-			if ownerReference.Kind != "Cluster" || ownerReference.Name != p.cluster.Name {
-				continue
-			}
-
-			filtered = append(filtered, deployment)
-		}
-	}
-
-	return filtered, nil
+	return p.filterOwnedResources(objects.Items), nil
 }
 
-// machineDeploymentExists tells whether the deployment exists in the
+// getMachineDeployments gets all live machine deployments for the cluster.
+func (p *Provisioner) getMachineDeployments(ctx context.Context, c client.Client) ([]unstructured.Unstructured, error) {
+	// TODO: this is flaky as hell, due to hard coded versions, needs a fix upstream.
+	return p.getOwnedResource(ctx, c, "cluster.x-k8s.io/v1beta1", "MachineDeployment")
+}
+
+// getKubeadmConfigTemplates gets all live config templates for the cluster.
+func (p *Provisioner) getKubeadmConfigTemplates(ctx context.Context, c client.Client) ([]unstructured.Unstructured, error) {
+	// TODO: this is flaky as hell, due to hard coded versions, needs a fix upstream.
+	return p.getOwnedResource(ctx, c, "bootstrap.cluster.x-k8s.io/v1beta1", "KubeadmConfigTemplate")
+}
+
+// getKubeadmControlPlanes gets all live control planes for the cluster.
+func (p *Provisioner) getKubeadmControlPlanes(ctx context.Context, c client.Client) ([]unstructured.Unstructured, error) {
+	// TODO: this is flaky as hell, due to hard coded versions, needs a fix upstream.
+	return p.getOwnedResource(ctx, c, "controlplane.cluster.x-k8s.io/v1beta1", "KubeadmControlPlane")
+}
+
+// getOpenstackMachineTemplates gets all live machine templates for the cluster.
+func (p *Provisioner) getOpenstackMachineTemplates(ctx context.Context, c client.Client) ([]unstructured.Unstructured, error) {
+	// TODO: this is flaky as hell, due to hard coded versions, needs a fix upstream.
+	return p.getOwnedResource(ctx, c, "infrastructure.cluster.x-k8s.io/v1alpha5", "OpenStackMachineTemplate")
+}
+
+// resourceExistsUnstructured tells whether the resource exists in the
 // expected list of names.
-func machineDeploymentExists(deployment *unstructured.Unstructured, names []string) bool {
+func resourceExistsUnstructured(o unstructured.Unstructured, names []string) bool {
 	for _, name := range names {
-		if name == deployment.GetName() {
+		if name == o.GetName() {
 			return true
 		}
 	}
 
 	return false
+}
+
+// filterNamedResourcesUnstructured returns only the resources in the names list.
+func filterNamedResourcesUnstructured(objects []unstructured.Unstructured, names []string) []unstructured.Unstructured {
+	var filtered []unstructured.Unstructured
+
+	for _, o := range objects {
+		if resourceExistsUnstructured(o, names) {
+			filtered = append(filtered, o)
+		}
+	}
+
+	return filtered
+}
+
+// getExpectedKubeadmConfigTemplateNames extracts the expected config templates from the
+// deployment references.
+func getExpectedKubeadmConfigTemplateNames(deployments []unstructured.Unstructured) []string {
+	names := make([]string, len(deployments))
+
+	for i, deployment := range deployments {
+		// TODO: may be not ok.
+		names[i], _, _ = unstructured.NestedString(deployment.Object, "spec", "template", "spec", "bootstrap", "configRef", "name")
+	}
+
+	return names
+}
+
+// getExpectedOpenstackMachineTemplateNames extracts the expected machine templates from the
+// deployment references.
+func getExpectedOpenstackMachineTemplateNames(deployments []unstructured.Unstructured, controlPlanes []unstructured.Unstructured) []string {
+	//nolint: prealloc
+	var names []string
+
+	for _, deployment := range deployments {
+		// TODO: may be not ok.
+		name, _, _ := unstructured.NestedString(deployment.Object, "spec", "template", "spec", "infrastructureRef", "name")
+
+		names = append(names, name)
+	}
+
+	for _, controlPlane := range controlPlanes {
+		name, _, _ := unstructured.NestedString(controlPlane.Object, "spec", "machineTemplate", "infrastructureRef", "name")
+
+		names = append(names, name)
+	}
+
+	return names
+}
+
+// deleteForeignResources removes any resources in the given object set that
+// don't have a corresponding name in the allowed list.
+func deleteForeignResources(ctx context.Context, c client.Client, objects []unstructured.Unstructured, allowed []string) error {
+	log := log.FromContext(ctx)
+
+	for i, o := range objects {
+		if resourceExistsUnstructured(o, allowed) {
+			continue
+		}
+
+		log.Info("deleting orphaned resource", "kind", o.GetKind(), "name", o.GetName())
+
+		if err := c.Delete(ctx, &objects[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // deleteOrphanedMachineDeployments does just that. So what happens when you
@@ -494,8 +591,6 @@ func machineDeploymentExists(deployment *unstructured.Unstructured, names []stri
 // so Argo thinks it's an implicitly created resource now.  So, what we need to
 // do is manually delete any orphaned MachineDeployments.
 func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) error {
-	log := log.FromContext(ctx)
-
 	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
 	if err != nil {
 		return fmt.Errorf("%w: failed to get cluster kubeconfig", err)
@@ -506,28 +601,47 @@ func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) erro
 		return fmt.Errorf("%w: failed to create cluster client", err)
 	}
 
-	names, err := p.getWorkloadPoolMachineDeploymentNames(ctx)
-	if err != nil {
-		return err
-	}
-
 	deployments, err := p.getMachineDeployments(ctx, vclusterClient)
 	if err != nil {
 		return err
 	}
 
-	for i := range deployments {
-		deployment := &deployments[i]
+	kubeadmConfigTemplates, err := p.getKubeadmConfigTemplates(ctx, vclusterClient)
+	if err != nil {
+		return err
+	}
 
-		if machineDeploymentExists(deployment, names) {
-			continue
-		}
+	kubeadmControlPlanes, err := p.getKubeadmControlPlanes(ctx, vclusterClient)
+	if err != nil {
+		return err
+	}
 
-		log.Info("deleting orphaned machine deployment", "name", deployment.GetName())
+	openstackMachineTemplates, err := p.getOpenstackMachineTemplates(ctx, vclusterClient)
+	if err != nil {
+		return err
+	}
 
-		if err := vclusterClient.Delete(ctx, deployment); err != nil {
-			return err
-		}
+	// Work out the machine deployment names that should exist, grab all that
+	// exist, and remember the intersection.
+	deploymentNames := p.getWorkloadPoolMachineDeploymentNames()
+
+	expectedDeployments := filterNamedResourcesUnstructured(deployments, deploymentNames)
+
+	// Get the expected kubeadm config template and openstack machine template names from
+	// the deployments.  These are generated by Helm, and unguessable.
+	kubeadmConfigTemplatesNames := getExpectedKubeadmConfigTemplateNames(expectedDeployments)
+	openstackMachineTemplatesNames := getExpectedOpenstackMachineTemplateNames(expectedDeployments, kubeadmControlPlanes)
+
+	if err := deleteForeignResources(ctx, vclusterClient, deployments, deploymentNames); err != nil {
+		return err
+	}
+
+	if err := deleteForeignResources(ctx, vclusterClient, kubeadmConfigTemplates, kubeadmConfigTemplatesNames); err != nil {
+		return err
+	}
+
+	if err := deleteForeignResources(ctx, vclusterClient, openstackMachineTemplates, openstackMachineTemplatesNames); err != nil {
+		return err
 	}
 
 	return nil
@@ -539,7 +653,16 @@ func (p *Provisioner) provisionCluster(ctx context.Context) error {
 
 	log.Info("provisioning kubernetes cluster")
 
-	object, err := p.generateApplication(ctx)
+	// Do this once so it's atomic, we don't want it changing in different
+	// places.
+	workloadPools, err := p.getWorkloadPools(ctx)
+	if err != nil {
+		return err
+	}
+
+	p.workloadPools = workloadPools
+
+	object, err := p.generateApplication()
 	if err != nil {
 		return err
 	}
@@ -688,6 +811,10 @@ func (p *Provisioner) provisionOpenstackCloudProvider(ctx context.Context, serve
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	log.Info("provisioning unikorn kubernetes cluster")
+
 	group, gctx := errgroup.WithContext(ctx)
 
 	group.Go(func() error { return p.provisionCluster(gctx) })
@@ -696,6 +823,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	if err := group.Wait(); err != nil {
 		return err
 	}
+
+	log.Info("unikorn kubernetes cluster provisioned")
 
 	return nil
 }
@@ -743,7 +872,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	object, err = p.generateApplication(ctx)
+	object, err = p.generateApplication()
 	if err != nil {
 		return err
 	}
