@@ -283,7 +283,7 @@ func (o *createClusterOptions) run() error {
 
 	workloadPool := &unikornv1alpha1.KubernetesWorkloadPool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "default",
+			Name: o.name + "-default",
 			Labels: map[string]string{
 				constants.VersionLabel:           constants.Version,
 				constants.ProjectLabel:           o.project,

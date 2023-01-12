@@ -584,6 +584,30 @@ func (in *KubernetesWorkloadPoolList) DeepCopyObject() runtime.Object {
 func (in *KubernetesWorkloadPoolSpec) DeepCopyInto(out *KubernetesWorkloadPoolSpec) {
 	*out = *in
 	in.MachineGeneric.DeepCopyInto(&out.MachineGeneric)
+	if in.Name != nil {
+		in, out := &in.Name, &out.Name
+		*out = new(string)
+		**out = **in
+	}
+	if in.FailureDomain != nil {
+		in, out := &in.FailureDomain, &out.FailureDomain
+		*out = new(string)
+		**out = **in
+	}
+	if in.Labels != nil {
+		in, out := &in.Labels, &out.Labels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.Files != nil {
+		in, out := &in.Files, &out.Files
+		*out = make([]File, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Autoscaling != nil {
 		in, out := &in.Autoscaling, &out.Autoscaling
 		*out = new(MachineGenericAutoscaling)
@@ -645,25 +669,6 @@ func (in *MachineGeneric) DeepCopyInto(out *MachineGeneric) {
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(int)
 		**out = **in
-	}
-	if in.FailureDomain != nil {
-		in, out := &in.FailureDomain, &out.FailureDomain
-		*out = new(string)
-		**out = **in
-	}
-	if in.Labels != nil {
-		in, out := &in.Labels, &out.Labels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
-	if in.Files != nil {
-		in, out := &in.Files, &out.Files
-		*out = make([]File, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
 	}
 	return
 }

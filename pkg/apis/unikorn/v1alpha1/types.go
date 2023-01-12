@@ -379,14 +379,6 @@ type MachineGeneric struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=3
 	Replicas *int `json:"replicas,omitempty"`
-	// FailureDomain is the failure domain to use for the pool.
-	FailureDomain *string `json:"failureDomain,omitempty"`
-	// Labels is the set of node labels to apply to the pool on
-	// initialisation/join.
-	Labels map[string]string `json:"labels,omitempty"`
-	// Files are a set of files that can be installed onto the node
-	// on initialisation/join.
-	Files []File `json:"files,omitempty"`
 }
 
 // File is a file that can be deployed to a cluster node on creation.
@@ -443,6 +435,18 @@ type MachineGenericAutoscalingSchedulerGPU struct {
 // state.
 type KubernetesWorkloadPoolSpec struct {
 	MachineGeneric `json:",inline"`
+	// Name allows overriding the pool name.  Workload pool resources in the same
+	// namespace need unique names, but may apply to different clusters which exist
+	// in their own "namespace".
+	Name *string `json:"name,omitempty"`
+	// FailureDomain is the failure domain to use for the pool.
+	FailureDomain *string `json:"failureDomain,omitempty"`
+	// Labels is the set of node labels to apply to the pool on
+	// initialisation/join.
+	Labels map[string]string `json:"labels,omitempty"`
+	// Files are a set of files that can be installed onto the node
+	// on initialisation/join.
+	Files []File `json:"files,omitempty"`
 	// Autoscaling contains optional sclaing limits and scheduling
 	// hints for autoscaling.
 	Autoscaling *MachineGenericAutoscaling `json:"autoscaling,omitempty"`
