@@ -90,23 +90,24 @@ func (o *getWorkloadPoolOptions) run() error {
 		return err
 	}
 
-	selector := labels.Everything()
-
-	if o.clusterFlags.Project != "" {
-		clusterLabel, err := labels.NewRequirement(constants.KubernetesClusterLabel, selection.Equals, []string{o.clusterFlags.Project})
-		if err != nil {
-			return err
-		}
-
-		selector = selector.Add(*clusterLabel)
-	}
-
 	// We are using the "kubectl get" library to retrieve resources.  That command
 	// is generic, it accepts a kind and name(s), or a list of type/name tuples.
 	// In our case, the type is implicit, so we need to prepend it to keep things
 	// working as they should.
 	args := []string{unikornv1alpha1.KubernetesWorkloadPoolResource}
-	args = append(args, o.names...)
+
+	selector := labels.Everything()
+
+	if o.clusterFlags.Cluster != "" {
+		clusterLabel, err := labels.NewRequirement(constants.KubernetesClusterLabel, selection.Equals, []string{o.clusterFlags.Cluster})
+		if err != nil {
+			return err
+		}
+
+		selector = selector.Add(*clusterLabel)
+	} else {
+		args = append(args, o.names...)
+	}
 
 	r := o.f.NewBuilder().
 		Unstructured().
