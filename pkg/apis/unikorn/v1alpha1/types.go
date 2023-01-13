@@ -350,6 +350,7 @@ type KubernetesWorkloadPoolList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
+// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels.unikorn\\.eschercloud\\.ai/cluster"
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.version"
 // +kubebuilder:printcolumn:name="image",type="string",JSONPath=".spec.image"
 // +kubebuilder:printcolumn:name="flavor",type="string",JSONPath=".spec.flavor"

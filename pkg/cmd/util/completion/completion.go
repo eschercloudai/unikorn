@@ -41,17 +41,17 @@ func ControlPlanesCompletionFunc(f cmdutil.Factory, project *string) func(*cobra
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		unikornClient, err := unikorn.NewForConfig(config)
+		client, err := unikorn.NewForConfig(config)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		namespace, err := util.GetProjectNamespace(context.TODO(), unikornClient, *project)
+		namespace, err := util.GetProjectNamespace(context.TODO(), client, *project)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		controlPlanes, err := unikornClient.UnikornV1alpha1().ControlPlanes(namespace).List(context.TODO(), metav1.ListOptions{})
+		controlPlanes, err := client.UnikornV1alpha1().ControlPlanes(namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -77,17 +77,17 @@ func ClustersCompletionFunc(f cmdutil.Factory, project, controlPlane *string) fu
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		unikornClient, err := unikorn.NewForConfig(config)
+		client, err := unikorn.NewForConfig(config)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		namespace, err := util.GetControlPlaneNamespace(context.TODO(), unikornClient, *project, *controlPlane)
+		namespace, err := util.GetControlPlaneNamespace(context.TODO(), client, *project, *controlPlane)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		clusters, err := unikornClient.UnikornV1alpha1().KubernetesClusters(namespace).List(context.TODO(), metav1.ListOptions{})
+		clusters, err := client.UnikornV1alpha1().KubernetesClusters(namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -101,5 +101,28 @@ func ClustersCompletionFunc(f cmdutil.Factory, project, controlPlane *string) fu
 		}
 
 		return matches, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// WorkloadPoolsCompletionFunc returns a list of workload pools that belong to a control
+// plane and optionally a cluster in a project that match a prefix.
+func WorkloadPoolsCompletionFunc(f cmdutil.Factory, project, controlPlane, cluster *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		config, err := f.ToRESTConfig()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		client, err := unikorn.NewForConfig(config)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		names, err := util.GetClusterWorkloadPools(context.TODO(), client, *project, *controlPlane, *cluster)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		return names, cobra.ShellCompDirectiveNoFileComp
 	}
 }

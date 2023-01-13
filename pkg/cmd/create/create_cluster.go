@@ -319,6 +319,8 @@ func (o *createClusterOptions) run() error {
 		return err
 	}
 
+	fmt.Printf("%s.%s/%s created\n", unikornv1alpha1.KubernetesClusterResource, unikornv1alpha1.GroupName, o.name)
+
 	return nil
 }
 

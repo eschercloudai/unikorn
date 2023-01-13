@@ -36,6 +36,7 @@ func NewGetCommand(f cmdutil.Factory) *cobra.Command {
 		newGetControlPlaneCommand(f),
 		newGetKubeConfigCommand(f),
 		newGetClusterCommand(f),
+		newGetWorkloadPoolCommand(f),
 	}
 
 	cmd.AddCommand(commands...)
