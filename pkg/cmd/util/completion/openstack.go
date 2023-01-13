@@ -28,7 +28,7 @@ import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/spf13/cobra"
 
-	"github.com/eschercloudai/unikorn/pkg/cmd/util"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/openstack"
 )
 
 // CloudCompletionFunc parses clouds.yaml and supplies matching cloud names.
@@ -88,7 +88,7 @@ func (n *Network) UnmarshalJSON(b []byte) error {
 // Names can alias which makes mapping from name to ID practically useless.
 func OpenstackExternalNetworkCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := util.OpenstackNetworkClient(*cloud)
+		client, err := openstack.NetworkClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -122,7 +122,7 @@ func OpenstackExternalNetworkCompletionFunc(cloud *string) func(*cobra.Command, 
 //nolint:dupl
 func OpenstackSSHKeyCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := util.OpenstackComputeClient(*cloud)
+		client, err := openstack.ComputeClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -156,7 +156,7 @@ func OpenstackSSHKeyCompletionFunc(cloud *string) func(*cobra.Command, []string,
 //nolint:dupl
 func OpenstackFlavorCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := util.OpenstackComputeClient(*cloud)
+		client, err := openstack.ComputeClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -188,7 +188,7 @@ func OpenstackFlavorCompletionFunc(cloud *string) func(*cobra.Command, []string,
 //nolint:dupl
 func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := util.OpenstackComputeClient(*cloud)
+		client, err := openstack.ComputeClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -218,7 +218,7 @@ func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, 
 // OpenstackAvailabilityZoneCompletionFunc lists any matching availability zones by name.
 func OpenstackAvailabilityZoneCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := util.OpenstackComputeClient(*cloud)
+		client, err := openstack.ComputeClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

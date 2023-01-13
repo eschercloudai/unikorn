@@ -25,21 +25,17 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	computil "k8s.io/kubectl/pkg/util/completion"
 )
 
 type getKubeConfigOptions struct {
-	project string
-
-	name string
+	// controlPlaneFlags define control plane scoping.
+	controlPlaneFlags flags.ControlPlaneFlags
 
 	// client is the Kubernetes v1 client.
 	client kubernetes.Interface
@@ -50,19 +46,11 @@ type getKubeConfigOptions struct {
 
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *getKubeConfigOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.project, "project", "", "Kubernetes project name that contains the control plane.")
-
-	if err := cmd.MarkFlagRequired("project"); err != nil {
-		panic(err)
-	}
-
-	if err := cmd.RegisterFlagCompletionFunc("project", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)); err != nil {
-		panic(err)
-	}
+	o.controlPlaneFlags.AddFlags(f, cmd)
 }
 
 // complete fills in any options not does automatically by flag parsing.
-func (o *getKubeConfigOptions) complete(f cmdutil.Factory, args []string) error {
+func (o *getKubeConfigOptions) complete(f cmdutil.Factory, _ []string) error {
 	var err error
 
 	if o.client, err = f.KubernetesClientSet(); err != nil {
@@ -78,32 +66,18 @@ func (o *getKubeConfigOptions) complete(f cmdutil.Factory, args []string) error 
 		return err
 	}
 
-	if len(args) != 1 {
-		return errors.ErrInvalidName
-	}
-
-	o.name = args[0]
-
 	return nil
 }
 
 // validate validates any tainted input not handled by complete() or flags
 // processing.
 func (o *getKubeConfigOptions) validate() error {
-	if len(o.name) == 0 {
-		return fmt.Errorf(`%w: "%s"`, errors.ErrInvalidName, o.name)
-	}
-
-	if len(o.project) == 0 {
-		return fmt.Errorf(`%w: "%s"`, errors.ErrInvalidName, o.project)
-	}
-
 	return nil
 }
 
 // run executes the command.
 func (o *getKubeConfigOptions) run() error {
-	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.unikornClient, o.project, o.name)
+	namespace, err := o.controlPlaneFlags.GetControlPlaneNamespace(context.TODO(), o.unikornClient)
 	if err != nil {
 		return err
 	}
@@ -140,7 +114,7 @@ func newGetKubeConfigCommand(f cmdutil.Factory) *cobra.Command {
 		Use:               "kubeconfig",
 		Short:             "Delete a Kubernetes cluster",
 		Long:              "Delete a Kubernetes cluster",
-		ValidArgsFunction: completion.ControlPlanesCompletionFunc(f, &o.project),
+		ValidArgsFunction: o.controlPlaneFlags.CompleteControlPlane(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

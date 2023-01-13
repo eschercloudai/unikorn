@@ -26,20 +26,20 @@ import (
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 type createControlPlaneOptions struct {
+	// projectFlags defines project scoping.
+	projectFlags flags.ProjectFlags
+
 	// name is the name of the control plane to create.
 	name string
-
-	// project is the project name.
-	project string
 
 	// client gives access to our custom resources.
 	client unikorn.Interface
@@ -47,15 +47,7 @@ type createControlPlaneOptions struct {
 
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.project, "project", "", "Kubernetes project name that contains the control plane.")
-
-	if err := cmd.MarkFlagRequired("project"); err != nil {
-		panic(err)
-	}
-
-	if err := cmd.RegisterFlagCompletionFunc("project", completion.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)); err != nil {
-		panic(err)
-	}
+	o.projectFlags.AddFlags(f, cmd)
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -90,7 +82,7 @@ func (o *createControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *createControlPlaneOptions) run() error {
-	namespace, err := util.GetProjectNamespace(context.TODO(), o.client, o.project)
+	namespace, err := o.projectFlags.GetProjectNamespace(context.TODO(), o.client)
 	if err != nil {
 		return err
 	}
@@ -100,7 +92,7 @@ func (o *createControlPlaneOptions) run() error {
 			Name: o.name,
 			Labels: map[string]string{
 				constants.VersionLabel: constants.Version,
-				constants.ProjectLabel: o.project,
+				constants.ProjectLabel: o.projectFlags.Project,
 			},
 		},
 	}
