@@ -26,28 +26,23 @@ import (
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	computil "k8s.io/kubectl/pkg/util/completion"
 )
 
 // deleteClusterOptions defines a set of options that are required to delete
 // a cluster.
 type deleteClusterOptions struct {
-	// project defines the project to delete the cluster from.
-	project string
+	// controlPlaneFlags define control plane scoping.
+	controlPlaneFlags flags.ControlPlaneFlags
 
-	// controlPlane defines the control plane name that the cluster will
-	// be deleted from.
-	controlPlane string
+	// deleteFlags define common deletion options.
+	deleteFlags flags.DeleteFlags
 
 	// names are the names of the clusters.
 	names []string
-
-	// all removes all resource that match the query.
-	all bool
 
 	// client gives access to our custom resources.
 	client unikorn.Interface
@@ -55,13 +50,14 @@ type deleteClusterOptions struct {
 
 // addFlags registers delete cluster options flags with the specified cobra command.
 func (o *deleteClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
-	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to deprovision the cluster from.", completion.ControlPlanesCompletionFunc(f, &o.project))
-	cmd.Flags().BoolVar(&o.all, "all", false, "Select all clusters that match the query.")
+	o.controlPlaneFlags.AddFlags(f, cmd)
+	o.deleteFlags.AddFlags(f, cmd)
 }
 
+// completeNames either sets the names explcitly via the CLI or implicitly if --all
+// is specified.
 func (o *deleteClusterOptions) completeNames(args []string) error {
-	if !o.all {
+	if !o.deleteFlags.All {
 		if len(args) == 0 {
 			return errors.ErrIncorrectArgumentNum
 		}
@@ -71,7 +67,7 @@ func (o *deleteClusterOptions) completeNames(args []string) error {
 		return nil
 	}
 
-	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
+	namespace, err := o.controlPlaneFlags.GetControlPlaneNamespace(context.TODO(), o.client)
 	if err != nil {
 		return err
 	}
@@ -115,7 +111,7 @@ func (o *deleteClusterOptions) complete(f cmdutil.Factory, args []string) error 
 // validate validates any tainted input not handled by complete() or flags
 // processing.
 func (o *deleteClusterOptions) validate() error {
-	if !o.all && len(o.names) == 0 {
+	if !o.deleteFlags.All && len(o.names) == 0 {
 		return fmt.Errorf(`%w: resource names or --all must be specified`, errors.ErrInvalidName)
 	}
 
@@ -124,7 +120,7 @@ func (o *deleteClusterOptions) validate() error {
 
 // run executes the command.
 func (o *deleteClusterOptions) run() error {
-	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
+	namespace, err := o.controlPlaneFlags.GetControlPlaneNamespace(context.TODO(), o.client)
 	if err != nil {
 		return err
 	}
@@ -157,7 +153,7 @@ func newDeleteClusterCommand(f cmdutil.Factory) *cobra.Command {
 		Short:             "Delete a Kubernetes cluster",
 		Long:              "Delete a Kubernetes cluster",
 		Example:           deleteClusterExamples,
-		ValidArgsFunction: completion.ClustersCompletionFunc(f, &o.project, &o.controlPlane),
+		ValidArgsFunction: o.controlPlaneFlags.CompleteCluster(f),
 		Aliases: []string{
 			"clusters",
 			"cl",

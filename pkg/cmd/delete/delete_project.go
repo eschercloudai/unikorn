@@ -26,6 +26,7 @@ import (
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -34,23 +35,25 @@ import (
 )
 
 type deleteProjectOptions struct {
+	// deleteFlags define common deletion options.
+	deleteFlags flags.DeleteFlags
+
 	// name allows explicit filtering of control plane namespaces.
 	names []string
-
-	// all removes all resource that match the query.
-	all bool
 
 	// client is a typed client for our custom resources.
 	client unikorn.Interface
 }
 
 // addFlags registers create cluster options flags with the specified cobra command.
-func (o *deleteProjectOptions) addFlags(_ cmdutil.Factory, cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&o.all, "all", false, "Select all projects.")
+func (o *deleteProjectOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
+	o.deleteFlags.AddFlags(f, cmd)
 }
 
+// completeNames either sets the names explcitly via the CLI or implicitly if --all
+// is specified.
 func (o *deleteProjectOptions) completeNames(args []string) error {
-	if !o.all {
+	if !o.deleteFlags.All {
 		if len(args) == 0 {
 			return errors.ErrIncorrectArgumentNum
 		}
@@ -95,7 +98,7 @@ func (o *deleteProjectOptions) complete(f cmdutil.Factory, args []string) error 
 // validate validates any tainted input not handled by complete() or flags
 // processing.
 func (o *deleteProjectOptions) validate() error {
-	if !o.all && len(o.names) == 0 {
+	if !o.deleteFlags.All && len(o.names) == 0 {
 		return fmt.Errorf(`%w: resource names or --all must be specified`, errors.ErrInvalidName)
 	}
 

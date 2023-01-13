@@ -24,21 +24,16 @@ import (
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	computil "k8s.io/kubectl/pkg/util/completion"
 )
 
 // getClusterOptions defines a set of options that are required to get
 // a cluster.
 type getClusterOptions struct {
-	// project defines the project to the control plane is under.
-	project string
-
-	// controlPlane defines the control plane name that the cluster will
-	// be searched for in.
-	controlPlane string
+	// controlPlaneFlags define control plane scoping.
+	controlPlaneFlags flags.ControlPlaneFlags
 
 	// names is an explicit set of resource names to get.
 	names []string
@@ -61,9 +56,7 @@ func newGetClusterOptions() *getClusterOptions {
 
 // addFlags registers get cluster options flags with the specified cobra command.
 func (o *getClusterOptions) addFlags(cmd *cobra.Command, f cmdutil.Factory) {
-	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
-	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to the cluster is in.", completion.ControlPlanesCompletionFunc(f, &o.project))
-
+	o.controlPlaneFlags.AddFlags(f, cmd)
 	o.getPrintFlags.addFlags(cmd)
 }
 
@@ -89,7 +82,7 @@ func (o *getClusterOptions) complete(f cmdutil.Factory, args []string) error {
 
 // run executes the command.
 func (o *getClusterOptions) run() error {
-	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
+	namespace, err := o.controlPlaneFlags.GetControlPlaneNamespace(context.TODO(), o.client)
 	if err != nil {
 		return err
 	}
@@ -139,7 +132,7 @@ func newGetClusterCommand(f cmdutil.Factory) *cobra.Command {
 		Short:             "Get or list Kubernetes clusters",
 		Long:              "Get or list Kubernetes clusters",
 		Example:           getClusterExamples,
-		ValidArgsFunction: completion.ClustersCompletionFunc(f, &o.project, &o.controlPlane),
+		ValidArgsFunction: o.controlPlaneFlags.CompleteCluster(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.run())

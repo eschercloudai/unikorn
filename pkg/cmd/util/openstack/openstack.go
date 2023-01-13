@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package openstack
 
 import (
 	"github.com/gophercloud/gophercloud"
@@ -22,9 +22,9 @@ import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 )
 
-// openstackProviderClient abstracts away a load of cruft when using gophercloud.
+// providerClient abstracts away a load of cruft when using gophercloud.
 // The provider client is used directly with each service.
-func openstackProviderClient(cloud string) (*gophercloud.ProviderClient, error) {
+func providerClient(cloud string) (*gophercloud.ProviderClient, error) {
 	clientOpts := &clientconfig.ClientOpts{
 		Cloud: cloud,
 	}
@@ -42,9 +42,9 @@ func openstackProviderClient(cloud string) (*gophercloud.ProviderClient, error) 
 	return provider, nil
 }
 
-// OpenstackComputeClient provides a simple one-liner to start computing.
-func OpenstackComputeClient(cloud string) (*gophercloud.ServiceClient, error) {
-	provider, err := openstackProviderClient(cloud)
+// ComputeClient provides a simple one-liner to start computing.
+func ComputeClient(cloud string) (*gophercloud.ServiceClient, error) {
+	provider, err := providerClient(cloud)
 	if err != nil {
 		return nil, err
 	}
@@ -52,9 +52,9 @@ func OpenstackComputeClient(cloud string) (*gophercloud.ServiceClient, error) {
 	return openstack.NewComputeV2(provider, gophercloud.EndpointOpts{})
 }
 
-// OpenstackNetworkClient provides a simple one-liner to start networking.
-func OpenstackNetworkClient(cloud string) (*gophercloud.ServiceClient, error) {
-	provider, err := openstackProviderClient(cloud)
+// NetworkClient provides a simple one-liner to start networking.
+func NetworkClient(cloud string) (*gophercloud.ServiceClient, error) {
+	provider, err := providerClient(cloud)
 	if err != nil {
 		return nil, err
 	}

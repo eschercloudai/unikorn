@@ -32,11 +32,11 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	computil "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"sigs.k8s.io/yaml"
@@ -74,12 +74,8 @@ var (
 // createClusterOptions defines a set of options that are required to create
 // a cluster.
 type createClusterOptions struct {
-	// project defines the project to create the cluster under.
-	project string
-
-	// controlPlane defines the control plane name that the cluster will
-	// be provisioned with.
-	controlPlane string
+	// controlPlaneFlags define control plane scoping.
+	controlPlaneFlags flags.ControlPlaneFlags
 
 	// name is the name of the cluster.
 	name string
@@ -96,7 +92,7 @@ type createClusterOptions struct {
 	caCert []byte
 
 	// version defines the Kubernetes version to install.
-	version util.SemverFlag
+	version flags.SemverFlag
 
 	// externalNetworkID is an internet facing Openstack network to provision
 	// VIPs on for load balancers and stuff.
@@ -126,7 +122,7 @@ type createClusterOptions struct {
 	replicas int
 
 	// diskSize defines the persistent volume size to provision with.
-	diskSize util.QuantityFlag
+	diskSize flags.QuantityFlag
 
 	// region is the OpenStack region the cluster exists in.
 	region string
@@ -147,33 +143,31 @@ type createClusterOptions struct {
 
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	// Unikorn options.
-	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
-	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to provision the cluster in.", completion.ControlPlanesCompletionFunc(f, &o.project))
+	o.controlPlaneFlags.AddFlags(f, cmd)
 
 	// Openstack configuration options.
-	util.RequiredStringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)
+	flags.RequiredStringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)
 
 	// Kubernetes options.
-	util.RequiredVar(cmd, &o.version, "kubernetes-version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --control-plane-image and --workload-image flags.")
+	flags.RequiredVar(cmd, &o.version, "kubernetes-version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --control-plane-image and --workload-image flags.")
 
 	// Networking options.
-	util.RequiredStringVarWithCompletion(cmd, &o.externalNetworkID, "external-network", "", "Openstack external network (see: 'openstack network list --external'.)", completion.OpenstackExternalNetworkCompletionFunc(&o.cloud))
+	flags.RequiredStringVarWithCompletion(cmd, &o.externalNetworkID, "external-network", "", "Openstack external network (see: 'openstack network list --external'.)", completion.OpenstackExternalNetworkCompletionFunc(&o.cloud))
 	cmd.Flags().IPNetVar(&o.nodeNetwork, "node-network", defaultNodeNetwork, "Node network prefix.")
 	cmd.Flags().IPNetVar(&o.podNetwork, "pod-network", defaultPodNetwork, "Pod network prefix.")
 	cmd.Flags().IPNetVar(&o.serviceNetwork, "service-network", defaultServiceNetwork, "Service network prefix.")
 	cmd.Flags().IPSliceVar(&o.dnsNameservers, "dns-nameservers", defaultDNSNameservers, "DNS nameservers for pods.")
 
 	// Kubernetes control plane options.
-	util.RequiredStringVarWithCompletion(cmd, &o.flavor, "flavor", "", "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
+	flags.RequiredStringVarWithCompletion(cmd, &o.flavor, "flavor", "", "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
 	cmd.Flags().IntVar(&o.replicas, "replicas", defaultControlPlaneReplicas, "Kubernetes control plane replicas.")
 	cmd.Flags().Var(&o.diskSize, "disk-size", "Kubernetes control plane disk size, defaults to that of the machine flavor.")
 
 	// Openstack provisioning options.
-	util.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Kubernetes Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
-	util.RequiredStringVar(cmd, &o.region, "region", "", "Openstack region to provision into.")
-	util.RequiredStringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
-	util.RequiredStringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
+	flags.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Kubernetes Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
+	flags.RequiredStringVar(cmd, &o.region, "region", "", "Openstack region to provision into.")
+	flags.RequiredStringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
+	flags.RequiredStringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -264,7 +258,7 @@ func (o *createClusterOptions) validate() error {
 
 // run executes the command.
 func (o *createClusterOptions) run() error {
-	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
+	namespace, err := o.controlPlaneFlags.GetControlPlaneNamespace(context.TODO(), o.client)
 	if err != nil {
 		return err
 	}
@@ -276,8 +270,8 @@ func (o *createClusterOptions) run() error {
 			Name: o.name,
 			Labels: map[string]string{
 				constants.VersionLabel:      constants.Version,
-				constants.ProjectLabel:      o.project,
-				constants.ControlPlaneLabel: o.controlPlane,
+				constants.ProjectLabel:      o.controlPlaneFlags.Project,
+				constants.ControlPlaneLabel: o.controlPlaneFlags.ControlPlane,
 			},
 		},
 		Spec: unikornv1alpha1.KubernetesClusterSpec{

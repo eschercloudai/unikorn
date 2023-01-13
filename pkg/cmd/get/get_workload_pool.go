@@ -24,27 +24,19 @@ import (
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	computil "k8s.io/kubectl/pkg/util/completion"
 )
 
 // getWorkloadPoolOptions defines a set of options that are required to get
 // a workload pool.
 type getWorkloadPoolOptions struct {
-	// project defines the project to the resource is under.
-	project string
-
-	// controlPlane defines the control plane name that the resource will
-	// be searched for in.
-	controlPlane string
-
-	// cluster defines the workload pool name that the resource is associated with.
-	cluster string
+	// clusterFlags define cluster scoping.
+	clusterFlags flags.ClusterFlags
 
 	// names is an explicit set of resource names to get.
 	names []string
@@ -67,10 +59,7 @@ func newGetWorkloadPoolOptions() *getWorkloadPoolOptions {
 
 // addFlags registers get workload pool options flags with the specified cobra command.
 func (o *getWorkloadPoolOptions) addFlags(cmd *cobra.Command, f cmdutil.Factory) {
-	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
-	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to the workload pool is in.", completion.ControlPlanesCompletionFunc(f, &o.project))
-	util.StringVarWithCompletion(cmd, &o.cluster, "cluster", "", "Control plane to the workload pool is in.", completion.ClustersCompletionFunc(f, &o.project, &o.controlPlane))
-
+	o.clusterFlags.AddFlags(f, cmd)
 	o.getPrintFlags.addFlags(cmd)
 }
 
@@ -96,15 +85,15 @@ func (o *getWorkloadPoolOptions) complete(f cmdutil.Factory, args []string) erro
 
 // run executes the command.
 func (o *getWorkloadPoolOptions) run() error {
-	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
+	namespace, err := o.clusterFlags.GetControlPlaneNamespace(context.TODO(), o.client)
 	if err != nil {
 		return err
 	}
 
 	selector := labels.Everything()
 
-	if o.cluster != "" {
-		clusterLabel, err := labels.NewRequirement(constants.KubernetesClusterLabel, selection.Equals, []string{o.cluster})
+	if o.clusterFlags.Project != "" {
+		clusterLabel, err := labels.NewRequirement(constants.KubernetesClusterLabel, selection.Equals, []string{o.clusterFlags.Project})
 		if err != nil {
 			return err
 		}
@@ -161,7 +150,7 @@ func newGetWorkloadPoolCommand(f cmdutil.Factory) *cobra.Command {
 		Short:             "Get or list Kubernetes workload pools",
 		Long:              "Get or list Kubernetes workload pools",
 		Example:           getWorkloadPoolExamples,
-		ValidArgsFunction: completion.WorkloadPoolsCompletionFunc(f, &o.project, &o.controlPlane, &o.cluster),
+		ValidArgsFunction: o.clusterFlags.CompleteWorkloadPool(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.run())

@@ -26,15 +26,14 @@ import (
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
-	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	computil "k8s.io/kubectl/pkg/util/completion"
 )
 
 type getControlPlaneOptions struct {
-	// project allows scoping of control plane searching.
-	project string
+	// projectFlags defines project scoping.
+	projectFlags flags.ProjectFlags
 
 	// name allows explicit filtering of control plane namespaces.
 	names []string
@@ -58,16 +57,7 @@ func newGetControlPlaneOptions() *getControlPlaneOptions {
 
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *getControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.project, "project", "", "Kubernetes project name that contains the control plane.")
-
-	if err := cmd.MarkFlagRequired("project"); err != nil {
-		panic(err)
-	}
-
-	if err := cmd.RegisterFlagCompletionFunc("project", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)); err != nil {
-		panic(err)
-	}
-
+	o.projectFlags.AddFlags(f, cmd)
 	o.getPrintFlags.addFlags(cmd)
 }
 
@@ -102,8 +92,8 @@ func (o *getControlPlaneOptions) validate() error {
 		}
 	}
 
-	if len(o.project) == 0 {
-		return fmt.Errorf(`%w: "%s"`, errors.ErrInvalidName, o.project)
+	if len(o.projectFlags.Project) == 0 {
+		return fmt.Errorf(`%w: "%s"`, errors.ErrInvalidName, o.projectFlags.Project)
 	}
 
 	return nil
@@ -111,7 +101,7 @@ func (o *getControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *getControlPlaneOptions) run() error {
-	namespace, err := util.GetProjectNamespace(context.TODO(), o.client, o.project)
+	namespace, err := o.projectFlags.GetProjectNamespace(context.TODO(), o.client)
 	if err != nil {
 		return err
 	}
@@ -153,7 +143,7 @@ func newGetControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
 		Use:               "control-plane",
 		Short:             "Get or list Cluster API control planes",
 		Long:              "Get or list Cluster API control planes",
-		ValidArgsFunction: completion.ControlPlanesCompletionFunc(f, &o.project),
+		ValidArgsFunction: o.projectFlags.CompleteControlPlane(f),
 		Aliases: []string{
 			"control-planes",
 			"cp",

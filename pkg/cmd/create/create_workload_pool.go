@@ -27,11 +27,11 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	computil "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -42,12 +42,8 @@ const (
 // createWorkloadPoolOptions defines a set of options that are required to create
 // a cluster.
 type createWorkloadPoolOptions struct {
-	// project defines the project to create the cluster under.
-	project string
-
-	// controlPlane defines the control plane name that the cluster will
-	// be provisioned with.
-	controlPlane string
+	// clusterFlags define control plane scoping.
+	clusterFlags flags.ClusterFlags
 
 	// cluster is the cluster name this belongs to.
 	cluster string
@@ -60,7 +56,7 @@ type createWorkloadPoolOptions struct {
 	name string
 
 	// version defines the Kubernetes version to install.
-	version util.SemverFlag
+	version flags.SemverFlag
 
 	// image defines the Openstack image for Kubernetes nodes.
 	image string
@@ -72,7 +68,7 @@ type createWorkloadPoolOptions struct {
 	replicas int
 
 	// diskSize defines the persistent volume size to provision with.
-	diskSize util.QuantityFlag
+	diskSize flags.QuantityFlag
 
 	// availabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.
@@ -84,20 +80,18 @@ type createWorkloadPoolOptions struct {
 
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createWorkloadPoolOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	// Unikorn options.
-	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
-	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to provision the workload pool in.", completion.ControlPlanesCompletionFunc(f, &o.project))
-	util.RequiredStringVarWithCompletion(cmd, &o.cluster, "cluster", "", "Cluster to provision the workload pool for.", completion.ClustersCompletionFunc(f, &o.project, &o.controlPlane))
+	// TODO: make required.
+	o.clusterFlags.AddFlags(f, cmd)
 
 	// Openstack configuration options.
-	util.StringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)
+	flags.StringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)
 
 	// Kubernetes workload pool options.
-	util.RequiredVar(cmd, &o.version, "version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --image flag.")
-	util.RequiredStringVarWithCompletion(cmd, &o.flavor, "flavor", "", "Kubernetes workload Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
+	flags.RequiredVar(cmd, &o.version, "version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --image flag.")
+	flags.RequiredStringVarWithCompletion(cmd, &o.flavor, "flavor", "", "Kubernetes workload Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
 	cmd.Flags().IntVar(&o.replicas, "replicas", defaultWorkloadReplicas, "Number of workload replicas.")
-	util.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
-	util.StringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into. Will default to that specified for the control plane. (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
+	flags.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
+	flags.StringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into. Will default to that specified for the control plane. (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
 	cmd.Flags().Var(&o.diskSize, "disk-size", "Disk size, defaults to that of the machine flavor.")
 }
 
@@ -129,7 +123,7 @@ func (o *createWorkloadPoolOptions) validate() error {
 
 // run executes the command.
 func (o *createWorkloadPoolOptions) run() error {
-	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
+	namespace, err := o.clusterFlags.GetControlPlaneNamespace(context.TODO(), o.client)
 	if err != nil {
 		return err
 	}
@@ -143,8 +137,8 @@ func (o *createWorkloadPoolOptions) run() error {
 			Name: name,
 			Labels: map[string]string{
 				constants.VersionLabel:           constants.Version,
-				constants.ProjectLabel:           o.project,
-				constants.ControlPlaneLabel:      o.controlPlane,
+				constants.ProjectLabel:           o.clusterFlags.Project,
+				constants.ControlPlaneLabel:      o.clusterFlags.ControlPlane,
 				constants.KubernetesClusterLabel: o.cluster,
 			},
 		},
