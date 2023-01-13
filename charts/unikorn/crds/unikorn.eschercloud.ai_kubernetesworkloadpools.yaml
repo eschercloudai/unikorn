@@ -19,6 +19,9 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .metadata.labels.unikorn\.eschercloud\.ai/cluster
+      name: Cluster
+      type: string
     - jsonPath: .spec.version
       name: version
       type: string

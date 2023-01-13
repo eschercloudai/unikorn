@@ -27,23 +27,29 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	computil "k8s.io/kubectl/pkg/util/completion"
 )
 
-// deleteClusterOptions defines a set of options that are required to delete
-// a cluster.
-type deleteClusterOptions struct {
-	// project defines the project to delete the cluster from.
+// deleteWorkloadPoolOptions defines a set of options that are required to delete
+// a workload pool.
+type deleteWorkloadPoolOptions struct {
+	// project defines the project to delete the workload pool from.
 	project string
 
-	// controlPlane defines the control plane name that the cluster will
+	// controlPlane defines the control plane name that the workload pool will
 	// be deleted from.
 	controlPlane string
 
-	// names are the names of the clusters.
+	// cluster defines the workload pool name that the resource is associated with.
+	cluster string
+
+	// names are the name of the workload pools to delete.
 	names []string
 
 	// all removes all resource that match the query.
@@ -53,14 +59,15 @@ type deleteClusterOptions struct {
 	client unikorn.Interface
 }
 
-// addFlags registers delete cluster options flags with the specified cobra command.
-func (o *deleteClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
+// addFlags registers delete workload pool options flags with the specified cobra command.
+func (o *deleteWorkloadPoolOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
-	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to deprovision the cluster from.", completion.ControlPlanesCompletionFunc(f, &o.project))
-	cmd.Flags().BoolVar(&o.all, "all", false, "Select all clusters that match the query.")
+	util.RequiredStringVarWithCompletion(cmd, &o.controlPlane, "control-plane", "", "Control plane to deprovision the workload pool from.", completion.ControlPlanesCompletionFunc(f, &o.project))
+	util.StringVarWithCompletion(cmd, &o.cluster, "cluster", "", "Control plane to the workload pool is in.", completion.ClustersCompletionFunc(f, &o.project, &o.controlPlane))
+	cmd.Flags().BoolVar(&o.all, "all", false, "Select all workload pools that match the query.")
 }
 
-func (o *deleteClusterOptions) completeNames(args []string) error {
+func (o *deleteWorkloadPoolOptions) completeNames(args []string) error {
 	if !o.all {
 		if len(args) == 0 {
 			return errors.ErrIncorrectArgumentNum
@@ -76,7 +83,18 @@ func (o *deleteClusterOptions) completeNames(args []string) error {
 		return err
 	}
 
-	resources, err := o.client.UnikornV1alpha1().KubernetesClusters(namespace).List(context.TODO(), metav1.ListOptions{})
+	selector := labels.Everything()
+
+	if o.cluster != "" {
+		clusterLabel, err := labels.NewRequirement(constants.KubernetesClusterLabel, selection.Equals, []string{o.cluster})
+		if err != nil {
+			return err
+		}
+
+		selector = selector.Add(*clusterLabel)
+	}
+
+	resources, err := o.client.UnikornV1alpha1().KubernetesClusters(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
@@ -91,7 +109,7 @@ func (o *deleteClusterOptions) completeNames(args []string) error {
 }
 
 // complete fills in any options not does automatically by flag parsing.
-func (o *deleteClusterOptions) complete(f cmdutil.Factory, args []string) error {
+func (o *deleteWorkloadPoolOptions) complete(f cmdutil.Factory, args []string) error {
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
@@ -114,7 +132,7 @@ func (o *deleteClusterOptions) complete(f cmdutil.Factory, args []string) error 
 
 // validate validates any tainted input not handled by complete() or flags
 // processing.
-func (o *deleteClusterOptions) validate() error {
+func (o *deleteWorkloadPoolOptions) validate() error {
 	if !o.all && len(o.names) == 0 {
 		return fmt.Errorf(`%w: resource names or --all must be specified`, errors.ErrInvalidName)
 	}
@@ -123,18 +141,18 @@ func (o *deleteClusterOptions) validate() error {
 }
 
 // run executes the command.
-func (o *deleteClusterOptions) run() error {
+func (o *deleteWorkloadPoolOptions) run() error {
 	namespace, err := util.GetControlPlaneNamespace(context.TODO(), o.client, o.project, o.controlPlane)
 	if err != nil {
 		return err
 	}
 
 	for _, name := range o.names {
-		if err := o.client.UnikornV1alpha1().KubernetesClusters(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+		if err := o.client.UnikornV1alpha1().KubernetesWorkloadPools(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 
-		fmt.Printf("%s.%s/%s deleted\n", unikornv1alpha1.KubernetesClusterResource, unikornv1alpha1.GroupName, name)
+		fmt.Printf("%s.%s/%s deleted\n", unikornv1alpha1.KubernetesWorkloadPoolResource, unikornv1alpha1.GroupName, name)
 	}
 
 	return nil
@@ -142,25 +160,25 @@ func (o *deleteClusterOptions) run() error {
 
 var (
 	//nolint:gochecknoglobals
-	deleteClusterExamples = util.TemplatedExample(`
-        # Delete a Kubernetes cluster
-        {{.Application}} delete cluster --control-plane foo`)
+	deleteWorkloadPoolExamples = util.TemplatedExample(`
+        # Delete a Kubernetes workload pool
+        {{.Application}} delete workload pool --control-plane foo`)
 )
 
-// newDeleteClusterCommand creates a command that deletes a Kubenretes cluster in the
-// specified Cluster API control plane.
-func newDeleteClusterCommand(f cmdutil.Factory) *cobra.Command {
-	o := &deleteClusterOptions{}
+// newDeleteWorkloadPoolCommand creates a command that deletes a Kubenretes workload pool in the
+// specified WorkloadPool API control plane.
+func newDeleteWorkloadPoolCommand(f cmdutil.Factory) *cobra.Command {
+	o := &deleteWorkloadPoolOptions{}
 
 	cmd := &cobra.Command{
-		Use:               "cluster",
-		Short:             "Delete a Kubernetes cluster",
-		Long:              "Delete a Kubernetes cluster",
-		Example:           deleteClusterExamples,
-		ValidArgsFunction: completion.ClustersCompletionFunc(f, &o.project, &o.controlPlane),
+		Use:               "workload pool",
+		Short:             "Delete a Kubernetes workload pool",
+		Long:              "Delete a Kubernetes workload pool",
+		Example:           deleteWorkloadPoolExamples,
+		ValidArgsFunction: completion.WorkloadPoolsCompletionFunc(f, &o.project, &o.controlPlane, &o.cluster),
 		Aliases: []string{
-			"clusters",
-			"cl",
+			"workload-pools",
+			"wp",
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))

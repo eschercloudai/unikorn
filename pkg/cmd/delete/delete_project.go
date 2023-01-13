@@ -18,6 +18,7 @@ package delete
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -36,8 +37,41 @@ type deleteProjectOptions struct {
 	// name allows explicit filtering of control plane namespaces.
 	names []string
 
-	// unikornClient is a typed client for our custom resources.
-	unikornClient unikorn.Interface
+	// all removes all resource that match the query.
+	all bool
+
+	// client is a typed client for our custom resources.
+	client unikorn.Interface
+}
+
+// addFlags registers create cluster options flags with the specified cobra command.
+func (o *deleteProjectOptions) addFlags(_ cmdutil.Factory, cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&o.all, "all", false, "Select all projects.")
+}
+
+func (o *deleteProjectOptions) completeNames(args []string) error {
+	if !o.all {
+		if len(args) == 0 {
+			return errors.ErrIncorrectArgumentNum
+		}
+
+		o.names = args
+
+		return nil
+	}
+
+	resources, err := o.client.UnikornV1alpha1().Projects().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	o.names = make([]string, len(resources.Items))
+
+	for i, resource := range resources.Items {
+		o.names[i] = resource.Name
+	}
+
+	return nil
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -47,15 +81,13 @@ func (o *deleteProjectOptions) complete(f cmdutil.Factory, args []string) error 
 		return err
 	}
 
-	if o.unikornClient, err = unikorn.NewForConfig(config); err != nil {
+	if o.client, err = unikorn.NewForConfig(config); err != nil {
 		return err
 	}
 
-	if len(args) != 1 {
-		return errors.ErrIncorrectArgumentNum
+	if err := o.completeNames(args); err != nil {
+		return err
 	}
-
-	o.names = args
 
 	return nil
 }
@@ -63,10 +95,8 @@ func (o *deleteProjectOptions) complete(f cmdutil.Factory, args []string) error 
 // validate validates any tainted input not handled by complete() or flags
 // processing.
 func (o *deleteProjectOptions) validate() error {
-	for _, name := range o.names {
-		if len(name) == 0 {
-			return errors.ErrInvalidName
-		}
+	if !o.all && len(o.names) == 0 {
+		return fmt.Errorf(`%w: resource names or --all must be specified`, errors.ErrInvalidName)
 	}
 
 	return nil
@@ -75,9 +105,11 @@ func (o *deleteProjectOptions) validate() error {
 // run executes the command.
 func (o *deleteProjectOptions) run() error {
 	for _, name := range o.names {
-		if err := o.unikornClient.UnikornV1alpha1().Projects().Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+		if err := o.client.UnikornV1alpha1().Projects().Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 			return err
 		}
+
+		fmt.Printf("%s.%s/%s deleted\n", unikornv1alpha1.ProjectResource, unikornv1alpha1.GroupName, name)
 	}
 
 	return nil
@@ -112,12 +144,18 @@ func newDeleteProjectCommand(f cmdutil.Factory) *cobra.Command {
 		Long:              deleteProjectLong,
 		Example:           deleteProjectExample,
 		ValidArgsFunction: completion.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource),
+		Aliases: []string{
+			"projects",
+			"pr",
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())
 			util.AssertNilError(o.run())
 		},
 	}
+
+	o.addFlags(f, cmd)
 
 	return cmd
 }

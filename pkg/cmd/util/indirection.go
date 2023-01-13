@@ -22,8 +22,11 @@ import (
 	"fmt"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 var (
@@ -75,4 +78,36 @@ func GetControlPlaneNamespace(ctx context.Context, client unikorn.Interface, pro
 	}
 
 	return namespace, nil
+}
+
+// GetClusterWorkloadPools gets workload pools linked to a cluster in a project's control plane.
+func GetClusterWorkloadPools(ctx context.Context, client unikorn.Interface, project, controlPlane, cluster string) ([]string, error) {
+	namespace, err := GetControlPlaneNamespace(ctx, client, project, controlPlane)
+	if err != nil {
+		return nil, err
+	}
+
+	selector := labels.Everything()
+
+	if cluster != "" {
+		clusterLabel, err := labels.NewRequirement(constants.KubernetesClusterLabel, selection.Equals, []string{cluster})
+		if err != nil {
+			return nil, err
+		}
+
+		selector = selector.Add(*clusterLabel)
+	}
+
+	pools, err := client.UnikornV1alpha1().KubernetesWorkloadPools(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, len(pools.Items))
+
+	for i, pool := range pools.Items {
+		names[i] = pool.Name
+	}
+
+	return names, nil
 }

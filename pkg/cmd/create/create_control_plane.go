@@ -18,6 +18,7 @@ package create
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -107,6 +108,8 @@ func (o *createControlPlaneOptions) run() error {
 	if _, err := o.client.UnikornV1alpha1().ControlPlanes(namespace).Create(context.TODO(), controlPlane, metav1.CreateOptions{}); err != nil {
 		return err
 	}
+
+	fmt.Printf("%s.%s/%s created\n", unikornv1alpha1.ControlPlaneResource, unikornv1alpha1.GroupName, o.name)
 
 	return nil
 }

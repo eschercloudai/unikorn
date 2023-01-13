@@ -18,6 +18,7 @@ package create
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -94,6 +95,8 @@ func (o *createProjectOptions) run() error {
 	if _, err := o.unikornClient.UnikornV1alpha1().Projects().Create(context.TODO(), project, metav1.CreateOptions{}); err != nil {
 		return err
 	}
+
+	fmt.Printf("%s.%s/%s created\n", unikornv1alpha1.ProjectResource, unikornv1alpha1.GroupName, o.name)
 
 	return nil
 }

@@ -18,6 +18,7 @@ package create
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -133,11 +134,13 @@ func (o *createWorkloadPoolOptions) run() error {
 		return err
 	}
 
+	name := o.cluster + "-" + o.name
+
 	version := unikornv1alpha1.SemanticVersion(o.version.Semver)
 
 	workloadPool := &unikornv1alpha1.KubernetesWorkloadPool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: o.cluster + "-" + o.name,
+			Name: name,
 			Labels: map[string]string{
 				constants.VersionLabel:           constants.Version,
 				constants.ProjectLabel:           o.project,
@@ -160,6 +163,8 @@ func (o *createWorkloadPoolOptions) run() error {
 	if _, err := o.client.UnikornV1alpha1().KubernetesWorkloadPools(namespace).Create(context.TODO(), workloadPool, metav1.CreateOptions{}); err != nil {
 		return err
 	}
+
+	fmt.Printf("%s.%s/%s created\n", unikornv1alpha1.KubernetesWorkloadPoolResource, unikornv1alpha1.GroupName, name)
 
 	return nil
 }

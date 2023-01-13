@@ -36,23 +36,49 @@ import (
 type deleteControlPlaneOptions struct {
 	project string
 
-	name string
+	names []string
 
-	// unikornClient gives access to our custom resources.
-	unikornClient unikorn.Interface
+	// all removes all resource that match the query.
+	all bool
+
+	// client gives access to our custom resources.
+	client unikorn.Interface
 }
 
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *deleteControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.project, "project", "", "Kubernetes project name that contains the control plane.")
+	util.RequiredStringVarWithCompletion(cmd, &o.project, "project", "", "Kubernetes project name that contains the control plane.", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource))
+	cmd.Flags().BoolVar(&o.all, "all", false, "Select all control planes that match the query.")
+}
 
-	if err := cmd.MarkFlagRequired("project"); err != nil {
-		panic(err)
+func (o *deleteControlPlaneOptions) completeNames(args []string) error {
+	if !o.all {
+		if len(args) == 0 {
+			return errors.ErrIncorrectArgumentNum
+		}
+
+		o.names = args
+
+		return nil
 	}
 
-	if err := cmd.RegisterFlagCompletionFunc("project", computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)); err != nil {
-		panic(err)
+	namespace, err := util.GetProjectNamespace(context.TODO(), o.client, o.project)
+	if err != nil {
+		return err
 	}
+
+	resources, err := o.client.UnikornV1alpha1().ControlPlanes(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	o.names = make([]string, len(resources.Items))
+
+	for i, resource := range resources.Items {
+		o.names[i] = resource.Name
+	}
+
+	return nil
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -64,15 +90,13 @@ func (o *deleteControlPlaneOptions) complete(f cmdutil.Factory, args []string) e
 		return err
 	}
 
-	if o.unikornClient, err = unikorn.NewForConfig(config); err != nil {
+	if o.client, err = unikorn.NewForConfig(config); err != nil {
 		return err
 	}
 
-	if len(args) != 1 {
-		return errors.ErrIncorrectArgumentNum
+	if err := o.completeNames(args); err != nil {
+		return err
 	}
-
-	o.name = args[0]
 
 	return nil
 }
@@ -80,12 +104,8 @@ func (o *deleteControlPlaneOptions) complete(f cmdutil.Factory, args []string) e
 // validate validates any tainted input not handled by complete() or flags
 // processing.
 func (o *deleteControlPlaneOptions) validate() error {
-	if len(o.name) == 0 {
-		return fmt.Errorf(`%w: "%s"`, errors.ErrInvalidName, o.name)
-	}
-
-	if len(o.project) == 0 {
-		return fmt.Errorf(`%w: "%s"`, errors.ErrInvalidName, o.project)
+	if !o.all && len(o.names) == 0 {
+		return fmt.Errorf(`%w: resource names or --all must be specified`, errors.ErrInvalidName)
 	}
 
 	return nil
@@ -93,13 +113,17 @@ func (o *deleteControlPlaneOptions) validate() error {
 
 // run executes the command.
 func (o *deleteControlPlaneOptions) run() error {
-	namespace, err := util.GetProjectNamespace(context.TODO(), o.unikornClient, o.project)
+	namespace, err := util.GetProjectNamespace(context.TODO(), o.client, o.project)
 	if err != nil {
 		return err
 	}
 
-	if err := o.unikornClient.UnikornV1alpha1().ControlPlanes(namespace).Delete(context.TODO(), o.name, metav1.DeleteOptions{}); err != nil {
-		return err
+	for _, name := range o.names {
+		if err := o.client.UnikornV1alpha1().ControlPlanes(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+
+		fmt.Printf("%s.%s/%s deleted\n", unikornv1alpha1.ControlPlaneResource, unikornv1alpha1.GroupName, name)
 	}
 
 	return nil
@@ -111,8 +135,8 @@ func newDeleteControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:               "control-plane",
-		Short:             "Delete a Kubernetes cluster",
-		Long:              "Delete a Kubernetes cluster",
+		Short:             "Delete a control plane",
+		Long:              "Delete a control plane",
 		ValidArgsFunction: completion.ControlPlanesCompletionFunc(f, &o.project),
 		Aliases: []string{
 			"control-planes",
