@@ -97,10 +97,6 @@ func (o *deleteClusterOptions) complete(f cmdutil.Factory, args []string) error 
 		return err
 	}
 
-	if len(args) != 1 {
-		return errors.ErrIncorrectArgumentNum
-	}
-
 	if err := o.completeNames(args); err != nil {
 		return err
 	}

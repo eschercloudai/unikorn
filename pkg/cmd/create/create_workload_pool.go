@@ -19,6 +19,7 @@ package create
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -28,8 +29,10 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
+	"github.com/eschercloudai/unikorn/pkg/cmd/util/openstack"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -37,6 +40,8 @@ import (
 
 const (
 	defaultWorkloadReplicas = 3
+
+	nvidiaGPUType = "nvidia.com/gpu"
 )
 
 // createWorkloadPoolOptions defines a set of options that are required to create
@@ -44,9 +49,6 @@ const (
 type createWorkloadPoolOptions struct {
 	// clusterFlags define control plane scoping.
 	clusterFlags flags.ClusterFlags
-
-	// cluster is the cluster name this belongs to.
-	cluster string
 
 	// cloud indicates the clouds.yaml key to use.  If only one exists it
 	// will default to that, otherwise it's a required parameter.
@@ -74,13 +76,22 @@ type createWorkloadPoolOptions struct {
 	// cluster will be provisioned in.
 	availabilityZone string
 
+	// autoscaling allows the cluster to determine its own destiny, not the
+	// user.
+	autoscaling bool
+
+	// minimumReplicas defines the minimum pool size for auto scaling.
+	minimumReplicas int
+
+	// maximumReplicas defines the maximum pool size for auto scaling.
+	maximumReplicas int
+
 	// client gives access to our custom resources.
 	client unikorn.Interface
 }
 
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createWorkloadPoolOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
-	// TODO: make required.
 	o.clusterFlags.AddFlags(f, cmd)
 
 	// Openstack configuration options.
@@ -93,6 +104,11 @@ func (o *createWorkloadPoolOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 	flags.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
 	flags.StringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into. Will default to that specified for the control plane. (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
 	cmd.Flags().Var(&o.diskSize, "disk-size", "Disk size, defaults to that of the machine flavor.")
+
+	// Feature enablement.
+	cmd.Flags().BoolVar(&o.autoscaling, "enable-autoscaling", false, "Enables workload pool auto-scaling. To function, you must enable autoscaling on the cluster.")
+	cmd.Flags().IntVar(&o.minimumReplicas, "minimum-replicas", 3, "Set the minimum number of auto-scaling replicas.")
+	cmd.Flags().IntVar(&o.maximumReplicas, "maximum-replicas", 10, "Set the maximum number of auto-scaling replicas.")
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -121,6 +137,58 @@ func (o *createWorkloadPoolOptions) validate() error {
 	return nil
 }
 
+// applyAutoscaling adds any autoscaling configuration to the cluster.
+func (o *createWorkloadPoolOptions) applyAutoscaling(workloadPool *unikornv1alpha1.KubernetesWorkloadPool) error {
+	if !o.autoscaling {
+		return nil
+	}
+
+	compute, err := openstack.NewComputeClient(o.cloud)
+	if err != nil {
+		return err
+	}
+
+	flavor, err := compute.Flavor(o.flavor)
+	if err != nil {
+		return err
+	}
+
+	flavorExtraSpecs, err := compute.FlavorExtraSpecs(flavor)
+	if err != nil {
+		return err
+	}
+
+	memory, err := resource.ParseQuantity(fmt.Sprintf("%dMi", flavor.RAM))
+	if err != nil {
+		return err
+	}
+
+	workloadPool.Spec.Autoscaling = &unikornv1alpha1.MachineGenericAutoscaling{
+		MinimumReplicas: &o.minimumReplicas,
+		MaximumReplicas: &o.maximumReplicas,
+		Scheduler: &unikornv1alpha1.MachineGenericAutoscalingScheduler{
+			CPU:    &flavor.VCPUs,
+			Memory: &memory,
+		},
+	}
+
+	if value, ok := flavorExtraSpecs["resources:VGPU"]; ok {
+		gpuType := nvidiaGPUType
+
+		gpus, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+
+		workloadPool.Spec.Autoscaling.Scheduler.GPU = &unikornv1alpha1.MachineGenericAutoscalingSchedulerGPU{
+			Type:  &gpuType,
+			Count: &gpus,
+		}
+	}
+
+	return nil
+}
+
 // run executes the command.
 func (o *createWorkloadPoolOptions) run() error {
 	namespace, err := o.clusterFlags.GetControlPlaneNamespace(context.TODO(), o.client)
@@ -128,7 +196,7 @@ func (o *createWorkloadPoolOptions) run() error {
 		return err
 	}
 
-	name := o.cluster + "-" + o.name
+	name := o.clusterFlags.Cluster + "-" + o.name
 
 	version := unikornv1alpha1.SemanticVersion(o.version.Semver)
 
@@ -139,7 +207,7 @@ func (o *createWorkloadPoolOptions) run() error {
 				constants.VersionLabel:           constants.Version,
 				constants.ProjectLabel:           o.clusterFlags.Project,
 				constants.ControlPlaneLabel:      o.clusterFlags.ControlPlane,
-				constants.KubernetesClusterLabel: o.cluster,
+				constants.KubernetesClusterLabel: o.clusterFlags.Cluster,
 			},
 		},
 		Spec: unikornv1alpha1.KubernetesWorkloadPoolSpec{
@@ -152,6 +220,10 @@ func (o *createWorkloadPoolOptions) run() error {
 				DiskSize: o.diskSize.Quantity,
 			},
 		},
+	}
+
+	if err := o.applyAutoscaling(workloadPool); err != nil {
+		return err
 	}
 
 	if _, err := o.client.UnikornV1alpha1().KubernetesWorkloadPools(namespace).Create(context.TODO(), workloadPool, metav1.CreateOptions{}); err != nil {
@@ -185,7 +257,11 @@ var (
 // newCreateWorkloadPoolCommand creates a command that is able to provison a new Kubernetes
 // cluster with a Cluster API control plane.
 func newCreateWorkloadPoolCommand(f cmdutil.Factory) *cobra.Command {
-	o := createWorkloadPoolOptions{}
+	o := &createWorkloadPoolOptions{
+		clusterFlags: flags.ClusterFlags{
+			ClusterRequired: true,
+		},
+	}
 
 	cmd := &cobra.Command{
 		Use:     "workload-pool",

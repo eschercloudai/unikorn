@@ -55,10 +55,6 @@ func (o *deleteControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 // is specified.
 func (o *deleteControlPlaneOptions) completeNames(args []string) error {
 	if !o.deleteFlags.All {
-		if len(args) == 0 {
-			return errors.ErrIncorrectArgumentNum
-		}
-
 		o.names = args
 
 		return nil
@@ -133,7 +129,7 @@ func (o *deleteControlPlaneOptions) run() error {
 
 // newDeleteControlPlaneCommand creates a command that deletes a Cluster API control plane.
 func newDeleteControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
-	o := deleteControlPlaneOptions{}
+	o := &deleteControlPlaneOptions{}
 
 	cmd := &cobra.Command{
 		Use:               "control-plane",

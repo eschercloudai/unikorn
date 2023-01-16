@@ -190,6 +190,11 @@ func (c *KubernetesCluster) UpdateAvailableCondition(status corev1.ConditionStat
 	return c.UpdateCondition(KubernetesClusterConditionAvailable, status, reason, message)
 }
 
+// AutoscalingEnabled indicates whether cluster autoscaling is enabled for the cluster.
+func (c *KubernetesCluster) AutoscalingEnabled() bool {
+	return c.Spec.Features != nil && c.Spec.Features.Autoscaling != nil && *c.Spec.Features.Autoscaling
+}
+
 // GetName is the name passed down to Helm.
 func (w *KubernetesWorkloadPool) GetName() string {
 	if w.Spec.Name != nil {

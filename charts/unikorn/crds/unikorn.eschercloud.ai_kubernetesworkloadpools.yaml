@@ -64,7 +64,7 @@ spec:
                     minimum: 1
                     type: integer
                   minimumReplicas:
-                    description: MimumumReplicas defines the minimum number of replicas
+                    description: MinimumReplicas defines the minimum number of replicas
                       that this pool can be scaled down to.
                     minimum: 0
                     type: integer

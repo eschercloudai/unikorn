@@ -61,10 +61,6 @@ func (o *deleteWorkloadPoolOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 // is specified.
 func (o *deleteWorkloadPoolOptions) completeNames(args []string) error {
 	if !o.deleteFlags.All {
-		if len(args) == 0 {
-			return errors.ErrIncorrectArgumentNum
-		}
-
 		o.names = args
 
 		return nil
@@ -86,7 +82,7 @@ func (o *deleteWorkloadPoolOptions) completeNames(args []string) error {
 		selector = selector.Add(*clusterLabel)
 	}
 
-	resources, err := o.client.UnikornV1alpha1().KubernetesClusters(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	resources, err := o.client.UnikornV1alpha1().KubernetesWorkloadPools(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
@@ -109,10 +105,6 @@ func (o *deleteWorkloadPoolOptions) complete(f cmdutil.Factory, args []string) e
 
 	if o.client, err = unikorn.NewForConfig(config); err != nil {
 		return err
-	}
-
-	if len(args) != 1 {
-		return errors.ErrIncorrectArgumentNum
 	}
 
 	if err := o.completeNames(args); err != nil {

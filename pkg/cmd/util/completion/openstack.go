@@ -17,14 +17,8 @@ limitations under the License.
 package completion
 
 import (
-	"encoding/json"
 	"strings"
 
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/images"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/spf13/cobra"
 
@@ -49,59 +43,18 @@ func CloudCompletionFunc(cmd *cobra.Command, args []string, toComplete string) (
 	return matches, cobra.ShellCompDirectiveNoFileComp
 }
 
-// Network allows us to extend gophercloud to get access to more interesting
-// fields not available in the standard data types.
-type Network struct {
-	// Network is the gophercloud network type.  This needs to be a field,
-	// not an embedded type, lest its UnmarshalJSON function get promoted...
-	Network networks.Network
-
-	// External is the bit we care about, is it an external network ID?
-	External bool `json:"router:external"`
-}
-
-// UnmarshalJSON does magic quite frankly.  We unmarshal directly into the
-// gophercloud network type, easy peasy.  When un marshalling into our network
-// type, we need to define a temporary type to avoid an infinite loop...
-func (n *Network) UnmarshalJSON(b []byte) error {
-	if err := json.Unmarshal(b, &n.Network); err != nil {
-		return err
-	}
-
-	type tmp Network
-
-	var s struct {
-		tmp
-	}
-
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-
-	n.External = s.tmp.External
-
-	return nil
-}
-
 // OpenstackExternalNetworkCompletionFunc lists any matching external networks by ID.
 // Yes this isn't particularly human friendly, but the ID is the only unique identifier.
 // Names can alias which makes mapping from name to ID practically useless.
 func OpenstackExternalNetworkCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.NetworkClient(*cloud)
+		client, err := openstack.NewNetworkClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		// This sucks, you cannot directly query for external networks...
-		page, err := networks.List(client, &networks.ListOpts{}).AllPages()
+		results, err := client.ExternalNetworks()
 		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		var results []Network
-
-		if err := networks.ExtractNetworksInto(page, &results); err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
@@ -118,21 +71,14 @@ func OpenstackExternalNetworkCompletionFunc(cloud *string) func(*cobra.Command, 
 }
 
 // OpenstackSSHKeyCompletionFunc lists any matching ssh key pairs by name.
-//
-//nolint:dupl
 func OpenstackSSHKeyCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.ComputeClient(*cloud)
+		client, err := openstack.NewComputeClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		page, err := keypairs.List(client, &keypairs.ListOpts{}).AllPages()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		results, err := keypairs.ExtractKeyPairs(page)
+		results, err := client.KeyPairs()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -152,21 +98,14 @@ func OpenstackSSHKeyCompletionFunc(cloud *string) func(*cobra.Command, []string,
 }
 
 // OpenstackFlavorCompletionFunc lists any matching flavors by name.
-//
-//nolint:dupl
 func OpenstackFlavorCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.ComputeClient(*cloud)
+		client, err := openstack.NewComputeClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		page, err := flavors.ListDetail(client, &flavors.ListOpts{}).AllPages()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		results, err := flavors.ExtractFlavors(page)
+		results, err := client.Flavors()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -184,21 +123,14 @@ func OpenstackFlavorCompletionFunc(cloud *string) func(*cobra.Command, []string,
 }
 
 // OpenstackImageCompletionFunc lists any matching images by name.
-//
-//nolint:dupl
 func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.ComputeClient(*cloud)
+		client, err := openstack.NewComputeClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		page, err := images.ListDetail(client, &images.ListOpts{}).AllPages()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		results, err := images.ExtractImages(page)
+		results, err := client.Images()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -218,17 +150,12 @@ func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, 
 // OpenstackAvailabilityZoneCompletionFunc lists any matching availability zones by name.
 func OpenstackAvailabilityZoneCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.ComputeClient(*cloud)
+		client, err := openstack.NewComputeClient(*cloud)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		page, err := availabilityzones.List(client).AllPages()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		results, err := availabilityzones.ExtractAvailabilityZones(page)
+		results, err := client.AvailabilityZones()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

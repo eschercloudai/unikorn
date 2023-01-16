@@ -54,10 +54,6 @@ func (o *deleteProjectOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 // is specified.
 func (o *deleteProjectOptions) completeNames(args []string) error {
 	if !o.deleteFlags.All {
-		if len(args) == 0 {
-			return errors.ErrIncorrectArgumentNum
-		}
-
 		o.names = args
 
 		return nil

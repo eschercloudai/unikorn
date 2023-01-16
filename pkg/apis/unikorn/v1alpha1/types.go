@@ -392,10 +392,10 @@ type File struct {
 
 // MachineGenericAutoscaling defines generic autoscaling configuration.
 type MachineGenericAutoscaling struct {
-	// MimumumReplicas defines the minimum number of replicas that
+	// MinimumReplicas defines the minimum number of replicas that
 	// this pool can be scaled down to.
 	// +kubebuilder:validation:Minimum=0
-	MimumumReplicas *int `json:"minimumReplicas"`
+	MinimumReplicas *int `json:"minimumReplicas"`
 	// MaximumReplicas defines the maximum numer of replicas that
 	// this pool can be scaled up to.
 	// +kubebuilder:validation:Minimum=1
@@ -500,9 +500,8 @@ type KubernetesClusterSpec struct {
 	ControlPlane *KubernetesClusterControlPlaneSpec `json:"controlPlane"`
 	// WorkloadPools defines the workload cluster topology.
 	WorkloadPools *KubernetesClusterWorkloadPoolsSpec `json:"workloadPools"`
-	// EnableAutoscaling , if specified, provisions a cluster autoscaler
-	// and allows workload pools to specify autoscaling configuration.
-	EnableAutoscaling *bool `json:"enableAutoscaling,omitempty"`
+	// Features defines add-on features that can be enabled for the cluster.
+	Features *KubernetesClusterFeaturesSpec `json:"features,omitempty"`
 }
 
 type KubernetesClusterOpenstackSpec struct {
@@ -549,6 +548,12 @@ type KubernetesClusterNetworkSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=1
 	DNSNameservers []IPv4Address `json:"dnsNameservers"`
+}
+
+type KubernetesClusterFeaturesSpec struct {
+	// Autoscaling , if true, provisions a cluster autoscaler
+	// and allows workload pools to specify autoscaling configuration.
+	Autoscaling *bool `json:"autoscaling,omitempty"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {
