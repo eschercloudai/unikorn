@@ -137,6 +137,10 @@ type createClusterOptions struct {
 	// then there are better ways of achieving this.
 	sshKeyName string
 
+	// autoscaling allows the cluster to determine its own destiny, not the
+	// user.
+	autoscaling bool
+
 	// client gives access to our custom resources.
 	client unikorn.Interface
 }
@@ -149,7 +153,7 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	flags.RequiredStringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)
 
 	// Kubernetes options.
-	flags.RequiredVar(cmd, &o.version, "kubernetes-version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --control-plane-image and --workload-image flags.")
+	flags.RequiredVar(cmd, &o.version, "version", "Kubernetes version to deploy.  Provisioning will be faster if this matches the version preloaded on images defined by the --control-plane-image and --workload-image flags.")
 
 	// Networking options.
 	flags.RequiredStringVarWithCompletion(cmd, &o.externalNetworkID, "external-network", "", "Openstack external network (see: 'openstack network list --external'.)", completion.OpenstackExternalNetworkCompletionFunc(&o.cloud))
@@ -168,6 +172,9 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	flags.RequiredStringVar(cmd, &o.region, "region", "", "Openstack region to provision into.")
 	flags.RequiredStringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
 	flags.RequiredStringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
+
+	// Feature enablement.
+	cmd.Flags().BoolVar(&o.autoscaling, "enable-autoscaling", false, "Enables cluster auto-scaling. To function, you must configure autoscaling on individual workload pools.")
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -306,6 +313,9 @@ func (o *createClusterOptions) run() error {
 					},
 				},
 			},
+			Features: &unikornv1alpha1.KubernetesClusterFeaturesSpec{
+				Autoscaling: &o.autoscaling,
+			},
 		},
 	}
 
@@ -342,7 +352,7 @@ var (
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes
 // cluster with a Cluster API control plane.
 func newCreateClusterCommand(f cmdutil.Factory) *cobra.Command {
-	o := createClusterOptions{}
+	o := &createClusterOptions{}
 
 	cmd := &cobra.Command{
 		Use:     "cluster",

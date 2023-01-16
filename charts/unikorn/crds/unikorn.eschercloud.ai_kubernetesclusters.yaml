@@ -112,10 +112,15 @@ spec:
                 - image
                 - version
                 type: object
-              enableAutoscaling:
-                description: EnableAutoscaling , if specified, provisions a cluster
-                  autoscaler and allows workload pools to specify autoscaling configuration.
-                type: boolean
+              features:
+                description: Features defines add-on features that can be enabled
+                  for the cluster.
+                properties:
+                  autoscaling:
+                    description: Autoscaling , if true, provisions a cluster autoscaler
+                      and allows workload pools to specify autoscaling configuration.
+                    type: boolean
+                type: object
               network:
                 description: Network defines the Kubernetes networking.
                 properties:

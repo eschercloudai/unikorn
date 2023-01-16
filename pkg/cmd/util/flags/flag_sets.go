@@ -199,13 +199,22 @@ type ClusterFlags struct {
 
 	// Cluster defines the cluster a resource belongs to.
 	Cluster string
+
+	// Indicates whether the cluster parameter is required by the CLI.
+	ClusterRequired bool
 }
 
 // AddFlags adds the flags to a cobra command.
 func (o *ClusterFlags) AddFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	o.ControlPlaneFlags.AddFlags(f, cmd)
 
-	StringVarWithCompletion(cmd, &o.Cluster, "cluster", "", "Cluster scope of a resource.", o.CompleteCluster(f))
+	registerFunc := StringVarWithCompletion
+
+	if o.ClusterRequired {
+		registerFunc = RequiredStringVarWithCompletion
+	}
+
+	registerFunc(cmd, &o.Cluster, "cluster", "", "Cluster scope of a resource.", o.CompleteCluster(f))
 }
 
 // CompleteWorkloadPool provides tab completion for the specified resource type.

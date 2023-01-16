@@ -160,11 +160,24 @@ func (p *Provisioner) getWorkloadPools(ctx context.Context) (*unikornv1alpha1.Ku
 func (p *Provisioner) generateWorkloadPoolHelmValues() map[string]interface{} {
 	workloadPools := map[string]interface{}{}
 
-	for _, workloadPool := range p.workloadPools.Items {
+	// Not necessary for the delete case.
+	// TODO: we should perhaps just set this in the New function to prevent
+	// future problems.
+	if p.workloadPools == nil {
+		return nil
+	}
+
+	for i := range p.workloadPools.Items {
+		workloadPool := &p.workloadPools.Items[i]
+
 		object := map[string]interface{}{
 			"version":  string(*workloadPool.Spec.Version),
 			"replicas": *workloadPool.Spec.Replicas,
 			"machine":  p.generateMachineHelmValues(&workloadPool.Spec.MachineGeneric),
+		}
+
+		if p.cluster.AutoscalingEnabled() && workloadPool.Spec.Autoscaling != nil {
+			object["autoscaling"] = generateWorkloadPoolSchedulerHelmValues(workloadPool)
 		}
 
 		if len(workloadPool.Spec.Labels) != 0 {
@@ -190,11 +203,46 @@ func (p *Provisioner) generateWorkloadPoolHelmValues() map[string]interface{} {
 			object["files"] = files
 		}
 
-		// TODO: scheduling.
 		workloadPools[workloadPool.GetName()] = object
 	}
 
 	return workloadPools
+}
+
+// generateWorkloadPoolSchedulerHelmValues translates from Kubernetes API scheduling
+// parameters into ones acceptable by Helm.
+func generateWorkloadPoolSchedulerHelmValues(p *unikornv1alpha1.KubernetesWorkloadPool) map[string]interface{} {
+	// When enabled, scaling limits are required.
+	values := map[string]interface{}{
+		"limits": map[string]interface{}{
+			"minReplicas": *p.Spec.Autoscaling.MinimumReplicas,
+			"maxReplicas": *p.Spec.Autoscaling.MaximumReplicas,
+		},
+	}
+
+	// When scaler from zero is enabled, you need to provide CPU and memory hints,
+	// the autoscaler cannot guess the flavor attributes.
+	if p.Spec.Autoscaling.Scheduler != nil {
+		scheduling := map[string]interface{}{
+			"cpu":    *p.Spec.Autoscaling.Scheduler.CPU,
+			"memory": fmt.Sprintf("%dG", p.Spec.Autoscaling.Scheduler.Memory.Value()>>30),
+		}
+
+		// If the flavor has a GPU, then we also need to inform the autoscaler
+		// about the GPU scheduling information.
+		if p.Spec.Autoscaling.Scheduler.GPU != nil {
+			gpu := map[string]interface{}{
+				"type":  *p.Spec.Autoscaling.Scheduler.GPU.Type,
+				"count": *p.Spec.Autoscaling.Scheduler.GPU.Count,
+			}
+
+			scheduling["gpu"] = gpu
+		}
+
+		values["scheduler"] = scheduling
+	}
+
+	return values
 }
 
 // generateApplication creates an ArgoCD application for a cluster.
