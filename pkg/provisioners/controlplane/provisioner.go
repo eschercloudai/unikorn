@@ -181,7 +181,9 @@ func argoCDClusterServer(namespace string) string {
 // be provisioned into.
 func (p *Provisioner) provisionArgoCDCluster(ctx context.Context, namespace string) error {
 	// Grab the client condiguration from the vcluster.
-	vclusterConfig, err := vcluster.GetConfig(ctx, vcluster.NewControllerRuntimeGetter(p.client), namespace, false)
+	vc := vcluster.NewControllerRuntimeClient(p.client)
+
+	vclusterConfig, err := vc.ClientConfig(ctx, namespace, false)
 	if err != nil {
 		return err
 	}

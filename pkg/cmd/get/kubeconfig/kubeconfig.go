@@ -14,31 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package get
+package kubeconfig
 
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/eschercloudai/unikorn/pkg/cmd/get/kubeconfig"
-
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-// NewGetCommand returns a command that can list all resources, or get information
-// about a single one.
-func NewGetCommand(f cmdutil.Factory) *cobra.Command {
+// NewGetKubeconfigCommand returns a command that can get a Kubernetes configuration.
+func NewGetKubeconfigCommand(f cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get",
-		Short: "Get Kubernetes clusters and resources",
-		Long:  "Get Kubernetes clusters and resources",
+		Use:   "kubeconfig",
+		Short: "Get Kubernetes configuration",
+		Long:  "Get Kubernetes configuration",
 	}
 
 	commands := []*cobra.Command{
-		newGetProjectCommand(f),
-		newGetControlPlaneCommand(f),
-		newGetClusterCommand(f),
-		newGetWorkloadPoolCommand(f),
-		kubeconfig.NewGetKubeconfigCommand(f),
+		newGetKubeconfigControlPlane(f),
+		newGetKubeconfigCluster(f),
 	}
 
 	cmd.AddCommand(commands...)

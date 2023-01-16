@@ -19,6 +19,7 @@ package vcluster
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"time"
 
@@ -39,63 +40,138 @@ var (
 	ErrLoadBalancerIngressMissing = errors.New("ingress address not found")
 )
 
-func RESTConfig(ctx context.Context, client client.Client, namespace string) (*rest.Config, error) {
-	return clientcmd.BuildConfigFromKubeconfigGetter("", KubeConfigGetter(ctx, client, namespace))
-}
+// VCluster provides services around virtual clusters.
+type VCluster interface {
+	// ClientConfig returns a raw client configuration.
+	ClientConfig(ctx context.Context, namespace string, external bool) (*clientcmdapi.Config, error)
 
-func KubeConfigGetter(ctx context.Context, client client.Client, namespace string) clientcmd.KubeconfigGetter {
-	return func() (*clientcmdapi.Config, error) {
-		return GetConfig(ctx, NewControllerRuntimeGetter(client), namespace, false)
-	}
+	// RESTConfig returns a REST client configuration.
+	RESTConfig(ctx context.Context, namespace string, external bool) (*rest.Config, error)
+
+	// Kubeconfig return the Kubernetes configuration file blob.
+	Kubeconfig(ctx context.Context, namespace string, external bool) (string, error)
 }
 
 // ConfigGetter abstracts the fact that we call this code from a controller-runtime
 // world, and a kubectl one, each having wildly different client models.
 type ConfigGetter interface {
+	// GetSecret provides an implementation specific way to get a secret.
 	GetSecret(ctx context.Context, namespace, name string) (*corev1.Secret, error)
+
+	// GetService provides an implementation specific way to get a service.
 	GetService(ctx context.Context, namespace, name string) (*corev1.Service, error)
 }
 
-type ControllerRuntimeGetter struct {
+// ControllerRuntimeClient provides vcluster services for controllers.
+type ControllerRuntimeClient struct {
 	client client.Client
 }
 
-func NewControllerRuntimeGetter(client client.Client) *ControllerRuntimeGetter {
-	return &ControllerRuntimeGetter{
+// NewControllerRuntimeClient returns vcluster abstraction with a controller
+// runtime client.
+func NewControllerRuntimeClient(client client.Client) *ControllerRuntimeClient {
+	return &ControllerRuntimeClient{
 		client: client,
 	}
 }
 
-func (g *ControllerRuntimeGetter) GetSecret(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
+// Ensure all the interfaces are correctly implemented.
+var _ VCluster = &ControllerRuntimeClient{}
+var _ ConfigGetter = &ControllerRuntimeClient{}
+
+// ClientConfig returns a raw client configuration.
+func (c *ControllerRuntimeClient) ClientConfig(ctx context.Context, namespace string, external bool) (*clientcmdapi.Config, error) {
+	return getClientConfig(ctx, c, namespace, external)
+}
+
+// RESTConfig returns a REST client configuration.
+func (c *ControllerRuntimeClient) RESTConfig(ctx context.Context, namespace string, external bool) (*rest.Config, error) {
+	getter := func() (*clientcmdapi.Config, error) {
+		return c.ClientConfig(ctx, namespace, external)
+	}
+
+	return clientcmd.BuildConfigFromKubeconfigGetter("", getter)
+}
+
+// Kubeconfig return the Kubernetes configuration file blob.
+func (c *ControllerRuntimeClient) Kubeconfig(ctx context.Context, namespace string, external bool) (string, error) {
+	config, err := c.ClientConfig(ctx, namespace, external)
+	if err != nil {
+		return "", err
+	}
+
+	return getKubeconfig(config)
+}
+
+// GetSecret provides an implementation specific way to get a secret.
+func (c *ControllerRuntimeClient) GetSecret(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
 	secret := &corev1.Secret{}
-	if err := g.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, secret); err != nil {
+	if err := c.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, secret); err != nil {
 		return nil, err
 	}
 
 	return secret, nil
 }
 
-func (g *ControllerRuntimeGetter) GetService(ctx context.Context, namespace, name string) (*corev1.Service, error) {
+// GetService provides an implementation specific way to get a service.
+func (c *ControllerRuntimeClient) GetService(ctx context.Context, namespace, name string) (*corev1.Service, error) {
 	service := &corev1.Service{}
-	if err := g.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, service); err != nil {
+	if err := c.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, service); err != nil {
 		return nil, err
 	}
 
 	return service, nil
 }
 
-type KubectlGetter struct {
+// Client returns a controller runtime client able to access resources in the vcluster.
+func (c *ControllerRuntimeClient) Client(ctx context.Context, namespace string, external bool) (client.Client, error) {
+	config, err := c.RESTConfig(ctx, namespace, external)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.New(config, client.Options{})
+}
+
+// Client provides vcluster services for standard client-go apps.
+type Client struct {
 	client kubernetes.Interface
 }
 
-func NewKubectlGetter(client kubernetes.Interface) *KubectlGetter {
-	return &KubectlGetter{
+// NewClient returns vcluster abstraction with a client-go client.
+func NewClient(client kubernetes.Interface) *Client {
+	return &Client{
 		client: client,
 	}
 }
 
-func (g *KubectlGetter) GetSecret(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
-	secret, err := g.client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+// ClientConfig returns a raw client configuration.
+func (c *Client) ClientConfig(ctx context.Context, namespace string, external bool) (*clientcmdapi.Config, error) {
+	return getClientConfig(ctx, c, namespace, external)
+}
+
+// RESTConfig returns a REST client configuration.
+func (c *Client) RESTConfig(ctx context.Context, namespace string, external bool) (*rest.Config, error) {
+	getter := func() (*clientcmdapi.Config, error) {
+		return c.ClientConfig(ctx, namespace, external)
+	}
+
+	return clientcmd.BuildConfigFromKubeconfigGetter("", getter)
+}
+
+// Kubeconfig return the Kubernetes configuration file blob.
+func (c *Client) Kubeconfig(ctx context.Context, namespace string, external bool) (string, error) {
+	config, err := c.ClientConfig(ctx, namespace, external)
+	if err != nil {
+		return "", err
+	}
+
+	return getKubeconfig(config)
+}
+
+// GetSecret provides an implementation specific way to get a secret.
+func (c *Client) GetSecret(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
+	secret, err := c.client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -103,8 +179,9 @@ func (g *KubectlGetter) GetSecret(ctx context.Context, namespace, name string) (
 	return secret, nil
 }
 
-func (g *KubectlGetter) GetService(ctx context.Context, namespace, name string) (*corev1.Service, error) {
-	service, err := g.client.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
+// GetService provides an implementation specific way to get a service.
+func (c *Client) GetService(ctx context.Context, namespace, name string) (*corev1.Service, error) {
+	service, err := c.client.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +189,14 @@ func (g *KubectlGetter) GetService(ctx context.Context, namespace, name string) 
 	return service, nil
 }
 
-// GetConfig acknowledges that vcluster configuration is synchronized by a side car, so it
+// Ensure all the interfaces are correctly implemented.
+var _ VCluster = &Client{}
+var _ ConfigGetter = &Client{}
+
+// getClientConfig acknowledges that vcluster configuration is synchronized by a side car, so it
 // performs a retry until the provided context expires.  It also acknowledges that load
 // balancer services may take a while to get a public IP.
-func GetConfig(ctx context.Context, getter ConfigGetter, namespace string, external bool) (*clientcmdapi.Config, error) {
+func getClientConfig(ctx context.Context, getter ConfigGetter, namespace string, external bool) (*clientcmdapi.Config, error) {
 	var config *clientcmdapi.Config
 
 	callback := func() error {
@@ -173,56 +254,33 @@ func GetConfig(ctx context.Context, getter ConfigGetter, namespace string, exter
 	return config, nil
 }
 
-// WriteConfig writes a vcluster config to a temporary location.  It returns a path to the config,
-// a cleanup callback that should be invoked via a defer in a non nil error.
-func WriteConfig(ctx context.Context, getter ConfigGetter, namespace string) (string, func(), error) {
-	config, err := GetConfig(ctx, getter, namespace, true)
-	if err != nil {
-		return "", nil, err
-	}
-
+// getKubeconfig returns a kubeconfig string, sadly client-go doesn't let you
+// do this in memory.
+func getKubeconfig(config *clientcmdapi.Config) (string, error) {
 	tf, err := os.CreateTemp("", "")
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 
 	tf.Close()
 
-	if err := clientcmd.WriteToFile(*config, tf.Name()); err != nil {
-		os.Remove(tf.Name())
-
-		return "", nil, err
-	}
-
-	cleanup := func() {
-		os.Remove(tf.Name())
-	}
-
-	return tf.Name(), cleanup, nil
-}
-
-func WriteInClusterConfig(ctx context.Context, getter ConfigGetter, namespace string) (string, func(), error) {
-	config, err := GetConfig(ctx, getter, namespace, false)
-	if err != nil {
-		return "", nil, err
-	}
-
-	tf, err := os.CreateTemp("", "")
-	if err != nil {
-		return "", nil, err
-	}
-
-	tf.Close()
+	defer os.Remove(tf.Name())
 
 	if err := clientcmd.WriteToFile(*config, tf.Name()); err != nil {
 		os.Remove(tf.Name())
 
-		return "", nil, err
+		return "", err
 	}
 
-	cleanup := func() {
-		os.Remove(tf.Name())
+	f, err := os.Open(tf.Name())
+	if err != nil {
+		return "", err
 	}
 
-	return tf.Name(), cleanup, nil
+	out, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+
+	return string(out), nil
 }
