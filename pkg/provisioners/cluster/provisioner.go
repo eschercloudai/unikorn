@@ -319,7 +319,7 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api-cluster-openstack",
-					"targetRevision": "v0.3.1",
+					"targetRevision": "v0.3.2",
 					"helm": map[string]interface{}{
 						"releaseName": p.cluster.Name,
 						"values":      string(values),
@@ -463,6 +463,74 @@ func (p *Provisioner) generateCiliumApplication(server string) *unstructured.Uns
 				"destination": map[string]interface{}{
 					"name":      server,
 					"namespace": "kube-system",
+				},
+				"syncPolicy": map[string]interface{}{
+					"automated": map[string]interface{}{
+						"selfHeal": true,
+						"prune":    true,
+					},
+				},
+			},
+		},
+	}
+}
+
+// generateClusterAuotscalerApplication creates an in-cluster instance of the
+// cluster autoscaler that is deployed in the same namespace as the cluster,
+// with namespace scoped privilege.
+func (p *Provisioner) generateClusterAuotscalerApplication() *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "Application",
+			"metadata": map[string]interface{}{
+				"generateName": "cluster-autoscaler-",
+				"namespace":    "argocd",
+				"labels":       p.getLabels("cluster-autoscaler"),
+			},
+			"spec": map[string]interface{}{
+				"project": "default",
+				"source": map[string]interface{}{
+					//TODO:  programmable
+					"repoURL":        "https://kubernetes.github.io/autoscaler",
+					"chart":          "cluster-autoscaler",
+					"targetRevision": "9.21.1",
+					"helm": map[string]interface{}{
+						"parameters": []interface{}{
+							map[string]interface{}{
+								"name":  "cloudProvider",
+								"value": "clusterapi",
+							},
+							map[string]interface{}{
+								"name":  "clusterAPIMode",
+								"value": "kubeconfig-incluster",
+							},
+							map[string]interface{}{
+								"name":  "clusterAPIKubeconfigSecret",
+								"value": p.cluster.Name + "-kubeconfig",
+							},
+							map[string]interface{}{
+								"name":  "autoDiscovery.clusterName",
+								"value": p.cluster.Name,
+							},
+							map[string]interface{}{
+								"name":  "extraArgs.scale-down-delay-after-add",
+								"value": "5m",
+							},
+							map[string]interface{}{
+								"name":  "extraArgs.scale-down-unneeded-time",
+								"value": "5m",
+							},
+							map[string]interface{}{
+								"name":  "rbac.clusterScoped",
+								"value": "false",
+							},
+						},
+					},
+				},
+				"destination": map[string]interface{}{
+					"name":      p.server,
+					"namespace": p.cluster.Name,
 				},
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
@@ -639,14 +707,11 @@ func deleteForeignResources(ctx context.Context, c client.Client, objects []unst
 // so Argo thinks it's an implicitly created resource now.  So, what we need to
 // do is manually delete any orphaned MachineDeployments.
 func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) error {
-	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
-	if err != nil {
-		return fmt.Errorf("%w: failed to get cluster kubeconfig", err)
-	}
+	vc := vcluster.NewControllerRuntimeClient(p.client)
 
-	vclusterClient, err := client.New(vclusterConfig, client.Options{})
+	vclusterClient, err := vc.Client(ctx, p.cluster.Namespace, false)
 	if err != nil {
-		return fmt.Errorf("%w: failed to create cluster client", err)
+		return fmt.Errorf("%w: failed to create vcluster client", err)
 	}
 
 	deployments, err := p.getMachineDeployments(ctx, vclusterClient)
@@ -731,14 +796,11 @@ func (p *Provisioner) provisionCluster(ctx context.Context) error {
 // getKubernetesClusterConfig retrieves the Kubernetes configuration from
 // a cluster API cluster.
 func (p *Provisioner) getKubernetesClusterConfig(ctx context.Context) (*clientcmdapi.Config, error) {
-	vclusterConfig, err := vcluster.RESTConfig(ctx, p.client, p.cluster.Namespace)
-	if err != nil {
-		return nil, fmt.Errorf("%w: failed to get cluster kubeconfig", err)
-	}
+	vc := vcluster.NewControllerRuntimeClient(p.client)
 
-	vclusterClient, err := client.New(vclusterConfig, client.Options{})
+	vclusterClient, err := vc.Client(ctx, p.cluster.Namespace, false)
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to create cluster client", err)
+		return nil, fmt.Errorf("%w: failed to get vcluster client", err)
 	}
 
 	secret := &corev1.Secret{}
@@ -857,6 +919,27 @@ func (p *Provisioner) provisionOpenstackCloudProvider(ctx context.Context, serve
 	return nil
 }
 
+// provisionClusterAutoscaler creates a cluster autoscaler in the control
+// plane if autoscaling is enabled.
+func (p *Provisioner) provisionClusterAutoscaler(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	// TODO: you can create with it on, turn it on, but not remove it...
+	if !p.cluster.AutoscalingEnabled() {
+		return nil
+	}
+
+	log.Info("provisioning cluster autoscaler")
+
+	if err := application.New(p.client, p.generateClusterAuotscalerApplication()).Provision(ctx); err != nil {
+		return err
+	}
+
+	log.Info("cluster autoscaler provisioned")
+
+	return nil
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
@@ -872,12 +955,18 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	if err := p.provisionClusterAutoscaler(ctx); err != nil {
+		return err
+	}
+
 	log.Info("unikorn kubernetes cluster provisioned")
 
 	return nil
 }
 
 // Deprovision implements the Provision interface.
+//
+//nolint:cyclop
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
@@ -887,6 +976,16 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	server := config.Clusters[config.Contexts[config.CurrentContext].Cluster].Server
+
+	if p.cluster.AutoscalingEnabled() {
+		log.Info("deprovisioning cluster autoscaler")
+
+		if err := application.New(p.client, p.generateClusterAuotscalerApplication()).Deprovision(ctx); err != nil {
+			return err
+		}
+
+		log.Info("cluster autoscaler deprovisioned")
+	}
 
 	log.Info("deprovisioning cilium")
 

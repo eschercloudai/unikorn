@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package get
+package kubeconfig
 
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -33,7 +31,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-type getKubeConfigOptions struct {
+type getKubeconfigControlPlaneOptions struct {
 	// controlPlaneFlags define control plane scoping.
 	controlPlaneFlags flags.ControlPlaneFlags
 
@@ -45,12 +43,12 @@ type getKubeConfigOptions struct {
 }
 
 // addFlags registers create cluster options flags with the specified cobra command.
-func (o *getKubeConfigOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
+func (o *getKubeconfigControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	o.controlPlaneFlags.AddFlags(f, cmd)
 }
 
 // complete fills in any options not does automatically by flag parsing.
-func (o *getKubeConfigOptions) complete(f cmdutil.Factory, _ []string) error {
+func (o *getKubeconfigControlPlaneOptions) complete(f cmdutil.Factory, _ []string) error {
 	var err error
 
 	if o.client, err = f.KubernetesClientSet(); err != nil {
@@ -71,50 +69,37 @@ func (o *getKubeConfigOptions) complete(f cmdutil.Factory, _ []string) error {
 
 // validate validates any tainted input not handled by complete() or flags
 // processing.
-func (o *getKubeConfigOptions) validate() error {
+func (o *getKubeconfigControlPlaneOptions) validate() error {
 	return nil
 }
 
 // run executes the command.
-func (o *getKubeConfigOptions) run() error {
+func (o *getKubeconfigControlPlaneOptions) run() error {
 	namespace, err := o.controlPlaneFlags.GetControlPlaneNamespace(context.TODO(), o.unikornClient)
 	if err != nil {
 		return err
 	}
 
-	configPath, cleanup, err := vcluster.WriteConfig(context.TODO(), vcluster.NewKubectlGetter(o.client), namespace)
+	vc := vcluster.NewClient(o.client)
+
+	kubeconfig, err := vc.Kubeconfig(context.TODO(), namespace, true)
 	if err != nil {
 		return err
 	}
 
-	defer cleanup()
-
-	f, err := os.Open(configPath)
-	if err != nil {
-		return err
-	}
-
-	out, err := io.ReadAll(f)
-	if err != nil {
-		return err
-	}
-
-	f.Close()
-
-	fmt.Println(string(out))
+	fmt.Println(kubeconfig)
 
 	return nil
 }
 
-// newGetKubeConfigCommand creates a command that gets a Cluster API control plane.
-func newGetKubeConfigCommand(f cmdutil.Factory) *cobra.Command {
-	o := getKubeConfigOptions{}
+// newGetKubeconfigControlPlane creates a command that gets a control plane kubeconfig.
+func newGetKubeconfigControlPlane(f cmdutil.Factory) *cobra.Command {
+	o := &getKubeconfigControlPlaneOptions{}
 
 	cmd := &cobra.Command{
-		Use:               "kubeconfig",
-		Short:             "Delete a Kubernetes cluster",
-		Long:              "Delete a Kubernetes cluster",
-		ValidArgsFunction: o.controlPlaneFlags.CompleteControlPlane(f),
+		Use:   "control-plane",
+		Short: "Get the control plane's Kubernetes config",
+		Long:  "Get the control plane's Kubernetes config",
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

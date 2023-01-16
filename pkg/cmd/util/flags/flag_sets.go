@@ -214,7 +214,8 @@ func (o *ClusterFlags) AddFlags(f cmdutil.Factory, cmd *cobra.Command) {
 		registerFunc = RequiredStringVarWithCompletion
 	}
 
-	registerFunc(cmd, &o.Cluster, "cluster", "", "Cluster scope of a resource.", o.CompleteCluster(f))
+	// Note: cannot use "cluster" here as it clashes with cli-runtime.
+	registerFunc(cmd, &o.Cluster, "kubernetes-cluster", "", "Cluster scope of a resource.", o.CompleteCluster(f))
 }
 
 // CompleteWorkloadPool provides tab completion for the specified resource type.
