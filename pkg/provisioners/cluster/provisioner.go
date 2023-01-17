@@ -94,8 +94,6 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.Kub
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-var ErrMissingLabel = errors.New("expected label is missing")
-
 // getLabels returns an application specific set of labels to uniquely identify the
 // application.
 func (p *Provisioner) getLabels(app string) (map[string]interface{}, error) {

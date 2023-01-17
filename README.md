@@ -51,7 +51,7 @@ For the more adventurous, you can add it to `/etc/bash_completion.d/` or whateve
 Is all done via Helm, which means we can also deploy using ArgoCD.
 As this is a private repository, we're keeping the charts private for now also, so you'll need to either checkout the correct branch for a local Helm installation, or imbue Argo with an access token to get access to the repository.
 
-Deploy argo (the release name is hard code, don't change it yet please):
+Deploy argo (the release name is hard coded, don't change it yet please):
 
 ```
 helm repo add argo https://argoproj.github.io/argo-helm
@@ -65,15 +65,24 @@ To add the credentials go to `Settings`, `Repositories` and `Connect Repo`, then
 * Name: `unikorn`
 * Project: `default`
 * Repository URL: `git@github.com:eschercloudai/unikorn`
-* SSH private key data: the contents of `~/.ssh/id\_blah`
+* SSH private key data: the contents of `~/.ssh/id_blah`
 
-You can install using the local repo, or with CD:
+You can install using the local repo, or with CD.
+
+First, unless you are doing local development and want to manually load images, you will want to configure image pull secrets in order to be able to pull the images.
+Create a GitHub personal access token that has the `read:packages` scope, then add it to your `docker.conf`:
+
+```
+docker login ghcr.io --username spjmurray --password ghp_blahBlahBlah
+```
+
+Then install Unikorn:
 
 <details>
 <summary>Helm</summary>
 
 ```shell
-helm install unikorn charts/unikorn --namespace unikorn --create-namespace
+helm install unikorn charts/unikorn --namespace unikorn --create-namespace --set dockerConfig=$(cat ~/.docker/config.json | base64 -w0)
 ```
 </details>
 
@@ -95,7 +104,7 @@ spec:
     helm:
       parameters:
       - name: dockerConfig
-        value: # run "cat ~/.docker/config.json | base64 -w0"
+        value: # output of "cat ~/.docker/config.json | base64 -w0"
   destination:
     namespace: unikorn
     server: https://kubernetes.default.svc
