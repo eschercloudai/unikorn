@@ -78,8 +78,6 @@ func New(client client.Client, controlPlane *unikornv1alpha1.ControlPlane) *Prov
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-var ErrMissingLabel = errors.New("expected label is missing")
-
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
