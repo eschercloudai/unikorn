@@ -51,7 +51,11 @@ For the more adventurous, you can add it to `/etc/bash_completion.d/` or whateve
 Is all done via Helm, which means we can also deploy using ArgoCD.
 As this is a private repository, we're keeping the charts private for now also, so you'll need to either checkout the correct branch for a local Helm installation, or imbue Argo with an access token to get access to the repository.
 
-Deploy argo (the release name is hard coded, don't change it yet please):
+#### Installing ArgoCD
+
+ArgoCD is a **required** to use Unikorn.
+
+Deploy argo using Helm (the release name is _hard coded_, don't change it yet please):
 
 ```
 helm repo add argo https://argoproj.github.io/argo-helm
@@ -61,16 +65,18 @@ helm install argocd argo/argo-cd -n argocd --create-namespace
 
 To add the credentials go to `Settings`, `Repositories` and `Connect Repo`, then fill in:
 
-* Connection method: SSH
-* Name: `unikorn`
-* Project: `default`
-* Repository URL: `git@github.com:eschercloudai/unikorn`
-* SSH private key data: the contents of `~/.ssh/id_blah`
+* **Connection method**: `SSH`
+* **Name**: `unikorn`
+* **Project**: `default`
+* **Repository URL**: `git@github.com:eschercloudai/unikorn`
+* **SSH private key data**: the contents of `~/.ssh/id_blahBlahBlah`
+
+#### Installing Unikorn
 
 You can install using the local repo, or with CD.
 
 First, unless you are doing local development and want to manually load images, you will want to configure image pull secrets in order to be able to pull the images.
-Create a GitHub personal access token that has the `read:packages` scope, then add it to your `docker.conf`:
+Create a GitHub personal access token that has the `read:packages` scope, then add it to your `~/.docker/config.json`:
 
 ```
 docker login ghcr.io --username spjmurray --password ghp_blahBlahBlah
@@ -82,7 +88,7 @@ Then install Unikorn:
 <summary>Helm</summary>
 
 ```shell
-helm install unikorn charts/unikorn --namespace unikorn --create-namespace --set dockerConfig=$(cat ~/.docker/config.json | base64 -w0)
+helm install unikorn charts/unikorn --namespace unikorn --create-namespace --set dockerConfig=$(base64 -w0 ~/.docker/config.json)
 ```
 </details>
 
@@ -104,7 +110,7 @@ spec:
     helm:
       parameters:
       - name: dockerConfig
-        value: # output of "cat ~/.docker/config.json | base64 -w0"
+        value: # output of "base64 -w0 ~/.docker/config.json"
   destination:
     namespace: unikorn
     server: https://kubernetes.default.svc
@@ -117,10 +123,10 @@ spec:
 ```
 </details>
 
-### Monitoring
+## Monitoring & Logging
 
 Can be enabled with the `--set monitoring.enabled=true` flag.
-See the [monitoring](docs/monitoring.md) documentation from more information.
+See the [monitoring & logging](docs/monitoring.md) documentation from more information.
 
 ## Documentation
 
