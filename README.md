@@ -75,7 +75,7 @@ spec:
   source:
     path: charts/unikorn
     repoURL: git@github.com:eschercloudai/unikorn
-    targetRevision: v0.2.0
+    targetRevision: v0.3.2
   destination:
     namespace: unikorn
     server: https://kubernetes.default.svc
