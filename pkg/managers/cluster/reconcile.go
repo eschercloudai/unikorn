@@ -59,12 +59,10 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	server := fmt.Sprintf("https://vcluster.%s", object.Namespace)
 
-	labels := map[string]string{
-		constants.ProjectLabel:      object.Labels[constants.ProjectLabel],
-		constants.ControlPlaneLabel: object.Labels[constants.ControlPlaneLabel],
+	provisioner, err := cluster.New(ctx, r.client, object, server)
+	if err != nil {
+		return reconcile.Result{}, err
 	}
-
-	provisioner := cluster.New(r.client, object, server).WithLabels(labels)
 
 	// If it's being deleted, ignore it, we don't need to take any additional action.
 	if object.DeletionTimestamp != nil {

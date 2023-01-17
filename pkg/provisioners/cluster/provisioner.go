@@ -64,46 +64,55 @@ type Provisioner struct {
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1alpha1.KubernetesCluster
 
+	// server is the ArgoCD server to provision in.
 	server string
 
-	labels map[string]string
-
+	// workloadPools is a snapshot of the workload pool members at
+	// creation time.
 	workloadPools *unikornv1alpha1.KubernetesWorkloadPoolList
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, cluster *unikornv1alpha1.KubernetesCluster, server string) *Provisioner {
-	return &Provisioner{
-		client:  client,
-		cluster: cluster,
-		server:  server,
+func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.KubernetesCluster, server string) (*Provisioner, error) {
+	// Do this once so it's atomic, we don't want it changing in different
+	// places.
+	workloadPools, err := getWorkloadPools(ctx, client, cluster)
+	if err != nil {
+		return nil, err
 	}
+
+	provisioner := &Provisioner{
+		client:        client,
+		cluster:       cluster,
+		server:        server,
+		workloadPools: workloadPools,
+	}
+
+	return provisioner, nil
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-// WithLabels associates set of labels with the provisioner to uniquely identify
-// the provisioner instance.
-// TODO: this is fairly common, share it using interface aggregation.
-func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
-	p.labels = l
-
-	return p
-}
+var ErrMissingLabel = errors.New("expected label is missing")
 
 // getLabels returns an application specific set of labels to uniquely identify the
 // application.
-func (p *Provisioner) getLabels(app string) map[string]interface{} {
+func (p *Provisioner) getLabels(app string) (map[string]interface{}, error) {
+	labels, err := p.cluster.ResourceLabels()
+	if err != nil {
+		return nil, err
+	}
+
 	l := map[string]interface{}{
 		constants.ApplicationLabel: app,
 	}
 
-	for k, v := range p.labels {
+	for k, v := range labels {
 		l[k] = v
 	}
 
-	return l
+	return l, nil
 }
 
 // generateMachineHelmValues translates the API's idea of a machine into what's
@@ -124,11 +133,11 @@ func (p *Provisioner) generateMachineHelmValues(machine *unikornv1alpha1.Machine
 // getWorkloadPools athers all workload pools that belong to this cluster.
 // By default that's all the things, in reality most sane people will add label
 // selectors.
-func (p *Provisioner) getWorkloadPools(ctx context.Context) (*unikornv1alpha1.KubernetesWorkloadPoolList, error) {
+func getWorkloadPools(ctx context.Context, c client.Client, cluster *unikornv1alpha1.KubernetesCluster) (*unikornv1alpha1.KubernetesWorkloadPoolList, error) {
 	selector := labels.Everything()
 
-	if p.cluster.Spec.WorkloadPools != nil && p.cluster.Spec.WorkloadPools.Selector != nil {
-		s, err := metav1.LabelSelectorAsSelector(p.cluster.Spec.WorkloadPools.Selector)
+	if cluster.Spec.WorkloadPools != nil && cluster.Spec.WorkloadPools.Selector != nil {
+		s, err := metav1.LabelSelectorAsSelector(cluster.Spec.WorkloadPools.Selector)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +147,7 @@ func (p *Provisioner) getWorkloadPools(ctx context.Context) (*unikornv1alpha1.Ku
 
 	workloadPools := &unikornv1alpha1.KubernetesWorkloadPoolList{}
 
-	if err := p.client.List(ctx, workloadPools, &client.ListOptions{LabelSelector: selector}); err != nil {
+	if err := c.List(ctx, workloadPools, &client.ListOptions{LabelSelector: selector}); err != nil {
 		return nil, err
 	}
 
@@ -153,6 +162,18 @@ func (p *Provisioner) getWorkloadPools(ctx context.Context) (*unikornv1alpha1.Ku
 	}
 
 	return filtered, nil
+}
+
+// hasDefaultWorkloadPool indicates that there is a workload pool named default,
+// thus overriding the Helm default in values.yaml.
+func (p *Provisioner) hasDefaultWorkloadPool() bool {
+	for _, pool := range p.workloadPools.Items {
+		if pool.Name == "default" {
+			return true
+		}
+	}
+
+	return false
 }
 
 // generateWorkloadPoolHelmValues translates the API's idea of a workload pool into
@@ -301,6 +322,22 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 		return nil, err
 	}
 
+	var parameters interface{}
+
+	if !p.hasDefaultWorkloadPool() {
+		parameters = []interface{}{
+			map[string]interface{}{
+				"name":  "workloadPools.default",
+				"value": "null",
+			},
+		}
+	}
+
+	labels, err := p.getLabels("kubernetes-cluster")
+	if err != nil {
+		return nil, err
+	}
+
 	// Okay, from this point on, things get a bit "meta" because whoever
 	// wrote ArgoCD for some reason imported kubernetes, not client-go to
 	// get access to the schema information...
@@ -311,7 +348,7 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 			"metadata": map[string]interface{}{
 				"generateName": "kubernetes-cluster-",
 				"namespace":    "argocd",
-				"labels":       p.getLabels("kubernetes-cluster"),
+				"labels":       labels,
 			},
 			"spec": map[string]interface{}{
 				"project": "default",
@@ -323,6 +360,7 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 					"helm": map[string]interface{}{
 						"releaseName": p.cluster.Name,
 						"values":      string(values),
+						"parameters":  parameters,
 					},
 				},
 				"destination": map[string]interface{}{
@@ -345,9 +383,13 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 	return object, nil
 }
 
-// generateOpenstackCloudProviderApplication creates an ArgoCD application for
-// the Openstack controller manager.
-func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (*unstructured.Unstructured, error) {
+// generateOpenstackCloudProviderCloudConfigGlobalValues does the horrific translation
+// between the myriad ways that OpenStack deems necessary to authenticate to the
+// cloud configuration format.  See:
+// https://github.com/kubernetes/cloud-provider-openstack/blob/master/docs/openstack-cloud-controller-manager/using-openstack-cloud-controller-manager.md#config-openstack-cloud-controller-manager
+//
+//nolint:cyclop
+func (p *Provisioner) generateOpenstackCloudProviderCloudConfigGlobalValues() (map[string]interface{}, error) {
 	var clouds clientconfig.Clouds
 
 	if err := yaml.Unmarshal(*p.cluster.Spec.Openstack.CloudConfig, &clouds); err != nil {
@@ -359,15 +401,89 @@ func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (
 		return nil, fmt.Errorf("%w: cloud '%s' not found in clouds.yaml", ErrCloudConfiguration, *p.cluster.Spec.Openstack.Cloud)
 	}
 
+	// Like the "openstack" command we require application credentials to
+	// be marked with the correct authentication type, passwords can be
+	// explicitly or implictly typed, because that's just the way of the
+	// world...  Password auth is just a convenience thing for ease of
+	// development.  Production deployments will want to use application
+	// credentials so (possibly external) credentials aren't leaked.  That
+	// said given the whit show that is this code, it may be better to just
+	// kill passwords.
+	global := map[string]interface{}{
+		"auth-url": cloud.AuthInfo.AuthURL,
+	}
+
+	//nolint:exhaustive
+	switch cloud.AuthType {
+	case "", clientconfig.AuthV3Password:
+		// The user_id field is NOT supported by the provider.
+		if cloud.AuthInfo.Username == "" {
+			return nil, fmt.Errorf("%w: username must be specified in clouds.yaml", ErrCloudConfiguration)
+		}
+
+		global["username"] = cloud.AuthInfo.Username
+		global["password"] = cloud.AuthInfo.Password
+
+		// Try a flat, single domain first, then -- failing that -- look
+		// for a more hierarchical topology.
+		switch {
+		case cloud.AuthInfo.DomainID != "":
+			global["domain-id"] = cloud.AuthInfo.DomainID
+		case cloud.AuthInfo.DomainName != "":
+			global["domain-name"] = cloud.AuthInfo.DomainName
+		default:
+			switch {
+			case cloud.AuthInfo.UserDomainID != "":
+				global["user-domain-id"] = cloud.AuthInfo.UserDomainID
+			case cloud.AuthInfo.UserDomainName != "":
+				global["user-domain-name"] = cloud.AuthInfo.UserDomainName
+			default:
+				return nil, fmt.Errorf("%w: domain_name, domain_id, user_domain_name or user_domain_id must be specified in clouds.yaml", ErrCloudConfiguration)
+			}
+
+			switch {
+			case cloud.AuthInfo.ProjectDomainID != "":
+				global["tenant-domain-id"] = cloud.AuthInfo.ProjectDomainID
+			case cloud.AuthInfo.ProjectDomainName != "":
+				global["tenant-domain-name"] = cloud.AuthInfo.ProjectDomainName
+			default:
+				return nil, fmt.Errorf("%w: domain_name, domain_id, project_domain_name or project_domain_id must be specified in clouds.yaml", ErrCloudConfiguration)
+			}
+		}
+
+		switch {
+		case cloud.AuthInfo.ProjectID != "":
+			global["tenant-id"] = cloud.AuthInfo.ProjectID
+		case cloud.AuthInfo.ProjectName != "":
+			global["tenant-name"] = cloud.AuthInfo.ProjectName
+		default:
+			return nil, fmt.Errorf("%w: project_name or project_id must be specified in clouds.yaml", ErrCloudConfiguration)
+		}
+
+	case clientconfig.AuthV3ApplicationCredential:
+		global["application-credential-id"] = cloud.AuthInfo.ApplicationCredentialID
+		global["application-credential-secret"] = cloud.AuthInfo.ApplicationCredentialSecret
+
+	default:
+		return nil, fmt.Errorf("%w: v3password or v3applicationcredential auth_type must be specified in clouds.yaml", ErrCloudConfiguration)
+	}
+
+	return global, nil
+}
+
+// generateOpenstackCloudProviderApplication creates an ArgoCD application for
+// the Openstack controller manager.  Note there is an option, to just pass through
+// the clouds.yaml file, however the chart doesn't allow it to be exposed so we need
+// to translate between formats.
+func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (*unstructured.Unstructured, error) {
+	cloudConfigGlobal, err := p.generateOpenstackCloudProviderCloudConfigGlobalValues()
+	if err != nil {
+		return nil, err
+	}
+
 	valuesRaw := map[string]interface{}{
 		"cloudConfig": map[string]interface{}{
-			"global": map[string]interface{}{
-				"auth-url":    cloud.AuthInfo.AuthURL,
-				"username":    cloud.AuthInfo.Username,
-				"password":    cloud.AuthInfo.Password,
-				"domain-name": cloud.AuthInfo.DomainName,
-				"tenant-name": cloud.AuthInfo.ProjectName,
-			},
+			"global": cloudConfigGlobal,
 			"loadBalancer": map[string]interface{}{
 				"floating-network-id": *p.cluster.Spec.Openstack.ExternalNetworkID,
 			},
@@ -399,6 +515,11 @@ func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (
 		return nil, err
 	}
 
+	labels, err := p.getLabels("openstack-cloud-provider")
+	if err != nil {
+		return nil, err
+	}
+
 	object := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "argoproj.io/v1alpha1",
@@ -406,7 +527,7 @@ func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (
 			"metadata": map[string]interface{}{
 				"generateName": "openstack-cloud-provider-",
 				"namespace":    "argocd",
-				"labels":       p.getLabels("openstack-cloud-provider"),
+				"labels":       labels,
 			},
 			"spec": map[string]interface{}{
 				"project": "default",
@@ -442,15 +563,20 @@ func (p *Provisioner) generateOpenstackCloudProviderApplication(server string) (
 
 // generateCiliumApplication creates an ArgoCD application for the
 // Cilium CNI plugin.
-func (p *Provisioner) generateCiliumApplication(server string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
+func (p *Provisioner) generateCiliumApplication(server string) (*unstructured.Unstructured, error) {
+	labels, err := p.getLabels("cilium")
+	if err != nil {
+		return nil, err
+	}
+
+	object := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
 			"metadata": map[string]interface{}{
 				"generateName": "cilium-",
 				"namespace":    "argocd",
-				"labels":       p.getLabels("cilium"),
+				"labels":       labels,
 			},
 			"spec": map[string]interface{}{
 				"project": "default",
@@ -473,20 +599,27 @@ func (p *Provisioner) generateCiliumApplication(server string) *unstructured.Uns
 			},
 		},
 	}
+
+	return object, nil
 }
 
 // generateClusterAuotscalerApplication creates an in-cluster instance of the
 // cluster autoscaler that is deployed in the same namespace as the cluster,
 // with namespace scoped privilege.
-func (p *Provisioner) generateClusterAuotscalerApplication() *unstructured.Unstructured {
-	return &unstructured.Unstructured{
+func (p *Provisioner) generateClusterAuotscalerApplication() (*unstructured.Unstructured, error) {
+	labels, err := p.getLabels("cluster-autoscaler")
+	if err != nil {
+		return nil, err
+	}
+
+	object := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
 			"metadata": map[string]interface{}{
 				"generateName": "cluster-autoscaler-",
 				"namespace":    "argocd",
-				"labels":       p.getLabels("cluster-autoscaler"),
+				"labels":       labels,
 			},
 			"spec": map[string]interface{}{
 				"project": "default",
@@ -541,6 +674,8 @@ func (p *Provisioner) generateClusterAuotscalerApplication() *unstructured.Unstr
 			},
 		},
 	}
+
+	return object, nil
 }
 
 // getWorkloadPoolMachineDeploymentNames gets a list of machine deployments that should
@@ -766,15 +901,6 @@ func (p *Provisioner) provisionCluster(ctx context.Context) error {
 
 	log.Info("provisioning kubernetes cluster")
 
-	// Do this once so it's atomic, we don't want it changing in different
-	// places.
-	workloadPools, err := p.getWorkloadPools(ctx)
-	if err != nil {
-		return err
-	}
-
-	p.workloadPools = workloadPools
-
 	object, err := p.generateApplication()
 	if err != nil {
 		return err
@@ -889,7 +1015,12 @@ func (p *Provisioner) provisionCilium(ctx context.Context, server string) error 
 
 	log.Info("provisioning cilium")
 
-	if err := application.New(p.client, p.generateCiliumApplication(server)).Provision(ctx); err != nil {
+	object, err := p.generateCiliumApplication(server)
+	if err != nil {
+		return err
+	}
+
+	if err := application.New(p.client, object).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -931,7 +1062,12 @@ func (p *Provisioner) provisionClusterAutoscaler(ctx context.Context) error {
 
 	log.Info("provisioning cluster autoscaler")
 
-	if err := application.New(p.client, p.generateClusterAuotscalerApplication()).Provision(ctx); err != nil {
+	object, err := p.generateClusterAuotscalerApplication()
+	if err != nil {
+		return err
+	}
+
+	if err := application.New(p.client, object).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -980,7 +1116,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	if p.cluster.AutoscalingEnabled() {
 		log.Info("deprovisioning cluster autoscaler")
 
-		if err := application.New(p.client, p.generateClusterAuotscalerApplication()).Deprovision(ctx); err != nil {
+		object, err := p.generateClusterAuotscalerApplication()
+		if err != nil {
+			return err
+		}
+
+		if err := application.New(p.client, object).Deprovision(ctx); err != nil {
 			return err
 		}
 
@@ -989,7 +1130,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning cilium")
 
-	if err := application.New(p.client, p.generateCiliumApplication(server)).Deprovision(ctx); err != nil {
+	object, err := p.generateCiliumApplication(server)
+	if err != nil {
+		return err
+	}
+
+	if err := application.New(p.client, object).Deprovision(ctx); err != nil {
 		return err
 	}
 
@@ -997,7 +1143,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning openstack cloud provider")
 
-	object, err := p.generateOpenstackCloudProviderApplication(server)
+	object, err = p.generateOpenstackCloudProviderApplication(server)
 	if err != nil {
 		return err
 	}

@@ -80,18 +80,6 @@ var _ provisioners.Provisioner = &Provisioner{}
 
 var ErrMissingLabel = errors.New("expected label is missing")
 
-func (p *Provisioner) controlPlaneLabels() (map[string]string, error) {
-	project, ok := p.controlPlane.Labels[constants.ProjectLabel]
-	if !ok {
-		return nil, ErrMissingLabel
-	}
-
-	return map[string]string{
-		constants.ProjectLabel:      project,
-		constants.ControlPlaneLabel: p.controlPlane.Name,
-	}, nil
-}
-
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
@@ -106,7 +94,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	labels, err := p.controlPlaneLabels()
+	labels, err := p.controlPlane.ResourceLabels()
 	if err != nil {
 		return err
 	}
@@ -218,7 +206,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	labels, err := p.controlPlaneLabels()
+	labels, err := p.controlPlane.ResourceLabels()
 	if err != nil {
 		return err
 	}

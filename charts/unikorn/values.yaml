@@ -11,7 +11,7 @@ organization: eschercloudai
 
 # Set the docker configuration, doing so will create a secret and link it
 # to the service accounts of all the controllers.  You can do something like:
-# --set dockerConfig=$(cat ~/.docker/config.json | base64 -d)
+# --set dockerConfig=$(cat ~/.docker/config.json | base64 -w0)
 dockerConfig:
 
 # Set the image pull secret on the service accounts of all the controllers.
