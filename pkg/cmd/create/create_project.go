@@ -24,6 +24,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -106,17 +107,14 @@ var (
 	createProjectLong = templates.LongDesc(`
         Create a project.
 
-	Projects are modelled as custom resources, as they are domain specific
-	abstractions.  We tried initially modelling control planes on namespaces,
-	with projects being an annotations, but it turns out this is a whole
-	world of pain.
+	Projects conceptually represent an organization, or a department within an
+	organization, and ostensibly map to an OpenStack project.
 
-	Projects map 1:1 to a namespace, and these project namespaces also contain
+	Projects map 1:1 to a namespace, and these project namespaces contain
 	custom control plane resources.  Thus we can simply off-board users/projects
-	with a single delete.  We also no longer need to do an indexed search of
-	control planes by project, as control planes are encapsulated in projects.
+	with a single delete.
 
-	Projects are cluster scoped.`)
+	Projects are cluster scoped and therefore must have globally unique names.`)
 
 	//nolint:gochecknoglobals
 	createProjectExample = util.TemplatedExample(`
@@ -135,6 +133,7 @@ func newCreateProjectCommand(f cmdutil.Factory) *cobra.Command {
 		Short:   "Create a project.",
 		Long:    createProjectLong,
 		Example: createProjectExample,
+		Aliases: aliases.Project,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

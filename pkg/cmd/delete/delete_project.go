@@ -24,6 +24,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
@@ -54,7 +55,7 @@ func (o *deleteProjectOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 // is specified.
 func (o *deleteProjectOptions) completeNames(args []string) error {
 	if !o.deleteFlags.All {
-		o.names = args
+		o.names = util.UniqueString(args)
 
 		return nil
 	}
@@ -142,11 +143,8 @@ func newDeleteProjectCommand(f cmdutil.Factory) *cobra.Command {
 		Short:             "Delete a project",
 		Long:              deleteProjectLong,
 		Example:           deleteProjectExample,
+		Aliases:           aliases.Project,
 		ValidArgsFunction: completion.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource),
-		Aliases: []string{
-			"projects",
-			"pr",
-		},
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

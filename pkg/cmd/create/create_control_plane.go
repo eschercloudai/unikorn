@@ -24,6 +24,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
@@ -118,8 +119,7 @@ var (
         vcluster.  The use of vclusters allows a level of isolation between
         users in a multi-tenancy environment.  It also allows trivial deletion
         of resources contained within that vcluster as that is not subject
-        to finalizers and the like (Cluster API is poorly tested in failure
-        scenarios.)`)
+        to finalizers.`)
 
 	//nolint:gochecknoglobals
 	createControlPlaneExample = util.TemplatedExample(`
@@ -138,6 +138,7 @@ func newCreateControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
 		Short:   "Create a Cluster API control plane.",
 		Long:    createControlPlaneLong,
 		Example: createControlPlaneExample,
+		Aliases: aliases.ControlPlane,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

@@ -25,6 +25,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
@@ -268,6 +269,7 @@ func newCreateWorkloadPoolCommand(f cmdutil.Factory) *cobra.Command {
 		Short:   "Create a Kubernetes cluster workload pool",
 		Long:    createWorkloadPoolLong,
 		Example: createWorkloadPoolExamples,
+		Aliases: aliases.WorkloadPool,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

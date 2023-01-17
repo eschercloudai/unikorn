@@ -23,6 +23,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -77,7 +78,7 @@ func (o *getWorkloadPoolOptions) complete(f cmdutil.Factory, args []string) erro
 	}
 
 	if len(args) != 0 {
-		o.names = args
+		o.names = util.UniqueString(args)
 	}
 
 	return nil
@@ -151,6 +152,7 @@ func newGetWorkloadPoolCommand(f cmdutil.Factory) *cobra.Command {
 		Short:             "Get or list Kubernetes workload pools",
 		Long:              "Get or list Kubernetes workload pools",
 		Example:           getWorkloadPoolExamples,
+		Aliases:           aliases.WorkloadPool,
 		ValidArgsFunction: o.clusterFlags.CompleteWorkloadPool(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))

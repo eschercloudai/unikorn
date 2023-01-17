@@ -26,8 +26,8 @@ import (
 func NewCreateCommand(f cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create Kubernetes clusters and resources.",
-		Long:  "Create Kubernetes clusters and resources.",
+		Short: "Create Unikorn resources.",
+		Long:  "Create Unikorn resources.",
 	}
 
 	commands := []*cobra.Command{

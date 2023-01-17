@@ -24,6 +24,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
@@ -58,11 +59,7 @@ func (o *deleteClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 // is specified.
 func (o *deleteClusterOptions) completeNames(args []string) error {
 	if !o.deleteFlags.All {
-		if len(args) == 0 {
-			return errors.ErrIncorrectArgumentNum
-		}
-
-		o.names = args
+		o.names = util.UniqueString(args)
 
 		return nil
 	}
@@ -149,11 +146,8 @@ func newDeleteClusterCommand(f cmdutil.Factory) *cobra.Command {
 		Short:             "Delete a Kubernetes cluster",
 		Long:              "Delete a Kubernetes cluster",
 		Example:           deleteClusterExamples,
+		Aliases:           aliases.Cluster,
 		ValidArgsFunction: o.controlPlaneFlags.CompleteCluster(f),
-		Aliases: []string{
-			"clusters",
-			"cl",
-		},
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

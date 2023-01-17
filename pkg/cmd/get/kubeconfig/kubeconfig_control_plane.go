@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
@@ -97,9 +98,10 @@ func newGetKubeconfigControlPlane(f cmdutil.Factory) *cobra.Command {
 	o := &getKubeconfigControlPlaneOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "control-plane",
-		Short: "Get the control plane's Kubernetes config",
-		Long:  "Get the control plane's Kubernetes config",
+		Use:     "control-plane",
+		Short:   "Get a control plane Kubernetes config",
+		Long:    "Get a control plane Kubernetes config",
+		Aliases: aliases.ControlPlane,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

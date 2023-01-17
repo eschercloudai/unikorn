@@ -38,14 +38,7 @@ var (
 	and Cluster API control planes.  It also provides various Kubernetes
 	cluster life-cycle management functions.  For additional details on
 	how the individual components operatate, see the individual 'create'
-	help topics.
-
-	This tool is designed with flexibility in mind, so doesn't force any
-	sort of cardinality between control planes and clusters, however as
-	the control plane management is somewhat new, there are bugs that
-	suggest a 1:1 mapping is best intiial for teardown operations.  In the
-	future, some upstream hardening will allow 1:N and better resource
-	utilisation.`)
+	help topics.`)
 )
 
 // newRootCommand returns the root command and all its subordinates.
