@@ -20,12 +20,16 @@ import (
 	"errors"
 	"net"
 
+	"github.com/eschercloudai/unikorn/pkg/constants"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
 	ErrStatusConditionLookup = errors.New("status condition not found")
+
+	ErrMissingLabel = errors.New("expected label is missing")
 )
 
 // IPv4AddressSliceFromIPSlice is a simple converter from Go types
@@ -90,6 +94,14 @@ func (c *Project) UpdateAvailableCondition(status corev1.ConditionStatus, reason
 	return c.UpdateCondition(ProjectConditionAvailable, status, reason, message)
 }
 
+// ResourceLabels generates a set of labels to uniquely identify the resource
+// if it were to be placed in a single global namespace.
+func (c *Project) ResourceLabels() map[string]string {
+	return map[string]string{
+		constants.ProjectLabel: c.Name,
+	}
+}
+
 // LookupCondition scans the status conditions for an existing condition whose type
 // matches.  Returns the array index, or -1 if it doesn't exist.
 func (c *ControlPlane) LookupCondition(t ControlPlaneConditionType) (*ControlPlaneCondition, error) {
@@ -140,6 +152,22 @@ func (c *ControlPlane) UpdateAvailableCondition(status corev1.ConditionStatus, r
 	return c.UpdateCondition(ControlPlaneConditionAvailable, status, reason, message)
 }
 
+// ResourceLabels generates a set of labels to uniquely identify the resource
+// if it were to be placed in a single global namespace.
+func (c *ControlPlane) ResourceLabels() (map[string]string, error) {
+	project, ok := c.Labels[constants.ProjectLabel]
+	if !ok {
+		return nil, ErrMissingLabel
+	}
+
+	labels := map[string]string{
+		constants.ProjectLabel:      project,
+		constants.ControlPlaneLabel: c.Name,
+	}
+
+	return labels, nil
+}
+
 // LookupCondition scans the status conditions for an existing condition whose type
 // matches.  Returns the array index, or -1 if it doesn't exist.
 func (c *KubernetesCluster) LookupCondition(t KubernetesClusterConditionType) (*KubernetesClusterCondition, error) {
@@ -188,6 +216,28 @@ func (c *KubernetesCluster) UpdateCondition(t KubernetesClusterConditionType, st
 // UpdateAvailableCondition updates the Available condition specifically.
 func (c *KubernetesCluster) UpdateAvailableCondition(status corev1.ConditionStatus, reason KubernetesClusterConditionReason, message string) bool {
 	return c.UpdateCondition(KubernetesClusterConditionAvailable, status, reason, message)
+}
+
+// ResourceLabels generates a set of labels to uniquely identify the resource
+// if it were to be placed in a single global namespace.
+func (c *KubernetesCluster) ResourceLabels() (map[string]string, error) {
+	project, ok := c.Labels[constants.ProjectLabel]
+	if !ok {
+		return nil, ErrMissingLabel
+	}
+
+	controlPlane, ok := c.Labels[constants.ControlPlaneLabel]
+	if !ok {
+		return nil, ErrMissingLabel
+	}
+
+	labels := map[string]string{
+		constants.ProjectLabel:           project,
+		constants.ControlPlaneLabel:      controlPlane,
+		constants.KubernetesClusterLabel: c.Name,
+	}
+
+	return labels, nil
 }
 
 // AutoscalingEnabled indicates whether cluster autoscaling is enabled for the cluster.
