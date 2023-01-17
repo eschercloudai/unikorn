@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 
@@ -66,7 +67,7 @@ func (o *getProjectOptions) complete(f cmdutil.Factory, args []string) error {
 	}
 
 	if len(args) != 0 {
-		o.names = args
+		o.names = util.UniqueString(args)
 	}
 
 	return nil
@@ -137,13 +138,11 @@ func newGetProjectCommand(f cmdutil.Factory) *cobra.Command {
 	o := newGetProjectOptions()
 
 	cmd := &cobra.Command{
-		Use:     "project",
-		Short:   "Get or list Cluster API control planes",
-		Long:    "Get or list Cluster API control planes",
-		Example: getProjectExample,
-		Aliases: []string{
-			"projects",
-		},
+		Use:               "project",
+		Short:             "Get or list projects",
+		Long:              "Get or list projects",
+		Example:           getProjectExample,
+		Aliases:           aliases.Project,
 		ValidArgsFunction: completion.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))

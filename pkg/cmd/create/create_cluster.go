@@ -29,6 +29,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
@@ -331,17 +332,18 @@ func (o *createClusterOptions) run() error {
 var (
 	//nolint:gochecknoglobals
 	createClusterLong = templates.LongDesc(`
-	Create a Kubernetes cluster
+	Create a Kubernetes cluster.
+
+	A cluster is logically an aggregate of a cluster (this command defines the
+	cluster control plane), and a set of workload pools (defined with the
+	"create workload-pool" command.)
 
 	This command will use standard lookup rules to find a clouds.yaml file on
 	your local system.  You need to supply a --cloud parameter to select the
 	cloud and user account to provision with.  Only the selected cloud will be
 	passed to CAPI for security reasons.  It's also recommended that you use
 	the shell completion for --cloud first, as that'll allow further completion
-	functions to poll OpenStack to get images, flavors etc.
-
-	Tab completion is your friend here as it's a very chunky command, with lots
-	of required flags, let that be your shepherd.`)
+	functions to poll OpenStack to get images, flavors etc.`)
 
 	//nolint:gochecknoglobals
 	createClusterExamples = util.TemplatedExample(`
@@ -359,6 +361,7 @@ func newCreateClusterCommand(f cmdutil.Factory) *cobra.Command {
 		Short:   "Create a Kubernetes cluster",
 		Long:    createClusterLong,
 		Example: createClusterExamples,
+		Aliases: aliases.Cluster,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

@@ -23,6 +23,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 
@@ -74,7 +75,7 @@ func (o *getClusterOptions) complete(f cmdutil.Factory, args []string) error {
 	}
 
 	if len(args) != 0 {
-		o.names = args
+		o.names = util.UniqueString(args)
 	}
 
 	return nil
@@ -132,6 +133,7 @@ func newGetClusterCommand(f cmdutil.Factory) *cobra.Command {
 		Short:             "Get or list Kubernetes clusters",
 		Long:              "Get or list Kubernetes clusters",
 		Example:           getClusterExamples,
+		Aliases:           aliases.Cluster,
 		ValidArgsFunction: o.controlPlaneFlags.CompleteCluster(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))

@@ -14,30 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package delete
+package util
 
-import (
-	"github.com/spf13/cobra"
+// UniqueString removes duplicates from a list.  There are no ordering
+// guarantees.
+func UniqueString(l []string) []string {
+	set := map[string]interface{}{}
 
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-)
-
-// NewDeleteCommand creates a command that is responsible for deleting various resources.
-func NewDeleteCommand(f cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete Unikorn resources",
-		Long:  "Delete Unikorn resources",
+	for _, s := range l {
+		set[s] = nil
 	}
 
-	commands := []*cobra.Command{
-		newDeleteProjectCommand(f),
-		newDeleteControlPlaneCommand(f),
-		newDeleteClusterCommand(f),
-		newDeleteWorkloadPoolCommand(f),
+	//nolint:prealloc
+	var r []string
+
+	for s := range set {
+		r = append(r, s)
 	}
 
-	cmd.AddCommand(commands...)
-
-	return cmd
+	return r
 }

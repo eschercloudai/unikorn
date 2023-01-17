@@ -24,6 +24,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
@@ -55,7 +56,7 @@ func (o *deleteControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 // is specified.
 func (o *deleteControlPlaneOptions) completeNames(args []string) error {
 	if !o.deleteFlags.All {
-		o.names = args
+		o.names = util.UniqueString(args)
 
 		return nil
 	}
@@ -135,11 +136,8 @@ func newDeleteControlPlaneCommand(f cmdutil.Factory) *cobra.Command {
 		Use:               "control-plane",
 		Short:             "Delete a control plane",
 		Long:              "Delete a control plane",
+		Aliases:           aliases.ControlPlane,
 		ValidArgsFunction: o.projectFlags.CompleteControlPlane(f),
-		Aliases: []string{
-			"control-planes",
-			"cp",
-		},
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())

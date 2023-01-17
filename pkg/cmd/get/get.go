@@ -29,8 +29,8 @@ import (
 func NewGetCommand(f cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "Get Kubernetes clusters and resources",
-		Long:  "Get Kubernetes clusters and resources",
+		Short: "Get and list Unikorn resources",
+		Long:  "Get and list Unikorn resources",
 	}
 
 	commands := []*cobra.Command{

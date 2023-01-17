@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
+	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
@@ -118,9 +119,10 @@ func newGetKubeconfigCluster(f cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "cluster",
-		Short: "Get the cluster's Kubernetes config",
-		Long:  "Get the cluster's Kubernetes config",
+		Use:     "cluster",
+		Short:   "Get a cluster Kubernetes config",
+		Long:    "Get a cluster Kubernetes config",
+		Aliases: aliases.Cluster,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.AssertNilError(o.complete(f, args))
 			util.AssertNilError(o.validate())
