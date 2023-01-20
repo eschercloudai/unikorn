@@ -21,14 +21,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -58,8 +56,8 @@ type Provisioner struct {
 
 	server string
 
-	// labels is a set of labels to identify the applications.
-	labels map[string]string
+	// scope defines a unique application scope.
+	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
@@ -71,21 +69,9 @@ func New(client client.Client, server string) *Provisioner {
 }
 
 func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
-	p.labels = l
+	p.scope = l
 
 	return p
-}
-
-func (p *Provisioner) getLabels(app string) map[string]interface{} {
-	l := map[string]interface{}{
-		constants.ApplicationLabel: app,
-	}
-
-	for k, v := range p.labels {
-		l[k] = v
-	}
-
-	return l
 }
 
 // Ensure the Provisioner interface is implemented.
@@ -99,7 +85,6 @@ func (p *Provisioner) generateCertManagerApplication() *unstructured.Unstructure
 			"metadata": map[string]interface{}{
 				"generateName": "cert-manager-",
 				"namespace":    "argocd",
-				"labels":       p.getLabels("cert-manager"),
 			},
 			"spec": map[string]interface{}{
 				"project": "default",
@@ -142,9 +127,7 @@ func (p *Provisioner) generateClusterAPIApplication() *unstructured.Unstructured
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
 			"metadata": map[string]interface{}{
-				"generateName": "cluster-api-",
-				"namespace":    "argocd",
-				"labels":       p.getLabels("cluster-api"),
+				"namespace": "argocd",
 			},
 			"spec": map[string]interface{}{
 				"project": "default",
@@ -189,47 +172,26 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	timer := prometheus.NewTimer(durationMetric)
 	defer timer.ObserveDuration()
 
-	log := log.FromContext(ctx)
-
-	// TODO: code repetition.
-	log.Info("provisioning cert manager")
-
-	if err := application.New(p.client, p.generateCertManagerApplication()).Provision(ctx); err != nil {
+	if err := application.New(p.client, "cert-manager", p.scope, p.generateCertManagerApplication()).Provision(ctx); err != nil {
 		return err
 	}
 
-	log.Info("cert manager provisioned")
-
-	log.Info("provisioning cluster API")
-
-	if err := application.New(p.client, p.generateClusterAPIApplication()).Provision(ctx); err != nil {
+	if err := application.New(p.client, "cluster-api", p.scope, p.generateClusterAPIApplication()).Provision(ctx); err != nil {
 		return err
 	}
-
-	log.Info("cluster API provisioned")
 
 	return nil
 }
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	log := log.FromContext(ctx)
-
-	log.Info("deprovisioning cluster API")
-
-	if err := application.New(p.client, p.generateClusterAPIApplication()).Deprovision(ctx); err != nil {
+	if err := application.New(p.client, "cluster-api", p.scope, p.generateClusterAPIApplication()).Deprovision(ctx); err != nil {
 		return err
 	}
 
-	log.Info("cluster API deprovisioned")
-
-	log.Info("deprovisioning cert manager")
-
-	if err := application.New(p.client, p.generateCertManagerApplication()).Deprovision(ctx); err != nil {
+	if err := application.New(p.client, "cert-manager", p.scope, p.generateCertManagerApplication()).Deprovision(ctx); err != nil {
 		return err
 	}
-
-	log.Info("cert manager deprovisioned")
 
 	return nil
 }

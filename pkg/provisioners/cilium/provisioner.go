@@ -14,12 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vcluster
+package cilium
 
 import (
 	"context"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
@@ -27,71 +25,40 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
-	// vclusterName is a static name used for all resources.  Each CP has its own
-	// namespace, so this is safe for now.
-	vclusterName = "vcluster"
-
 	// applicationName is the unique name of the application.
-	applicationName = "vcluster"
+	applicationName = "cilium"
 )
 
-var (
-	// On home broadband it'll take about 90s to pull down images, plus any
-	// readniness gates we put in the way.  If images are cached then 20s.
-	//nolint:gochecknoglobals
-	durationMetric = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name: "unikorn_vcluster_provision_duration",
-		Help: "Time taken for vcluster to provision",
-		Buckets: []float64{
-			1, 5, 10, 15, 20, 30, 45, 60, 90, 120,
-		},
-	})
-)
-
-//nolint:gochecknoinits
-func init() {
-	metrics.Registry.MustRegister(durationMetric)
-}
-
-// Provisioner wraps up a whole load of horror code required to
-// get vcluster into a deployed and usable state.
+// Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
-	// namespace is the namespace to provision in.
-	namespace string
+	// server is the ArgoCD server to provision in.
+	server string
 
-	// scope is a set of labels to identify the vcluster.
+	// scope defines a unique application scope.
 	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, namespace string) *Provisioner {
+func New(client client.Client, server string, scope map[string]string) *Provisioner {
 	return &Provisioner{
-		client:    client,
-		namespace: namespace,
+		client: client,
+		server: server,
+		scope:  scope,
 	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
-	p.scope = l
-
-	return p
-}
-
+// generateApplication creates an ArgoCD application for the
+// Cilium CNI plugin.
 func (p *Provisioner) generateApplication() *unstructured.Unstructured {
-	// Okay, from this point on, things get a bit "meta" because whoever
-	// wrote ArgoCD for some reason imported kubernetes, not client-go to
-	// get access to the schema information...
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "argoproj.io/v1alpha1",
@@ -103,27 +70,13 @@ func (p *Provisioner) generateApplication() *unstructured.Unstructured {
 				"project": "default",
 				"source": map[string]interface{}{
 					//TODO:  programmable
-					"repoURL":        "https://charts.loft.sh",
-					"chart":          "vcluster",
-					"targetRevision": "0.12.1",
-					"helm": map[string]interface{}{
-						"releaseName": "vcluster",
-						// TODO: this is only required by unikornctl to get
-						// the kubeconfig (e.g. set a reachable address).  It
-						// wastes an IP and embiggens the attack vector.  If
-						// we change this to reqire port-forwarding it'll do
-						// the trick!
-						"parameters": []map[string]interface{}{
-							{
-								"name":  "service.type",
-								"value": "LoadBalancer",
-							},
-						},
-					},
+					"repoURL":        "https://helm.cilium.io/",
+					"chart":          "cilium",
+					"targetRevision": "1.12.4",
 				},
 				"destination": map[string]interface{}{
-					"name":      "in-cluster",
-					"namespace": p.namespace,
+					"name":      p.server,
+					"namespace": "kube-system",
 				},
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
@@ -138,18 +91,9 @@ func (p *Provisioner) generateApplication() *unstructured.Unstructured {
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	timer := prometheus.NewTimer(durationMetric)
-	defer timer.ObserveDuration()
-
-	log := log.FromContext(ctx)
-
-	log.Info("provisioning vcluster")
-
 	if err := application.New(p.client, applicationName, p.scope, p.generateApplication()).Provision(ctx); err != nil {
 		return err
 	}
-
-	log.Info("vcluster provisioned")
 
 	return nil
 }

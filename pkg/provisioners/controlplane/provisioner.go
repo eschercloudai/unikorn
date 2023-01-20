@@ -65,14 +65,24 @@ type Provisioner struct {
 
 	// controlPlane is the control plane CR this deployment relates to
 	controlPlane *unikornv1alpha1.ControlPlane
+
+	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, controlPlane *unikornv1alpha1.ControlPlane) *Provisioner {
-	return &Provisioner{
+func New(client client.Client, controlPlane *unikornv1alpha1.ControlPlane) (*Provisioner, error) {
+	scope, err := controlPlane.ResourceLabels()
+	if err != nil {
+		return nil, err
+	}
+
+	provisioner := &Provisioner{
 		client:       client,
 		controlPlane: controlPlane,
+		scope:        scope,
 	}
+
+	return provisioner, nil
 }
 
 // Ensure the Provisioner interface is implemented.
@@ -92,13 +102,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	labels, err := p.controlPlane.ResourceLabels()
-	if err != nil {
-		return err
-	}
-
 	// Provision a virtual cluster for CAPI to live in.
-	vclusterProvisioner := vcluster.New(p.client, namespace.Name).WithLabels(labels)
+	vclusterProvisioner := vcluster.New(p.client, namespace.Name).WithLabels(p.scope)
 
 	if err := vclusterProvisioner.Provision(ctx); err != nil {
 		return err
@@ -110,7 +115,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	// Provision CAPI in the vcluster.
-	clusterAPIProvisioner := clusterapi.New(p.client, argoCDClusterServer(namespace.Name)).WithLabels(labels)
+	clusterAPIProvisioner := clusterapi.New(p.client, p.argoCDClusterName()).WithLabels(p.scope)
 
 	if err := clusterAPIProvisioner.Provision(ctx); err != nil {
 		return err
@@ -158,6 +163,11 @@ func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace
 	return namespace, nil
 }
 
+// argoCDClusterName returns a human readable server name.
+func (p *Provisioner) argoCDClusterName() string {
+	return fmt.Sprintf("vcluster-%s-%s", p.scope[constants.ProjectLabel], p.controlPlane.Name)
+}
+
 // argoCDClusterServer returns the ArgoCD vcluster server name for a namespace.
 func argoCDClusterServer(namespace string) string {
 	return fmt.Sprintf("https://vcluster.%s", namespace)
@@ -180,7 +190,7 @@ func (p *Provisioner) provisionArgoCDCluster(ctx context.Context, namespace stri
 		return err
 	}
 
-	if err := argocdcluster.Upsert(ctx, argocd, argoCDClusterServer(namespace), vclusterConfig); err != nil {
+	if err := argocdcluster.Upsert(ctx, argocd, p.argoCDClusterName(), argoCDClusterServer(namespace), vclusterConfig); err != nil {
 		return err
 	}
 
@@ -204,23 +214,18 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	labels, err := p.controlPlane.ResourceLabels()
-	if err != nil {
-		return err
-	}
-
 	// Deprovision the CAPI application.
-	if err := clusterapi.New(p.client, "").WithLabels(labels).Deprovision(ctx); err != nil {
+	if err := clusterapi.New(p.client, "").WithLabels(p.scope).Deprovision(ctx); err != nil {
 		return err
 	}
 
 	// Delete the cluster from ArgoCD
-	if err := p.deprovisionArgoCDCluster(ctx, namespace.Name); err != nil {
+	if err := p.deprovisionArgoCDCluster(ctx); err != nil {
 		return err
 	}
 
 	// Deprovision the vcluster application.
-	if err := vcluster.New(p.client, namespace.Name).WithLabels(labels).Deprovision(ctx); err != nil {
+	if err := vcluster.New(p.client, namespace.Name).WithLabels(p.scope).Deprovision(ctx); err != nil {
 		return err
 	}
 
@@ -250,13 +255,13 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 }
 
 // deprovisionArgoCDCluster removes the vcluster from ArgoCD.
-func (p *Provisioner) deprovisionArgoCDCluster(ctx context.Context, namespace string) error {
+func (p *Provisioner) deprovisionArgoCDCluster(ctx context.Context) error {
 	argocd, err := argocdclient.NewInCluster(ctx, p.client, "argocd")
 	if err != nil {
 		return err
 	}
 
-	if err := argocdcluster.Delete(ctx, argocd, argoCDClusterServer(namespace)); err != nil {
+	if err := argocdcluster.Delete(ctx, argocd, p.argoCDClusterName()); err != nil {
 		return err
 	}
 
