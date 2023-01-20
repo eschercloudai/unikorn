@@ -33,7 +33,7 @@ var (
 
 // Upsert is an idempotent method to create a cluster in ArgoCD from a client config.
 // This is limited to X.509 mutual authentication at present.
-func Upsert(ctx context.Context, client *argocdapi.APIClient, name string, config *clientcmdapi.Config) error {
+func Upsert(ctx context.Context, client *argocdapi.APIClient, name, server string, config *clientcmdapi.Config) error {
 	clientContext, ok := config.Contexts[config.CurrentContext]
 	if !ok {
 		return ErrContextUndefined
@@ -48,7 +48,8 @@ func Upsert(ctx context.Context, client *argocdapi.APIClient, name string, confi
 	clusterConfig.SetTlsClientConfig(*tlsClientConfig)
 
 	cluster := argocdapi.NewV1alpha1Cluster()
-	cluster.SetServer(name)
+	cluster.SetName(name)
+	cluster.SetServer(server)
 	cluster.SetConfig(*clusterConfig)
 
 	if _, _, err := client.ClusterServiceApi.ClusterServiceCreate(ctx).Body(*cluster).Upsert(true).Execute(); err != nil {
@@ -68,11 +69,11 @@ func Delete(ctx context.Context, client *argocdapi.APIClient, name string) error
 	}
 
 	for _, cluster := range clusters.Items {
-		if *cluster.Server != name {
+		if *cluster.Name != name {
 			continue
 		}
 
-		if _, _, err := client.ClusterServiceApi.ClusterServiceDelete(ctx, url.QueryEscape(name)).Execute(); err != nil {
+		if _, _, err := client.ClusterServiceApi.ClusterServiceDelete(ctx, url.QueryEscape(*cluster.Server)).Execute(); err != nil {
 			return err
 		}
 

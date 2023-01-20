@@ -57,9 +57,7 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 
-	server := fmt.Sprintf("https://vcluster.%s", object.Namespace)
-
-	provisioner, err := cluster.New(ctx, r.client, object, server)
+	provisioner, err := cluster.New(ctx, r.client, object)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

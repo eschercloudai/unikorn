@@ -57,7 +57,10 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 
-	provisioner := controlplane.New(r.client, object)
+	provisioner, err := controlplane.New(r.client, object)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	// If it's being deleted, ignore it, we don't need to take any additional action.
 	if object.DeletionTimestamp != nil {
