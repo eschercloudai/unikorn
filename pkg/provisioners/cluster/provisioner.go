@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"golang.org/x/sync/errgroup"
@@ -35,6 +36,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -162,18 +164,6 @@ func getWorkloadPools(ctx context.Context, c client.Client, cluster *unikornv1al
 	return filtered, nil
 }
 
-// hasDefaultWorkloadPool indicates that there is a workload pool named default,
-// thus overriding the Helm default in values.yaml.
-func (p *Provisioner) hasDefaultWorkloadPool() bool {
-	for _, pool := range p.workloadPools.Items {
-		if pool.Name == "default" {
-			return true
-		}
-	}
-
-	return false
-}
-
 // generateWorkloadPoolHelmValues translates the API's idea of a workload pool into
 // what's expected by the underlying Helm chart.
 func (p *Provisioner) generateWorkloadPoolHelmValues() map[string]interface{} {
@@ -274,18 +264,23 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 		nameservers[i] = nameserver.IP.String()
 	}
 
+	openstackValues := map[string]interface{}{
+		"cloud":             *p.cluster.Spec.Openstack.Cloud,
+		"cloudsYAML":        base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
+		"ca":                base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
+		"sshKeyName":        *p.cluster.Spec.Openstack.SSHKeyName,
+		"failureDomain":     *p.cluster.Spec.Openstack.FailureDomain,
+		"externalNetworkID": *p.cluster.Spec.Openstack.ExternalNetworkID,
+	}
+
+	if p.cluster.Spec.Openstack.SSHKeyName != nil {
+		openstackValues["sshKeyName"] = *p.cluster.Spec.Openstack.SSHKeyName
+	}
+
 	// TODO: generate types from the Helm values schema.
 	// TODO: add in API configuration.
 	valuesRaw := map[string]interface{}{
-		"openstack": map[string]interface{}{
-			"cloud":             *p.cluster.Spec.Openstack.Cloud,
-			"cloudsYAML":        base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
-			"ca":                base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
-			"sshKeyName":        *p.cluster.Spec.Openstack.SSHKeyName,
-			"region":            *p.cluster.Spec.Openstack.Region,
-			"failureDomain":     *p.cluster.Spec.Openstack.FailureDomain,
-			"externalNetworkID": *p.cluster.Spec.Openstack.ExternalNetworkID,
-		},
+		"openstack": openstackValues,
 		"cluster": map[string]interface{}{
 			"taints": []interface{}{
 				// This prevents things like coreDNS from coming up until
@@ -320,17 +315,6 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 		return nil, err
 	}
 
-	var parameters interface{}
-
-	if !p.hasDefaultWorkloadPool() {
-		parameters = []interface{}{
-			map[string]interface{}{
-				"name":  "workloadPools.default",
-				"value": "null",
-			},
-		}
-	}
-
 	labels, err := p.getLabels("kubernetes-cluster")
 	if err != nil {
 		return nil, err
@@ -354,16 +338,28 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api-cluster-openstack",
-					"targetRevision": "v0.3.2",
+					"targetRevision": "v0.3.4",
 					"helm": map[string]interface{}{
 						"releaseName": p.cluster.Name,
 						"values":      string(values),
-						"parameters":  parameters,
 					},
 				},
 				"destination": map[string]interface{}{
 					"name":      p.server,
 					"namespace": p.cluster.Name,
+				},
+				"ignoreDifferences": []interface{}{
+					// We use a JQ query to select machine deployments that
+					// have auto-scaling constraints on them.  If they do, then
+					// ignore the replicas field as the cluster autoscaler will
+					// update that and we don't want to revert it.
+					map[string]interface{}{
+						"group": "cluster.x-k8s.io/v1beta1",
+						"kind":  "MachineDeployments",
+						"jqPathExpressions": []interface{}{
+							`select(.metadata.annotations["capacity.cluster-autoscaler.kubernetes.io/cpu"] != null) | .spec.replicas`,
+						},
+					},
 				},
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
@@ -651,10 +647,6 @@ func (p *Provisioner) generateClusterAuotscalerApplication() (*unstructured.Unst
 							map[string]interface{}{
 								"name":  "extraArgs.scale-down-unneeded-time",
 								"value": "5m",
-							},
-							map[string]interface{}{
-								"name":  "rbac.clusterScoped",
-								"value": "false",
 							},
 						},
 					},
@@ -1098,33 +1090,12 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	return nil
 }
 
-// Deprovision implements the Provision interface.
-//
-//nolint:cyclop
-func (p *Provisioner) Deprovision(ctx context.Context) error {
+// deprovisionKubernetesClusterAddOns removes the various addons required in the
+// cluster to get it running.
+func (p *Provisioner) deprovisionKubernetesClusterAddOns(ctx context.Context, config *clientcmdapi.Config) error {
 	log := log.FromContext(ctx)
 
-	config, err := p.getKubernetesClusterConfig(ctx)
-	if err != nil {
-		return err
-	}
-
 	server := config.Clusters[config.Contexts[config.CurrentContext].Cluster].Server
-
-	if p.cluster.AutoscalingEnabled() {
-		log.Info("deprovisioning cluster autoscaler")
-
-		object, err := p.generateClusterAuotscalerApplication()
-		if err != nil {
-			return err
-		}
-
-		if err := application.New(p.client, object).Deprovision(ctx); err != nil {
-			return err
-		}
-
-		log.Info("cluster autoscaler deprovisioned")
-	}
 
 	log.Info("deprovisioning cilium")
 
@@ -1150,10 +1121,8 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("openstack cloud provider deprovisioned")
-
-	log.Info("deprovisioning kubernetes cluster")
-
+	// TODO: Can I delete the cluster and then have all the dependent applications
+	// get magically cleaned up?
 	argocd, err := argocdclient.NewInCluster(ctx, p.client, "argocd")
 	if err != nil {
 		return err
@@ -1163,7 +1132,51 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	object, err = p.generateApplication()
+	return nil
+}
+
+// Deprovision implements the Provision interface.
+func (p *Provisioner) Deprovision(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	if p.cluster.AutoscalingEnabled() {
+		log.Info("deprovisioning cluster autoscaler")
+
+		object, err := p.generateClusterAuotscalerApplication()
+		if err != nil {
+			return err
+		}
+
+		if err := application.New(p.client, object).Deprovision(ctx); err != nil {
+			return err
+		}
+
+		log.Info("cluster autoscaler deprovisioned")
+	}
+
+	// Clean up the add-ons, if the config doesn't exist, we can infer that the
+	// ArgoCD cluster was never created and neither were the add-ons.
+	// There is a global timeout we cannot get rid of, but we can make a
+	// quicker one.
+	quickContext, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	config, err := p.getKubernetesClusterConfig(quickContext)
+	if err != nil {
+		if !kerrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	if config != nil {
+		if err := p.deprovisionKubernetesClusterAddOns(ctx, config); err != nil {
+			return err
+		}
+	}
+
+	log.Info("deprovisioning kubernetes cluster")
+
+	object, err := p.generateApplication()
 	if err != nil {
 		return err
 	}

@@ -417,11 +417,6 @@ func (in *KubernetesClusterOpenstackSpec) DeepCopyInto(out *KubernetesClusterOpe
 		*out = new(string)
 		**out = **in
 	}
-	if in.Region != nil {
-		in, out := &in.Region, &out.Region
-		*out = new(string)
-		**out = **in
-	}
 	if in.FailureDomain != nil {
 		in, out := &in.FailureDomain, &out.FailureDomain
 		*out = new(string)

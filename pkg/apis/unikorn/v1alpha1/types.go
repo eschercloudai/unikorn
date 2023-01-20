@@ -514,9 +514,7 @@ type KubernetesClusterOpenstackSpec struct {
 	// to use for provisioning.
 	Cloud *string `json:"cloud"`
 	// SSHKeyName is the SSH key name to use to provide access to the VMs.
-	SSHKeyName *string `json:"sshKeyName"`
-	// Region is the region that the cluster is provisioned in.
-	Region *string `json:"region"`
+	SSHKeyName *string `json:"sshKeyName,omitempty"`
 	// FailureDomain is the global failure domain to use.  The control plane
 	// will always be deployed in this region.  Individual worload pools will
 	// default to this, but can override it.
