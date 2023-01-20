@@ -125,17 +125,11 @@ type createClusterOptions struct {
 	// diskSize defines the persistent volume size to provision with.
 	diskSize flags.QuantityFlag
 
-	// region is the OpenStack region the cluster exists in.
-	region string
-
 	// availabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.
 	availabilityZone string
 
 	// sshKeyName defines the SSH key to inject onto the Kubernetes cluster.
-	// TODO: this is a legacy thing, and a security hole.  I'm pretty sure
-	// cloud-init will do all the provisioning.  If we need access for support
-	// then there are better ways of achieving this.
 	sshKeyName string
 
 	// autoscaling allows the cluster to determine its own destiny, not the
@@ -170,9 +164,8 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 
 	// Openstack provisioning options.
 	flags.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Kubernetes Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
-	flags.RequiredStringVar(cmd, &o.region, "region", "", "Openstack region to provision into.")
 	flags.RequiredStringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
-	flags.RequiredStringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
+	flags.StringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
 
 	// Feature enablement.
 	cmd.Flags().BoolVar(&o.autoscaling, "enable-autoscaling", false, "Enables cluster auto-scaling. To function, you must configure autoscaling on individual workload pools.")
@@ -287,7 +280,6 @@ func (o *createClusterOptions) run() error {
 				CACert:            &o.caCert,
 				CloudConfig:       &o.clouds,
 				Cloud:             &o.cloud,
-				Region:            &o.region,
 				FailureDomain:     &o.availabilityZone,
 				SSHKeyName:        &o.sshKeyName,
 				ExternalNetworkID: &o.externalNetworkID,
@@ -348,7 +340,7 @@ var (
 	//nolint:gochecknoglobals
 	createClusterExamples = util.TemplatedExample(`
         # Create a Kubernetes cluster
-        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --ssh-key-name spjmurray --external-network c9d130bc-301d-45c0-9328-a6964af65579 --flavor c.small --version v1.24.7 --image ubuntu-2004-kube-v1.24.7 --availability-zone nova baz`)
+        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --external-network c9d130bc-301d-45c0-9328-a6964af65579 --flavor c.small --version v1.24.7 --image ubuntu-2004-kube-v1.24.7 --availability-zone nova baz`)
 )
 
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes

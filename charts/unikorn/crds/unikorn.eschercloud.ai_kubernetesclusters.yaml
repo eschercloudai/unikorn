@@ -179,10 +179,6 @@ spec:
                       control plane will always be deployed in this region.  Individual
                       worload pools will default to this, but can override it.
                     type: string
-                  region:
-                    description: Region is the region that the cluster is provisioned
-                      in.
-                    type: string
                   sshKeyName:
                     description: SSHKeyName is the SSH key name to use to provide
                       access to the VMs.
@@ -193,8 +189,6 @@ spec:
                 - cloudConfig
                 - externalNetworkId
                 - failureDomain
-                - region
-                - sshKeyName
                 type: object
               timeout:
                 default: 20m

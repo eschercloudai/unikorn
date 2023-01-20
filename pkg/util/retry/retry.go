@@ -80,7 +80,7 @@ func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
 	for {
 		select {
 		case <-c.Done():
-			return fmt.Errorf("%w: last error: %s", c.Err(), rerr.Error())
+			return fmt.Errorf("%s: %w", c.Err().Error(), rerr)
 		case <-t.C:
 			if rerr = f(); rerr != nil {
 				break

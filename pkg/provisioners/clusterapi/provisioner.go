@@ -152,7 +152,7 @@ func (p *Provisioner) generateClusterAPIApplication() *unstructured.Unstructured
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api",
-					"targetRevision": "v0.1.1",
+					"targetRevision": "v0.1.3",
 				},
 				"destination": map[string]interface{}{
 					"name": p.server,
@@ -161,15 +161,6 @@ func (p *Provisioner) generateClusterAPIApplication() *unstructured.Unstructured
 					{
 						"group": "rbac.authorization.k8s.io",
 						"kind":  "ClusterRole",
-						"name":  "capi-aggregated-manager-role",
-						"jsonPointers": []interface{}{
-							"/rules",
-						},
-					},
-					{
-						"group": "rbac.authorization.k8s.io",
-						"kind":  "ClusterRole",
-						"name":  "capi-kubeadm-control-plane-aggregated-manager-role",
 						"jsonPointers": []interface{}{
 							"/rules",
 						},
