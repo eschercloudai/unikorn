@@ -45,22 +45,13 @@ type Provisioner struct {
 
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1alpha1.KubernetesCluster
-
-	// scope defines a unique application scope.
-	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
 func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.KubernetesCluster) (*Provisioner, error) {
-	scope, err := cluster.ResourceLabels()
-	if err != nil {
-		return nil, err
-	}
-
 	provisioner := &Provisioner{
 		client:  client,
 		cluster: cluster,
-		scope:   scope,
 	}
 
 	return provisioner, nil
@@ -71,17 +62,17 @@ var _ provisioners.Provisioner = &Provisioner{}
 
 // newOpenstackCloudProviderProvisioner wraps up OCP provisioner configuration.
 func (p *Provisioner) newOpenstackCloudProviderProvisioner() *openstackcloudprovider.Provisioner {
-	return openstackcloudprovider.New(p.client, p.argoCDClusterName(), p.scope, p.cluster)
+	return openstackcloudprovider.New(p.client, p.cluster, p.argoCDClusterName())
 }
 
 // newCiliumProvisioner wraps up Cilium provisioner configuration.
 func (p *Provisioner) newCiliumProvisioner() *cilium.Provisioner {
-	return cilium.New(p.client, p.argoCDClusterName(), p.scope)
+	return cilium.New(p.client, p.cluster, p.argoCDClusterName())
 }
 
 // argoCDClusterName returns a human readable server name.
 func (p *Provisioner) argoCDClusterName() string {
-	return fmt.Sprintf("kubernetes-%s-%s-%s", p.scope[constants.ProjectLabel], p.scope[constants.ControlPlaneLabel], p.cluster.Name)
+	return fmt.Sprintf("kubernetes-%s-%s-%s", p.cluster.Labels[constants.ProjectLabel], p.cluster.Labels[constants.ControlPlaneLabel], p.cluster.Name)
 }
 
 // getKubernetesClusterConfig retrieves the Kubernetes configuration from

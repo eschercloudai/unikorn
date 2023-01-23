@@ -28,6 +28,7 @@ import (
 	argocdcluster "github.com/eschercloudai/unikorn/pkg/argocd/cluster"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/certmanager"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusterapi"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
@@ -65,21 +66,13 @@ type Provisioner struct {
 
 	// controlPlane is the control plane CR this deployment relates to
 	controlPlane *unikornv1alpha1.ControlPlane
-
-	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
 func New(client client.Client, controlPlane *unikornv1alpha1.ControlPlane) (*Provisioner, error) {
-	scope, err := controlPlane.ResourceLabels()
-	if err != nil {
-		return nil, err
-	}
-
 	provisioner := &Provisioner{
 		client:       client,
 		controlPlane: controlPlane,
-		scope:        scope,
 	}
 
 	return provisioner, nil
@@ -103,9 +96,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	// Provision a virtual cluster for CAPI to live in.
-	vclusterProvisioner := vcluster.New(p.client, namespace.Name).WithLabels(p.scope)
-
-	if err := vclusterProvisioner.Provision(ctx); err != nil {
+	if err := vcluster.New(p.client, p.controlPlane, namespace.Name).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -114,10 +105,13 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	// Provision CAPI in the vcluster.
-	clusterAPIProvisioner := clusterapi.New(p.client, p.argoCDClusterName()).WithLabels(p.scope)
+	// Provision cert manager in the vcluster.
+	if err := certmanager.New(p.client, p.controlPlane, p.argoCDClusterName()).Provision(ctx); err != nil {
+		return err
+	}
 
-	if err := clusterAPIProvisioner.Provision(ctx); err != nil {
+	// Provision CAPI in the vcluster.
+	if err := clusterapi.New(p.client, p.controlPlane, p.argoCDClusterName()).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -165,7 +159,7 @@ func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace
 
 // argoCDClusterName returns a human readable server name.
 func (p *Provisioner) argoCDClusterName() string {
-	return fmt.Sprintf("vcluster-%s-%s", p.scope[constants.ProjectLabel], p.controlPlane.Name)
+	return fmt.Sprintf("vcluster-%s-%s", p.controlPlane.Labels[constants.ProjectLabel], p.controlPlane.Name)
 }
 
 // argoCDClusterServer returns the ArgoCD vcluster server name for a namespace.
@@ -215,7 +209,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	// Deprovision the CAPI application.
-	if err := clusterapi.New(p.client, "").WithLabels(p.scope).Deprovision(ctx); err != nil {
+	if err := clusterapi.New(p.client, p.controlPlane, p.argoCDClusterName()).Deprovision(ctx); err != nil {
+		return err
+	}
+
+	// Deprovision the cert manager application.
+	if err := certmanager.New(p.client, p.controlPlane, p.argoCDClusterName()).Deprovision(ctx); err != nil {
 		return err
 	}
 
@@ -225,7 +224,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	// Deprovision the vcluster application.
-	if err := vcluster.New(p.client, namespace.Name).WithLabels(p.scope).Deprovision(ctx); err != nil {
+	if err := vcluster.New(p.client, p.controlPlane, namespace.Name).Deprovision(ctx); err != nil {
 		return err
 	}
 

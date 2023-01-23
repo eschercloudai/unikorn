@@ -70,7 +70,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.Kub
 var _ provisioners.Provisioner = &Provisioner{}
 
 func (p *Provisioner) newClusterAutoscalerProvisioner() *clusterautoscaler.Provisioner {
-	return clusterautoscaler.New(p.client, p.server, p.scope, p.cluster.Name, p.cluster.Name, p.cluster.Name+"-kubeconfig")
+	return clusterautoscaler.New(p.client, p.cluster, p.server, p.cluster.Name, p.cluster.Name, p.cluster.Name+"-kubeconfig")
 }
 
 // Provision implements the Provision interface.
