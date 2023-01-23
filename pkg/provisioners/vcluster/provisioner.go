@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -64,41 +63,43 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
+	// resource defines the unique resource this provisoner belongs to.
+	resource application.MutuallyExclusiveResource
+
 	// namespace is the namespace to provision in.
 	namespace string
-
-	// scope is a set of labels to identify the vcluster.
-	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, namespace string) *Provisioner {
+func New(client client.Client, resource application.MutuallyExclusiveResource, namespace string) *Provisioner {
 	return &Provisioner{
 		client:    client,
+		resource:  resource,
 		namespace: namespace,
 	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
+var _ application.Generator = &Provisioner{}
 
-func (p *Provisioner) WithLabels(l map[string]string) *Provisioner {
-	p.scope = l
-
-	return p
+// Resource implements the application.Generator interface.
+func (p *Provisioner) Resource() application.MutuallyExclusiveResource {
+	return p.resource
 }
 
-func (p *Provisioner) generateApplication() *unstructured.Unstructured {
+// Name implements the application.Generator interface.
+func (p *Provisioner) Name() string {
+	return applicationName
+}
+
+// Generate implements the application.Generator interface.
+func (p *Provisioner) Generate() (client.Object, error) {
 	// Okay, from this point on, things get a bit "meta" because whoever
 	// wrote ArgoCD for some reason imported kubernetes, not client-go to
 	// get access to the schema information...
-	return &unstructured.Unstructured{
+	object := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "argoproj.io/v1alpha1",
-			"kind":       "Application",
-			"metadata": map[string]interface{}{
-				"namespace": "argocd",
-			},
 			"spec": map[string]interface{}{
 				"project": "default",
 				"source": map[string]interface{}{
@@ -134,6 +135,8 @@ func (p *Provisioner) generateApplication() *unstructured.Unstructured {
 			},
 		},
 	}
+
+	return object, nil
 }
 
 // Provision implements the Provision interface.
@@ -141,22 +144,16 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	timer := prometheus.NewTimer(durationMetric)
 	defer timer.ObserveDuration()
 
-	log := log.FromContext(ctx)
-
-	log.Info("provisioning vcluster")
-
-	if err := application.New(p.client, applicationName, p.scope, p.generateApplication()).Provision(ctx); err != nil {
+	if err := application.New(p.client, p).Provision(ctx); err != nil {
 		return err
 	}
-
-	log.Info("vcluster provisioned")
 
 	return nil
 }
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	if err := application.New(p.client, applicationName, p.scope, p.generateApplication()).Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p).Deprovision(ctx); err != nil {
 		return err
 	}
 

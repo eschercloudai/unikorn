@@ -24,11 +24,16 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
+	// ErrStatusConditionLookup is raised when a condition is not found in
+	// the resource status.
 	ErrStatusConditionLookup = errors.New("status condition not found")
 
+	// ErrMissingLabel is raised when an expected label is not present on
+	// a resource.
 	ErrMissingLabel = errors.New("expected label is missing")
 )
 
@@ -96,10 +101,12 @@ func (c *Project) UpdateAvailableCondition(status corev1.ConditionStatus, reason
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
 // if it were to be placed in a single global namespace.
-func (c *Project) ResourceLabels() map[string]string {
-	return map[string]string{
+func (c *Project) ResourceLabels() (labels.Set, error) {
+	labels := labels.Set{
 		constants.ProjectLabel: c.Name,
 	}
+
+	return labels, nil
 }
 
 // LookupCondition scans the status conditions for an existing condition whose type
@@ -154,13 +161,13 @@ func (c *ControlPlane) UpdateAvailableCondition(status corev1.ConditionStatus, r
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
 // if it were to be placed in a single global namespace.
-func (c *ControlPlane) ResourceLabels() (map[string]string, error) {
+func (c *ControlPlane) ResourceLabels() (labels.Set, error) {
 	project, ok := c.Labels[constants.ProjectLabel]
 	if !ok {
 		return nil, ErrMissingLabel
 	}
 
-	labels := map[string]string{
+	labels := labels.Set{
 		constants.ProjectLabel:      project,
 		constants.ControlPlaneLabel: c.Name,
 	}
@@ -220,7 +227,7 @@ func (c *KubernetesCluster) UpdateAvailableCondition(status corev1.ConditionStat
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
 // if it were to be placed in a single global namespace.
-func (c *KubernetesCluster) ResourceLabels() (map[string]string, error) {
+func (c *KubernetesCluster) ResourceLabels() (labels.Set, error) {
 	project, ok := c.Labels[constants.ProjectLabel]
 	if !ok {
 		return nil, ErrMissingLabel
@@ -231,7 +238,7 @@ func (c *KubernetesCluster) ResourceLabels() (map[string]string, error) {
 		return nil, ErrMissingLabel
 	}
 
-	labels := map[string]string{
+	labels := labels.Set{
 		constants.ProjectLabel:           project,
 		constants.ControlPlaneLabel:      controlPlane,
 		constants.KubernetesClusterLabel: c.Name,

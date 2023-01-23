@@ -54,23 +54,30 @@ type Provisioner struct {
 
 	// server is the ArgoCD server to provision in.
 	server string
-
-	// scope defines a unique application scope.
-	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, server string, scope map[string]string, cluster *unikornv1alpha1.KubernetesCluster) *Provisioner {
+func New(client client.Client, cluster *unikornv1alpha1.KubernetesCluster, server string) *Provisioner {
 	return &Provisioner{
 		client:  client,
 		cluster: cluster,
 		server:  server,
-		scope:   scope,
 	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
+var _ application.Generator = &Provisioner{}
+
+// Resource implements the application.Generator interface.
+func (p *Provisioner) Resource() application.MutuallyExclusiveResource {
+	return p.cluster
+}
+
+// Name implements the application.Generator interface.
+func (p *Provisioner) Name() string {
+	return applicationName
+}
 
 // generateGlobalValues does the horrific translation
 // between the myriad ways that OpenStack deems necessary to authenticate to the
@@ -160,11 +167,10 @@ func (p *Provisioner) generateGlobalValues() (map[string]interface{}, error) {
 	return global, nil
 }
 
-// generateApplication creates an ArgoCD application for
-// the Openstack controller manager.  Note there is an option, to just pass through
-// the clouds.yaml file, however the chart doesn't allow it to be exposed so we need
-// to translate between formats.
-func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) {
+// Generate implements the application.Generator interface.
+// Note there is an option, to just pass through the clouds.yaml file, however
+// the chart doesn't allow it to be exposed so we need to translate between formats.
+func (p *Provisioner) Generate() (client.Object, error) {
 	cloudConfigGlobal, err := p.generateGlobalValues()
 	if err != nil {
 		return nil, err
@@ -245,12 +251,7 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	object, err := p.generateApplication()
-	if err != nil {
-		return err
-	}
-
-	if err := application.New(p.client, applicationName, p.scope, object).Provision(ctx); err != nil {
+	if err := application.New(p.client, p).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -259,12 +260,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	object, err := p.generateApplication()
-	if err != nil {
-		return err
-	}
-
-	if err := application.New(p.client, applicationName, p.scope, object).Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p).Deprovision(ctx); err != nil {
 		return err
 	}
 

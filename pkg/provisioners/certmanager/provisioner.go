@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clusterapi
+package certmanager
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 
 const (
 	// applicationName is the unique name of the application.
-	applicationName = "cluster-api"
+	applicationName = "cert-manager"
 )
 
 // Provisioner wraps up a whole load of horror code required to
@@ -76,33 +76,30 @@ func (p *Provisioner) Generate() (client.Object, error) {
 				"project": "default",
 				"source": map[string]interface{}{
 					//TODO:  programmable
-					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
-					"chart":          "cluster-api",
-					"targetRevision": "v0.1.3",
+					"repoURL":        "https://charts.jetstack.io",
+					"chart":          "cert-manager",
+					"targetRevision": "v1.10.1",
+					"helm": map[string]interface{}{
+						"releaseName": "cert-manager",
+						"parameters": []map[string]interface{}{
+							{
+								"name":  "installCRDs",
+								"value": "true",
+							},
+						},
+					},
 				},
 				"destination": map[string]interface{}{
-					"name": p.server,
-				},
-				"ignoreDifferences": []map[string]interface{}{
-					{
-						"group": "rbac.authorization.k8s.io",
-						"kind":  "ClusterRole",
-						"jsonPointers": []interface{}{
-							"/rules",
-						},
-					},
-					{
-						"group": "apiextensions.k8s.io",
-						"kind":  "CustomResourceDefinition",
-						"jsonPointers": []interface{}{
-							"/spec/conversion/webhook/clientConfig/caBundle",
-						},
-					},
+					"name":      p.server,
+					"namespace": "cert-manager",
 				},
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
 						"prune":    true,
+					},
+					"syncOptions": []string{
+						"CreateNamespace=true",
 					},
 				},
 			},

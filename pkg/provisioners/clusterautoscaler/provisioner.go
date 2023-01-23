@@ -37,25 +37,29 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
+	// resource defines the unique resource this provisoner belongs to.
+	resource application.MutuallyExclusiveResource
+
 	// server is the ArgoCD server to provision in.
 	server string
 
-	// scope defines a unique application scope.
-	scope map[string]string
-
+	// namespace defines the namespace to provison into.
 	namespace string
 
+	// clusterName defines the CAPI cluster name.
 	clusterName string
 
+	// clusterKubeconfigSecretName defines the secret that contains the
+	// kubeconfig for the cluster.
 	clusterKubeconfigSecretName string
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, server string, scope map[string]string, namespace, clusterName, clusterKubeconfigSecretName string) *Provisioner {
+func New(client client.Client, resource application.MutuallyExclusiveResource, server string, namespace, clusterName, clusterKubeconfigSecretName string) *Provisioner {
 	return &Provisioner{
 		client:                      client,
+		resource:                    resource,
 		server:                      server,
-		scope:                       scope,
 		namespace:                   namespace,
 		clusterName:                 clusterName,
 		clusterKubeconfigSecretName: clusterKubeconfigSecretName,
@@ -64,18 +68,25 @@ func New(client client.Client, server string, scope map[string]string, namespace
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
+var _ application.Generator = &Provisioner{}
 
-// generateClusterAuotscalerApplication creates an in-cluster instance of the
-// cluster autoscaler that is deployed in the same namespace as the cluster,
-// with clsuter scoped privilege (namespace scoped doesn't work).
-func (p *Provisioner) generateApplication() *unstructured.Unstructured {
-	return &unstructured.Unstructured{
+// Name implements the application.Generator interface.
+func (p *Provisioner) Name() string {
+	return applicationName
+}
+
+// Resource implements the application.Generator interface.
+func (p *Provisioner) Resource() application.MutuallyExclusiveResource {
+	return p.resource
+}
+
+// Generate implements the application.Generator interface.
+// Note: this generates an in-cluster instance of the cluster autoscaler
+// that is deployed in the same namespace as the cluster, with cluster
+// scoped privilege (namespace scoped doesn't work).
+func (p *Provisioner) Generate() (client.Object, error) {
+	object := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "argoproj.io/v1alpha1",
-			"kind":       "Application",
-			"metadata": map[string]interface{}{
-				"namespace": "argocd",
-			},
 			"spec": map[string]interface{}{
 				"project": "default",
 				"source": map[string]interface{}{
@@ -125,11 +136,13 @@ func (p *Provisioner) generateApplication() *unstructured.Unstructured {
 			},
 		},
 	}
+
+	return object, nil
 }
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	if err := application.New(p.client, applicationName, p.scope, p.generateApplication()).Provision(ctx); err != nil {
+	if err := application.New(p.client, p).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -138,7 +151,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	if err := application.New(p.client, applicationName, p.scope, p.generateApplication()).Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p).Deprovision(ctx); err != nil {
 		return err
 	}
 

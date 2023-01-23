@@ -31,42 +31,94 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	// namespace is where all the applications live.  BY necessity at
+	// present.
+	// TODO: Make this dynamic.
+	namespace = "argocd"
+)
+
 var (
+	// ErrItemLengthMismatch is returned when items are listed but the
+	// wrong number are returned.  Given we are dealing with unique applications
+	// one or zero are expected.
 	ErrItemLengthMismatch = errors.New("item count not as expected")
 )
 
-// Provisioner wraps up a whole load of horror code required to
-// get vcluster into a deployed and usable state.
+// MutuallyExclusiveResource is a generic interface over all resource types,
+// where the resource can be uniquely identified.  As these typically map to
+// custom resource types, be extra careful you don't overload anything in
+// metav1.Object or runtime.Object.
+type MutuallyExclusiveResource interface {
+	// ResourceLabels returns a set of labels from the resource that uniquely
+	// identify it, if they all were to reside in the same namespace.
+	// In database terms this would be a composite key.
+	ResourceLabels() (labels.Set, error)
+}
+
+// Generator defines a common interface for clients to
+// generate application templates.
+type Generator interface {
+	// Resouece returns the parent resource an application
+	// belongs to.
+	Resource() MutuallyExclusiveResource
+
+	// Name returns the unique application name.
+	Name() string
+
+	// Generate creates an application resource template. It just needs
+	// to return the spec as a top level key, all other type and object
+	// meta are filled in by this.
+	// TODO: This is still very Argo specific, we need to abstract away
+	// this to be more Helm-centric.
+	Generate() (client.Object, error)
+}
+
+// Provisioner deploys an application that is keyed to a specific resource.
+// For example, ArgoCD dictates that applications be installed in the same
+// namespace, so we use the resource to define a unique set of labels that
+// identifies that resource out of all others, and add in the application
+// name to uniquely identify the application within that resource.
+// TODO: These can still alias e.g. {a: a, app: foo} and {a: a, b: b, app: foo}
+// match when selected using the first set with the same application deployed
+// in different scopes.
 type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
-	// name is the application name.
-	name string
-
-	// object is the object's required state.
-	object client.Object
-
-	// labels defines a unique application label selector.
-	labels labels.Set
+	// generator provides application generation functionality.
+	generator Generator
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, name string, scope labels.Set, object client.Object) *Provisioner {
+func New(client client.Client, generator Generator) *Provisioner {
 	return &Provisioner{
-		client: client,
-		name:   name,
-		object: object,
-		labels: labels.Merge(scope, labels.Set{constants.ApplicationLabel: name}),
+		client:    client,
+		generator: generator,
 	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+// labels returns a unique set of labels for the application.
+func (p *Provisioner) labels() (labels.Set, error) {
+	l, err := p.generator.Resource().ResourceLabels()
+	if err != nil {
+		return nil, err
+	}
+
+	return labels.Merge(l, labels.Set{constants.ApplicationLabel: p.generator.Name()}), nil
+}
+
 // toUnstructured converts the provided object to a canonical unstructured form.
 func (p *Provisioner) toUnstructured() (*unstructured.Unstructured, error) {
-	switch t := p.object.(type) {
+	object, err := p.generator.Generate()
+	if err != nil {
+		return nil, err
+	}
+
+	switch t := object.(type) {
 	case *unstructured.Unstructured:
 		return t, nil
 	default:
@@ -92,9 +144,12 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 		},
 	}
 
-	selector := labels.SelectorFromSet(p.labels)
+	l, err := p.labels()
+	if err != nil {
+		return nil, err
+	}
 
-	if err := p.client.List(ctx, resources, &client.ListOptions{Namespace: "argocd", LabelSelector: selector}); err != nil {
+	if err := p.client.List(ctx, resources, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(l)}); err != nil {
 		return nil, err
 	}
 
@@ -115,7 +170,7 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning application", "application", p.name)
+	log.Info("provisioning application", "application", p.generator.Name())
 
 	// Convert the generic object type into unstructured for the next bit...
 	required, err := p.toUnstructured()
@@ -123,8 +178,16 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	required.SetGenerateName(p.name + "-")
-	required.SetLabels(p.labels)
+	l, err := p.labels()
+	if err != nil {
+		return err
+	}
+
+	required.SetAPIVersion("argoproj.io/v1alpha1")
+	required.SetKind("Application")
+	required.SetGenerateName(p.generator.Name() + "-")
+	required.SetNamespace(namespace)
+	required.SetLabels(l)
 
 	// Resource, after provisioning, should be set to either the existing resource
 	// or the newly created one.  The point here is the API will have filled in
@@ -135,7 +198,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	if resource == nil {
-		log.Info("creating new application", "application", p.name)
+		log.Info("creating new application", "application", p.generator.Name())
 
 		if err := p.client.Create(ctx, required); err != nil {
 			return err
@@ -143,7 +206,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 		resource = required
 	} else {
-		log.Info("updating existing application", "application", p.name)
+		log.Info("updating existing application", "application", p.generator.Name())
 
 		// Replace the specification with what we expect.
 		temp := resource.DeepCopy()
@@ -154,7 +217,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		}
 	}
 
-	log.Info("waiting for application to become healthy", "application", p.name)
+	log.Info("waiting for application to become healthy", "application", p.generator.Name())
 
 	applicationHealthy := readiness.NewApplicationHealthy(p.client, resource)
 
@@ -162,7 +225,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("application provisioned", "application", p.name)
+	log.Info("application provisioned", "application", p.generator.Name())
 
 	return nil
 }
@@ -171,7 +234,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning application", "application", p.name)
+	log.Info("deprovisioning application", "application", p.generator.Name())
 
 	resource, err := p.findApplication(ctx)
 	if err != nil {
@@ -179,12 +242,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	if resource == nil {
-		log.Info("application does not exist", "application", p.name)
+		log.Info("application does not exist", "application", p.generator.Name())
 
 		return nil
 	}
 
-	log.Info("adding application finalizer", "application", p.name)
+	log.Info("adding application finalizer", "application", p.generator.Name())
 
 	// Apply a finalizer to ensure synchronous deletion. See
 	// https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/
@@ -195,19 +258,19 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("deleting application", "application", p.name)
+	log.Info("deleting application", "application", p.generator.Name())
 
 	if err := p.client.Delete(ctx, resource); err != nil {
 		return err
 	}
 
-	log.Info("waiting for application deletion", "application", p.name)
+	log.Info("waiting for application deletion", "application", p.generator.Name())
 
 	if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, resource)).Check(ctx); err != nil {
 		return err
 	}
 
-	log.Info("application deleted", "application", p.name)
+	log.Info("application deleted", "application", p.generator.Name())
 
 	return nil
 }

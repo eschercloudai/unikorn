@@ -54,17 +54,10 @@ type Provisioner struct {
 	// workloadPools is a snapshot of the workload pool members at
 	// creation time.
 	workloadPools *unikornv1alpha1.KubernetesWorkloadPoolList
-
-	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
 func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.KubernetesCluster, server string) (*Provisioner, error) {
-	scope, err := cluster.ResourceLabels()
-	if err != nil {
-		return nil, err
-	}
-
 	// Do this once so it's atomic, we don't want it changing in different
 	// places.
 	workloadPools, err := getWorkloadPools(ctx, client, cluster)
@@ -77,7 +70,6 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.Kub
 		cluster:       cluster,
 		server:        server,
 		workloadPools: workloadPools,
-		scope:         scope,
 	}
 
 	return provisioner, nil
@@ -85,6 +77,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.Kub
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
+var _ application.Generator = &Provisioner{}
 
 // generateMachineHelmValues translates the API's idea of a machine into what's
 // expected by the underlying Helm chart.
@@ -225,8 +218,18 @@ func generateWorkloadPoolSchedulerHelmValues(p *unikornv1alpha1.KubernetesWorklo
 	return values
 }
 
-// generateApplication creates an ArgoCD application for a cluster.
-func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) {
+// Resource implements the application.Generator interface.
+func (p *Provisioner) Resource() application.MutuallyExclusiveResource {
+	return p.cluster
+}
+
+// Name implements the application.Generator interface.
+func (p *Provisioner) Name() string {
+	return applicationName
+}
+
+// Generate implements the application.Generator interface.
+func (p *Provisioner) Generate() (client.Object, error) {
 	workloadPools := p.generateWorkloadPoolHelmValues()
 
 	nameservers := make([]interface{}, len(p.cluster.Spec.Network.DNSNameservers))
@@ -290,11 +293,6 @@ func (p *Provisioner) generateApplication() (*unstructured.Unstructured, error) 
 	// get access to the schema information...
 	object := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "argoproj.io/v1alpha1",
-			"kind":       "Application",
-			"metadata": map[string]interface{}{
-				"namespace": "argocd",
-			},
 			"spec": map[string]interface{}{
 				"project": "default",
 				"source": map[string]interface{}{
@@ -559,12 +557,12 @@ func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) erro
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	object, err := p.generateApplication()
-	if err != nil {
-		return err
-	}
-
-	if err := application.New(p.client, applicationName, p.scope, object).Provision(ctx); err != nil {
+	// TODO: this application is special in that everything it creates is a
+	// CRD, so as far as Argo is concerned, everything is healthy and the
+	// check passes instantly, rather than waiting for the CAPI controllers
+	// to do something.  We kinda fudge it due to the concurrent deployment
+	// of the CNI and cloud controller add-ons blocking.
+	if err := application.New(p.client, p).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -577,12 +575,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	object, err := p.generateApplication()
-	if err != nil {
-		return err
-	}
-
-	if err := application.New(p.client, applicationName, p.scope, object).Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p).Deprovision(ctx); err != nil {
 		return err
 	}
 
