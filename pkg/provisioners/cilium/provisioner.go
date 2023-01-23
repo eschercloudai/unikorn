@@ -21,6 +21,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -40,16 +41,16 @@ type Provisioner struct {
 	// resource defines the unique resource this provisoner belongs to.
 	resource application.MutuallyExclusiveResource
 
-	// server is the ArgoCD server to provision in.
-	server string
+	// remote is the remote cluster to deploy to.
+	remote remotecluster.Generator
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, server string) *Provisioner {
+func New(client client.Client, resource application.MutuallyExclusiveResource, remote remotecluster.Generator) *Provisioner {
 	return &Provisioner{
 		client:   client,
 		resource: resource,
-		server:   server,
+		remote:   remote,
 	}
 }
 
@@ -79,10 +80,6 @@ func (p *Provisioner) Generate() (client.Object, error) {
 					"chart":          "cilium",
 					"targetRevision": "1.12.4",
 				},
-				"destination": map[string]interface{}{
-					"name":      p.server,
-					"namespace": "kube-system",
-				},
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
@@ -98,7 +95,7 @@ func (p *Provisioner) Generate() (client.Object, error) {
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	if err := application.New(p.client, p).Provision(ctx); err != nil {
+	if err := application.New(p.client, p).OnRemote(p.remote).InNamespace("kube-system").Provision(ctx); err != nil {
 		return err
 	}
 
@@ -107,7 +104,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	if err := application.New(p.client, p).Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p).OnRemote(p.remote).InNamespace("kube-system").Deprovision(ctx); err != nil {
 		return err
 	}
 

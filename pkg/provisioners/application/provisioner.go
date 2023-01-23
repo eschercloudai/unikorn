@@ -22,6 +22,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/readiness"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -86,6 +87,12 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
+	// remote is the remote cluster to deploy to.
+	remote remotecluster.Generator
+
+	// remoteNamespace explicitly sets the namespace for the application.
+	namespace string
+
 	// generator provides application generation functionality.
 	generator Generator
 }
@@ -100,6 +107,20 @@ func New(client client.Client, generator Generator) *Provisioner {
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
+
+// OnRemote deploys the application on a remote cluster.
+func (p *Provisioner) OnRemote(remote remotecluster.Generator) *Provisioner {
+	p.remote = remote
+
+	return p
+}
+
+// InNamespace deploys the application into an explicit namespace.
+func (p *Provisioner) InNamespace(namespace string) *Provisioner {
+	p.namespace = namespace
+
+	return p
+}
 
 // labels returns a unique set of labels for the application.
 func (p *Provisioner) labels() (labels.Set, error) {
@@ -166,6 +187,43 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 	return resource, nil
 }
 
+// applyResourceDefaults adds in things we explicitly control about the application.
+func (p *Provisioner) applyResourceDefaults(object *unstructured.Unstructured) error {
+	labels, err := p.labels()
+	if err != nil {
+		return err
+	}
+
+	object.SetAPIVersion("argoproj.io/v1alpha1")
+	object.SetKind("Application")
+	object.SetGenerateName(p.generator.Name() + "-")
+	object.SetNamespace(namespace)
+	object.SetLabels(labels)
+
+	return nil
+}
+
+// applyResourceDestination adds in optional destination information.
+func (p *Provisioner) applyResourceDestination(object *unstructured.Unstructured) error {
+	destination := map[string]interface{}{}
+
+	if p.remote != nil {
+		destination["name"] = remotecluster.GenerateName(p.remote)
+	}
+
+	if p.namespace != "" {
+		destination["namespace"] = p.namespace
+	}
+
+	if len(destination) != 0 {
+		if err := unstructured.SetNestedField(object.Object, destination, "spec", "destination"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
@@ -178,16 +236,13 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	l, err := p.labels()
-	if err != nil {
+	if err := p.applyResourceDefaults(required); err != nil {
 		return err
 	}
 
-	required.SetAPIVersion("argoproj.io/v1alpha1")
-	required.SetKind("Application")
-	required.SetGenerateName(p.generator.Name() + "-")
-	required.SetNamespace(namespace)
-	required.SetLabels(l)
+	if err := p.applyResourceDestination(required); err != nil {
+		return err
+	}
 
 	// Resource, after provisioning, should be set to either the existing resource
 	// or the newly created one.  The point here is the API will have filled in

@@ -18,6 +18,7 @@ package remotecluster
 
 import (
 	"context"
+	"strings"
 
 	argocdclient "github.com/eschercloudai/unikorn/pkg/argocd/client"
 	argocdcluster "github.com/eschercloudai/unikorn/pkg/argocd/cluster"
@@ -39,17 +40,33 @@ const (
 // Generator is an sbstraction around the sources of remote
 // clusters e.g. a cluster API or vcluster Kubernetes instance.
 type Generator interface {
-	// Name is a unique name for the remote cluster, this must
-	// be able to be procedurally generated in order to delete
-	// the remote by name, when the Server() is unavailable e.g
+	// Name is a unique name for the remote cluster provider. This,
+	// and labels, must be able to be procedurally generated in order to
+	// delete the remote by name, when the Server() is unavailable e.g
 	// derived from a deleted resource.
 	Name() string
+
+	// Labels define a set of strings that combine with the
+	// name to yield a unique remote cluster name.
+	Labels() []string
 
 	// Server is the URL for the remote cluster endpoint.
 	Server(ctx context.Context) (string, error)
 
 	// Config returns the client configuration (aka parsed Kubeconfig.)
 	Config(ctx context.Context) (*clientcmdapi.Config, error)
+}
+
+// GenerateName combines the generator's name and labels to form a unique
+// remote cluster name.
+func GenerateName(generator Generator) string {
+	name := generator.Name()
+
+	if len(generator.Labels()) != 0 {
+		name += "-" + strings.Join(generator.Labels(), ":")
+	}
+
+	return name
 }
 
 // Provisioner provides generic handling of remote cluster instances.
@@ -77,7 +94,9 @@ var _ provisioners.Provisioner = &Provisioner{}
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning remote cluster", "remotecluster", p.generator.Name())
+	name := GenerateName(p.generator)
+
+	log.Info("provisioning remote cluster", "remotecluster", name)
 
 	argocd, err := argocdclient.NewInCluster(ctx, p.client, namespace)
 	if err != nil {
@@ -99,7 +118,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 			return err
 		}
 
-		if err := argocdcluster.Upsert(ctx, argocd, p.generator.Name(), server, config); err != nil {
+		if err := argocdcluster.Upsert(ctx, argocd, name, server, config); err != nil {
 			return err
 		}
 
@@ -110,7 +129,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("remote cluster provisioned", "remotecluster", p.generator.Name())
+	log.Info("remote cluster provisioned", "remotecluster", name)
 
 	return nil
 }
@@ -119,18 +138,20 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning remote cluster", "remotecluster", p.generator.Name())
+	name := GenerateName(p.generator)
+
+	log.Info("deprovisioning remote cluster", "remotecluster", name)
 
 	argocd, err := argocdclient.NewInCluster(ctx, p.client, namespace)
 	if err != nil {
 		return err
 	}
 
-	if err := argocdcluster.Delete(ctx, argocd, p.generator.Name()); err != nil {
+	if err := argocdcluster.Delete(ctx, argocd, name); err != nil {
 		return err
 	}
 
-	log.Info("remote cluster deprovisioned", "remotecluster", p.generator.Name())
+	log.Info("remote cluster deprovisioned", "remotecluster", name)
 
 	return nil
 }

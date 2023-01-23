@@ -26,6 +26,7 @@ import (
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -52,16 +53,16 @@ type Provisioner struct {
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1alpha1.KubernetesCluster
 
-	// server is the ArgoCD server to provision in.
-	server string
+	// remote is the remote cluster to deploy to.
+	remote remotecluster.Generator
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, cluster *unikornv1alpha1.KubernetesCluster, server string) *Provisioner {
+func New(client client.Client, cluster *unikornv1alpha1.KubernetesCluster, remote remotecluster.Generator) *Provisioner {
 	return &Provisioner{
 		client:  client,
 		cluster: cluster,
-		server:  server,
+		remote:  remote,
 	}
 }
 
@@ -229,10 +230,6 @@ func (p *Provisioner) Generate() (client.Object, error) {
 						"values": string(values),
 					},
 				},
-				"destination": map[string]interface{}{
-					"name":      p.server,
-					"namespace": "ocp-system",
-				},
 				"syncPolicy": map[string]interface{}{
 					"automated": map[string]interface{}{
 						"selfHeal": true,
@@ -251,7 +248,7 @@ func (p *Provisioner) Generate() (client.Object, error) {
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	if err := application.New(p.client, p).Provision(ctx); err != nil {
+	if err := application.New(p.client, p).OnRemote(p.remote).InNamespace("ocp-system").Provision(ctx); err != nil {
 		return err
 	}
 
@@ -260,7 +257,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	if err := application.New(p.client, p).Deprovision(ctx); err != nil {
+	if err := application.New(p.client, p).OnRemote(p.remote).InNamespace("ocp-system").Deprovision(ctx); err != nil {
 		return err
 	}
 
