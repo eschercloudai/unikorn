@@ -18,8 +18,6 @@ package clusteropenstack
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
@@ -62,13 +60,16 @@ func NewRemoteClusterGenerator(client client.Client, namespace, name string, lab
 
 // Name implements the remotecluster.Generator interface.
 func (g *RemoteClusterGenerator) Name() string {
-	name := fmt.Sprintf("kubernetes-%s", g.name)
+	return "kubernetes"
+}
 
-	if len(g.labels) != 0 {
-		name += ":" + strings.Join(g.labels, ":")
-	}
+// Labels mplements the remotecluster.Generator interface.
+func (g *RemoteClusterGenerator) Labels() []string {
+	labels := []string{g.name}
 
-	return name
+	labels = append(labels, g.labels...)
+
+	return labels
 }
 
 // Server implements the remotecluster.Generator interface.

@@ -20,13 +20,13 @@ import (
 	"context"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/cilium"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/openstackcloudprovider"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -36,19 +36,15 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
-	// vclusterClient provides client access inside the control plane.
-	vclusterClient client.Client
-
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1alpha1.KubernetesCluster
 }
 
 // New returns a new initialized provisioner object.
-func New(ctx context.Context, client, vclusterClient client.Client, cluster *unikornv1alpha1.KubernetesCluster) (*Provisioner, error) {
+func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.KubernetesCluster) (*Provisioner, error) {
 	provisioner := &Provisioner{
-		client:         client,
-		vclusterClient: vclusterClient,
-		cluster:        cluster,
+		client:  client,
+		cluster: cluster,
 	}
 
 	return provisioner, nil
@@ -58,37 +54,42 @@ func New(ctx context.Context, client, vclusterClient client.Client, cluster *uni
 var _ provisioners.Provisioner = &Provisioner{}
 
 // newOpenstackCloudProviderProvisioner wraps up OCP provisioner configuration.
-func (p *Provisioner) newOpenstackCloudProviderProvisioner(remote string) *openstackcloudprovider.Provisioner {
+func (p *Provisioner) newOpenstackCloudProviderProvisioner(remote remotecluster.Generator) *openstackcloudprovider.Provisioner {
 	return openstackcloudprovider.New(p.client, p.cluster, remote)
 }
 
 // newCiliumProvisioner wraps up Cilium provisioner configuration.
-func (p *Provisioner) newCiliumProvisioner(remote string) *cilium.Provisioner {
+func (p *Provisioner) newCiliumProvisioner(remote remotecluster.Generator) *cilium.Provisioner {
 	return cilium.New(p.client, p.cluster, remote)
 }
 
-func (p *Provisioner) getRemoteClusterGenerator() *clusteropenstack.RemoteClusterGenerator {
-	clusterLabels := []string{
-		p.cluster.Labels[constants.ControlPlaneLabel],
-		p.cluster.Labels[constants.ProjectLabel],
+// getRemoteClusterGenerator returns a generator capable of reading the cluster
+// kubeconfig from the underlying control plane.
+func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusteropenstack.RemoteClusterGenerator, error) {
+	client, err := vcluster.NewControllerRuntimeClient(p.client).Client(ctx, p.cluster.Namespace, false)
+	if err != nil {
+		return nil, err
 	}
 
-	return clusteropenstack.NewRemoteClusterGenerator(p.vclusterClient, p.cluster.Namespace, p.cluster.Name, clusterLabels)
+	return clusteropenstack.NewRemoteClusterGenerator(client, p.cluster.Namespace, p.cluster.Name, provisioners.ClusterOpenstackLabelsFromCluster(p.cluster)), nil
 }
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	rcg := p.getRemoteClusterGenerator()
+	remote, err := p.getRemoteClusterGenerator(ctx)
+	if err != nil {
+		return err
+	}
 
-	if err := remotecluster.New(p.client, rcg).Provision(ctx); err != nil {
+	if err := remotecluster.New(p.client, remote).Provision(ctx); err != nil {
 		return err
 	}
 
 	group := concurrent.Provisioner{
 		Group: "cluster add-ons",
 		Provisioners: []provisioners.Provisioner{
-			p.newCiliumProvisioner(rcg.Name()),
-			p.newOpenstackCloudProviderProvisioner(rcg.Name()),
+			p.newCiliumProvisioner(remote),
+			p.newOpenstackCloudProviderProvisioner(remote),
 		},
 	}
 
@@ -101,13 +102,16 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	rcg := p.getRemoteClusterGenerator()
+	remote, err := p.getRemoteClusterGenerator(ctx)
+	if err != nil {
+		return err
+	}
 
 	group := concurrent.Provisioner{
 		Group: "cluster add-ons",
 		Provisioners: []provisioners.Provisioner{
-			p.newCiliumProvisioner(rcg.Name()),
-			p.newOpenstackCloudProviderProvisioner(rcg.Name()),
+			p.newCiliumProvisioner(remote),
+			p.newOpenstackCloudProviderProvisioner(remote),
 		},
 	}
 
@@ -115,7 +119,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	if err := remotecluster.New(p.client, rcg).Deprovision(ctx); err != nil {
+	if err := remotecluster.New(p.client, remote).Deprovision(ctx); err != nil {
 		return err
 	}
 

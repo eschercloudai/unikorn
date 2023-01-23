@@ -19,7 +19,6 @@ package vcluster
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 
@@ -55,13 +54,17 @@ func NewRemoteClusterGenerator(client client.Client, namespace string, labels []
 
 // Name implements the remotecluster.Generator interface.
 func (g *RemoteClusterGenerator) Name() string {
-	name := "vcluster-vcluster"
+	return "vcluster"
+}
 
-	if len(g.labels) != 0 {
-		name += ":" + strings.Join(g.labels, ":")
-	}
+// Labels mplements the remotecluster.Generator interface.
+func (g *RemoteClusterGenerator) Labels() []string {
+	// The instance name is implicit, for now.
+	labels := []string{"vcluster"}
 
-	return name
+	labels = append(labels, g.labels...)
+
+	return labels
 }
 
 // Server implements the remotecluster.Generator interface.

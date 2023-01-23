@@ -132,13 +132,10 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 	return nil
 }
 
+// getRemoteClusterGenerator returns a generator capable of reading the vcluster
+// kubeconfig from the underlying control cluster.
 func (p *Provisioner) getRemoteClusterGenerator(namespace string) *vcluster.RemoteClusterGenerator {
-	vclusterLabels := []string{
-		p.controlPlane.Name,
-		p.controlPlane.Labels[constants.ProjectLabel],
-	}
-
-	return vcluster.NewRemoteClusterGenerator(p.client, namespace, vclusterLabels)
+	return vcluster.NewRemoteClusterGenerator(p.client, namespace, provisioners.VClusterRemoteLabelsFromControlPlane(p.controlPlane))
 }
 
 // Provision implements the Provision interface.
@@ -168,12 +165,12 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	// Provision cert manager in the vcluster.
-	if err := certmanager.New(p.client, p.controlPlane, rcg.Name()).Provision(ctx); err != nil {
+	if err := certmanager.New(p.client, p.controlPlane, rcg).Provision(ctx); err != nil {
 		return err
 	}
 
 	// Provision CAPI in the vcluster.
-	if err := clusterapi.New(p.client, p.controlPlane, rcg.Name()).Provision(ctx); err != nil {
+	if err := clusterapi.New(p.client, p.controlPlane, rcg).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -202,12 +199,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	rcg := p.getRemoteClusterGenerator(namespace.Name)
 
 	// Deprovision the CAPI application.
-	if err := clusterapi.New(p.client, p.controlPlane, rcg.Name()).Deprovision(ctx); err != nil {
+	if err := clusterapi.New(p.client, p.controlPlane, rcg).Deprovision(ctx); err != nil {
 		return err
 	}
 
 	// Deprovision the cert manager application.
-	if err := certmanager.New(p.client, p.controlPlane, rcg.Name()).Deprovision(ctx); err != nil {
+	if err := certmanager.New(p.client, p.controlPlane, rcg).Deprovision(ctx); err != nil {
 		return err
 	}
 
