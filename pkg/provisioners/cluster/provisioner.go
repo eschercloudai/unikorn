@@ -25,7 +25,9 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusteropenstackaddons"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/conditional"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,23 +75,27 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	group := concurrent.Provisioner{
-		Group: "kubernetes cluster",
+	// TODO: you can create with autoscaling on, turn it on, but not remove it.
+	// That would require tracking of some variety.
+	provisioner := &serial.Provisioner{
 		Provisioners: []provisioners.Provisioner{
-			clusterProvisioner,
-			addonsProvisioner,
+			&concurrent.Provisioner{
+				Group: "kubernetes cluster",
+				Provisioners: []provisioners.Provisioner{
+					clusterProvisioner,
+					addonsProvisioner,
+				},
+			},
+			&conditional.Provisioner{
+				Name:        "cluster-autoscaler",
+				Condition:   p.cluster.AutoscalingEnabled,
+				Provisioner: p.newClusterAutoscalerProvisioner(),
+			},
 		},
 	}
 
-	if err := group.Provision(ctx); err != nil {
+	if err := provisioner.Provision(ctx); err != nil {
 		return err
-	}
-
-	// TODO: you can create with it on, turn it on, but not remove it...
-	if p.cluster.AutoscalingEnabled() {
-		if err := p.newClusterAutoscalerProvisioner().Provision(ctx); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -97,29 +103,31 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	if p.cluster.AutoscalingEnabled() {
-		if err := p.newClusterAutoscalerProvisioner().Deprovision(ctx); err != nil {
-			return err
-		}
-	}
-
-	// Remove the addons first, Argo will probably have a fit if the cluster vanishes
-	// before it has a chance to delete the contained add-on applications.
-	addonsProvisioner, err := clusteropenstackaddons.New(ctx, p.client, p.cluster)
-	if err != nil {
-		return err
-	}
-
-	if err := addonsProvisioner.Deprovision(ctx); err != nil {
-		return err
-	}
-
 	clusterProvisioner, err := clusteropenstack.New(ctx, p.client, p.cluster, p.remote)
 	if err != nil {
 		return err
 	}
 
-	if err := clusterProvisioner.Deprovision(ctx); err != nil {
+	addonsProvisioner, err := clusteropenstackaddons.New(ctx, p.client, p.cluster)
+	if err != nil {
+		return err
+	}
+
+	// Remove the addons first, Argo will probably have a fit if the cluster vanishes
+	// before it has a chance to delete the contained add-on applications.
+	provisioner := &serial.Provisioner{
+		Provisioners: []provisioners.Provisioner{
+			clusterProvisioner,
+			addonsProvisioner,
+			&conditional.Provisioner{
+				Name:        "cluster-autoscaler",
+				Condition:   p.cluster.AutoscalingEnabled,
+				Provisioner: p.newClusterAutoscalerProvisioner(),
+			},
+		},
+	}
+
+	if err := provisioner.Deprovision(ctx); err != nil {
 		return err
 	}
 
