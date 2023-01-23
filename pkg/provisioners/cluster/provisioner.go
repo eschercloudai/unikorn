@@ -18,7 +18,6 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -27,6 +26,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusteropenstackaddons"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -36,31 +36,35 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
+	// vclusterClient provides client access inside the control plane.
+	vclusterClient client.Client
+
+	// remoteClusterName defines where to provision CAPI and autosclaer resources.
+	remoteClusterName string
+
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1alpha1.KubernetesCluster
-
-	// server is the ArgoCD server to provision in.
-	server string
-
-	// scope defines a unique application scope.
-	scope map[string]string
 }
 
 // New returns a new initialized provisioner object.
 func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.KubernetesCluster) (*Provisioner, error) {
-	scope, err := cluster.ResourceLabels()
+	vclusterClient, err := vcluster.NewControllerRuntimeClient(client).Client(ctx, cluster.Namespace, false)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: find a place for this to live.
-	server := fmt.Sprintf("vcluster-%s-%s", scope[constants.ProjectLabel], scope[constants.ControlPlaneLabel])
+	vclusterLabels := []string{
+		cluster.Labels[constants.ControlPlaneLabel],
+		cluster.Labels[constants.ProjectLabel],
+	}
+
+	rcg := vcluster.NewRemoteClusterGenerator(client, cluster.Namespace, vclusterLabels)
 
 	provisioner := &Provisioner{
-		client:  client,
-		cluster: cluster,
-		server:  server,
-		scope:   scope,
+		client:            client,
+		vclusterClient:    vclusterClient,
+		remoteClusterName: rcg.Name(),
+		cluster:           cluster,
 	}
 
 	return provisioner, nil
@@ -70,17 +74,17 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.Kub
 var _ provisioners.Provisioner = &Provisioner{}
 
 func (p *Provisioner) newClusterAutoscalerProvisioner() *clusterautoscaler.Provisioner {
-	return clusterautoscaler.New(p.client, p.cluster, p.server, p.cluster.Name, p.cluster.Name, p.cluster.Name+"-kubeconfig")
+	return clusterautoscaler.New(p.client, p.cluster, p.remoteClusterName, p.cluster.Name, p.cluster.Name, p.cluster.Name+"-kubeconfig")
 }
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	clusterProvisioner, err := clusteropenstack.New(ctx, p.client, p.cluster, p.server)
+	clusterProvisioner, err := clusteropenstack.New(ctx, p.client, p.cluster, p.remoteClusterName)
 	if err != nil {
 		return err
 	}
 
-	addonsProvisioner, err := clusteropenstackaddons.New(ctx, p.client, p.cluster)
+	addonsProvisioner, err := clusteropenstackaddons.New(ctx, p.client, p.vclusterClient, p.cluster)
 	if err != nil {
 		return err
 	}
@@ -116,7 +120,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	// Remove the addons first, as they depend on the cluster's kubeconfig.
-	addonsProvisioner, err := clusteropenstackaddons.New(ctx, p.client, p.cluster)
+	addonsProvisioner, err := clusteropenstackaddons.New(ctx, p.client, p.vclusterClient, p.cluster)
 	if err != nil {
 		return err
 	}
@@ -125,7 +129,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	clusterProvisioner, err := clusteropenstack.New(ctx, p.client, p.cluster, p.server)
+	clusterProvisioner, err := clusteropenstack.New(ctx, p.client, p.cluster, p.remoteClusterName)
 	if err != nil {
 		return err
 	}
