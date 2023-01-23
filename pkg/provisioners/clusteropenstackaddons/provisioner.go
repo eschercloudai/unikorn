@@ -26,6 +26,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/openstackcloudprovider"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,19 +82,22 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	if err := remotecluster.New(p.client, remote).Provision(ctx); err != nil {
-		return err
-	}
-
-	group := concurrent.Provisioner{
-		Group: "cluster add-ons",
+	// Provision the remote cluster, then once that's configured, install
+	// the CNI and cloud provider in parallel.
+	provisioner := &serial.Provisioner{
 		Provisioners: []provisioners.Provisioner{
-			p.newCiliumProvisioner(remote),
-			p.newOpenstackCloudProviderProvisioner(remote),
+			remotecluster.New(p.client, remote),
+			&concurrent.Provisioner{
+				Group: "cluster add-ons",
+				Provisioners: []provisioners.Provisioner{
+					p.newCiliumProvisioner(remote),
+					p.newOpenstackCloudProviderProvisioner(remote),
+				},
+			},
 		},
 	}
 
-	if err := group.Provision(ctx); err != nil {
+	if err := provisioner.Provision(ctx); err != nil {
 		return err
 	}
 
@@ -107,19 +111,20 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	group := concurrent.Provisioner{
-		Group: "cluster add-ons",
+	provisioner := &serial.Provisioner{
 		Provisioners: []provisioners.Provisioner{
-			p.newCiliumProvisioner(remote),
-			p.newOpenstackCloudProviderProvisioner(remote),
+			remotecluster.New(p.client, remote),
+			&concurrent.Provisioner{
+				Group: "cluster add-ons",
+				Provisioners: []provisioners.Provisioner{
+					p.newCiliumProvisioner(remote),
+					p.newOpenstackCloudProviderProvisioner(remote),
+				},
+			},
 		},
 	}
 
-	if err := group.Deprovision(ctx); err != nil {
-		return err
-	}
-
-	if err := remotecluster.New(p.client, remote).Deprovision(ctx); err != nil {
+	if err := provisioner.Deprovision(ctx); err != nil {
 		return err
 	}
 

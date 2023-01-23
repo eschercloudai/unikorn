@@ -28,6 +28,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/certmanager"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusterapi"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 
@@ -138,6 +139,23 @@ func (p *Provisioner) getRemoteClusterGenerator(namespace string) *vcluster.Remo
 	return vcluster.NewRemoteClusterGenerator(p.client, namespace, provisioners.VClusterRemoteLabelsFromControlPlane(p.controlPlane))
 }
 
+// getControlPlaneProvisioner returns a provisoner that encodes control plane
+// provisioning steps.
+func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.Provisioner {
+	remote := p.getRemoteClusterGenerator(namespace)
+
+	// Provision the vitual cluster, setup the remote cluster then
+	// install cert manager and cluster API into it.
+	return &serial.Provisioner{
+		Provisioners: []provisioners.Provisioner{
+			vcluster.New(p.client, p.controlPlane, namespace),
+			remotecluster.New(p.client, remote),
+			certmanager.New(p.client, p.controlPlane, remote),
+			clusterapi.New(p.client, p.controlPlane, remote),
+		},
+	}
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
@@ -152,25 +170,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	// Provision a virtual cluster for CAPI to live in.
-	if err := vcluster.New(p.client, p.controlPlane, namespace.Name).Provision(ctx); err != nil {
-		return err
-	}
-
-	// Create the remote cluster in ArgoCD.
-	rcg := p.getRemoteClusterGenerator(namespace.Name)
-
-	if err := remotecluster.New(p.client, rcg).Provision(ctx); err != nil {
-		return err
-	}
-
-	// Provision cert manager in the vcluster.
-	if err := certmanager.New(p.client, p.controlPlane, rcg).Provision(ctx); err != nil {
-		return err
-	}
-
-	// Provision CAPI in the vcluster.
-	if err := clusterapi.New(p.client, p.controlPlane, rcg).Provision(ctx); err != nil {
+	if err := p.getControlPlaneProvisioner(namespace.Name).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -196,25 +196,8 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	rcg := p.getRemoteClusterGenerator(namespace.Name)
-
-	// Deprovision the CAPI application.
-	if err := clusterapi.New(p.client, p.controlPlane, rcg).Deprovision(ctx); err != nil {
-		return err
-	}
-
-	// Deprovision the cert manager application.
-	if err := certmanager.New(p.client, p.controlPlane, rcg).Deprovision(ctx); err != nil {
-		return err
-	}
-
-	// Delete the cluster from ArgoCD
-	if err := remotecluster.New(p.client, rcg).Deprovision(ctx); err != nil {
-		return err
-	}
-
-	// Deprovision the vcluster application.
-	if err := vcluster.New(p.client, p.controlPlane, namespace.Name).Deprovision(ctx); err != nil {
+	// Remove the control plane.
+	if err := p.getControlPlaneProvisioner(namespace.Name).Deprovision(ctx); err != nil {
 		return err
 	}
 
