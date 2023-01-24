@@ -24,6 +24,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/cilium"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/nvidiagpuoperator"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/openstackcloudprovider"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
@@ -64,6 +65,11 @@ func (p *Provisioner) newCiliumProvisioner(remote remotecluster.Generator) *cili
 	return cilium.New(p.client, p.cluster, remote)
 }
 
+// newNvidiaProvisioner wraps up nVidia GPU Operator provisioner configuration.
+func (p *Provisioner) newNvidiaProvisioner(remote remotecluster.Generator) *nvidiagpuoperator.Provisioner {
+	return nvidiagpuoperator.New(p.client, p.cluster, remote)
+}
+
 // getRemoteClusterGenerator returns a generator capable of reading the cluster
 // kubeconfig from the underlying control plane.
 func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusteropenstack.RemoteClusterGenerator, error) {
@@ -75,11 +81,11 @@ func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusterop
 	return clusteropenstack.NewRemoteClusterGenerator(client, p.cluster.Namespace, p.cluster.Name, provisioners.ClusterOpenstackLabelsFromCluster(p.cluster)), nil
 }
 
-// Provision implements the Provision interface.
-func (p *Provisioner) Provision(ctx context.Context) error {
+// getProvisioner returns a generic provisioner for provisioning and deprovisioning.
+func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
 	remote, err := p.getRemoteClusterGenerator(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Provision the remote cluster, then once that's configured, install
@@ -94,7 +100,18 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 					p.newOpenstackCloudProviderProvisioner(remote),
 				},
 			},
+			p.newNvidiaProvisioner(remote),
 		},
+	}
+
+	return provisioner, nil
+}
+
+// Provision implements the Provision interface.
+func (p *Provisioner) Provision(ctx context.Context) error {
+	provisioner, err := p.getProvisioner(ctx)
+	if err != nil {
+		return err
 	}
 
 	if err := provisioner.Provision(ctx); err != nil {
@@ -106,22 +123,9 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	remote, err := p.getRemoteClusterGenerator(ctx)
+	provisioner, err := p.getProvisioner(ctx)
 	if err != nil {
 		return err
-	}
-
-	provisioner := &serial.Provisioner{
-		Provisioners: []provisioners.Provisioner{
-			remotecluster.New(p.client, remote),
-			&concurrent.Provisioner{
-				Group: "cluster add-ons",
-				Provisioners: []provisioners.Provisioner{
-					p.newCiliumProvisioner(remote),
-					p.newOpenstackCloudProviderProvisioner(remote),
-				},
-			},
-		},
 	}
 
 	if err := provisioner.Deprovision(ctx); err != nil {
