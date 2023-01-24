@@ -25,6 +25,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,6 +68,20 @@ func GenerateName(generator Generator) string {
 	}
 
 	return name
+}
+
+// GetClient gets a client from the remote generator.
+func GetClient(ctx context.Context, generator Generator) (client.Client, error) {
+	getter := func() (*clientcmdapi.Config, error) {
+		return generator.Config(ctx)
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromKubeconfigGetter("", getter)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.New(restConfig, client.Options{})
 }
 
 // Provisioner provides generic handling of remote cluster instances.
