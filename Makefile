@@ -7,14 +7,16 @@ MODULE := $(shell cat go.mod | grep -m1 module | awk '{print $$2}')
 # Git revision.
 REVISION := $(shell git rev-parse HEAD)
 
-# Commands to build, the first lot are architecture agnostic and will be built
-# for your host's architecture.  The latter are going to run in Kubernetes, so
-# want to be amd64.
+# Get host architecture details
+HOST_OS:=$(shell go env GOOS)
+HOST_ARCH:=$(shell go env GOARCH)
+
+# Commands to build.  If we're not generated images, the local binaries are built
+# as per the host architecture
 COMMANDS = unikornctl
-CONTROLLERS = \
-  unikorn-project-manager \
-  unikorn-control-plane-manager \
-  unikorn-cluster-manager
+CONTROLLERS = unikorn-cluster-manager \
+	      unikorn-control-plane-manager \
+	      unikorn-project-manager
 
 # Some constants to describe the repository.
 BINDIR = bin
@@ -28,7 +30,7 @@ PREFIX = $(HOME)/bin
 
 # List of binaries to build.
 BINARIES := $(patsubst %,$(BINDIR)/%,$(COMMANDS))
-CONTROLLER_BINARIES := $(patsubst %,$(BINDIR)/amd64-linux-gnu/%,$(CONTROLLERS))
+CONTROLLER_BINARIES := $(patsubst %,$(BINDIR)/%,$(CONTROLLERS))
 
 # And where to install them to.
 INSTALL_BINARIES := $(patsubst %,$(PREFIX)/%,$(COMMANDS))
@@ -82,34 +84,40 @@ DOCKER_ORG = ghcr.io/eschercloudai
 all: $(BINARIES) $(CONTROLLER_BINARIES) $(CRDDIR)
 
 # Create a binary output directory, this should be an order-only prerequisite.
-$(BINDIR) $(BINDIR)/amd64-linux-gnu:
+$(BINDIR):
 	mkdir -p $@
 
 # Create a binary from a command.
 $(BINDIR)/%: $(SOURCES) $(GENDIR) | $(BINDIR)
 	CGO_ENABLED=0 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
 
-$(BINDIR)/amd64-linux-gnu/%: $(SOURCES) $(GENDIR) | $(BINDIR)/amd64-linux-gnu
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
-
 # Installation target, to test out things like shell completion you'll
 # want to install it somewhere in your PATH.
 .PHONY: install
 install: $(INSTALL_BINARIES)
 
-# Create container images.  Use buildkit here, as it's the future, and it does
-# good things, like per file .dockerignores and all that jazz.
+# Generate images for arm64 and amd64 and push to the specified registry
 .PHONY: images
-images: $(CONTROLLER_BINARIES)
-	for image in ${CONTROLLERS}; do docker buildx build --platform linux/amd64 . -f docker/$${image}/Dockerfile -t ${DOCKER_ORG}/$${image}:${VERSION}; done
+images:
+	@docker buildx create --use --name=multiplatform --node=multiplatform && \
+	for image in ${CONTROLLERS}; do \
+		docker buildx build --platform linux/amd64,linux/arm64 . \
+		--build-arg MODULE=${MODULE} --build-arg VERSION=${VERSION} --build-arg REVISION=${REVISION} \
+		-f docker/$${image}/Dockerfile -t ${DOCKER_ORG}/$${image}:${VERSION} --push;\
+	done
 
-# Purely lazy command that builds and pushes to docker hub.
-.PHONY: images-push
-images-push: images
-	for image in ${CONTROLLERS}; do docker push ${DOCKER_ORG}/$${image}:${VERSION}; done
+# Generate images for the local architecture only
+.PHONY: images-local
+images-local:
+	@docker buildx create --use --name=multiplatform --node=multiplatform && \
+	for image in ${CONTROLLERS}; do \
+		docker buildx build --platform linux/${HOST_ARCH} . \
+		--build-arg MODULE=${MODULE} --build-arg VERSION=${VERSION} --build-arg REVISION=${REVISION} \
+		-f docker/$${image}/Dockerfile -t ${DOCKER_ORG}/$${image}:${VERSION} --load;\
+	done
 
 .PHONY: images-kind-load
-images-kind-load: images
+images-kind-load: images-local
 	for image in ${CONTROLLERS}; do kind load docker-image ${DOCKER_ORG}/$${image}:${VERSION}; done
 
 .PHONY: test-unit
