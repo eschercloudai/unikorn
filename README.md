@@ -36,7 +36,11 @@ Download the official binary (update the version as appropriate):
 wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.2.0/unikornctl-linux-amd64
 ```
 
-Set up shell completion:
+### Set up shell completion
+
+`unikornctl` has a large amount of convenience and contextual awareness built into its various subcommands.  It's strongly recommended to set up shell completion to make your life a lot easier.
+
+#### bash
 
 ```shell
 export TEMP=$(mktemp)
@@ -45,6 +49,23 @@ source ${TEMP}
 ```
 
 For the more adventurous, you can add it to `/etc/bash_completion.d/` or whatever you use.
+
+#### zsh
+
+With zsh, the [recommendation](https://jzelinskie.com/posts/dont-recommend-sourcing-shell-completion/) is to do the following:
+
+```shell
+autoload -U +X compinit && compinit
+unikornctl completion zsh > $fpath/_unikornctl
+```
+
+If you have a set of existing paths in `$fpath`, create the `_unikornctl` in your own custom completion function directory.  For example, if you had custom functions in `~/.zshfunc` then you would add the following to your `~/.zshenv`:
+
+```
+fpath=( ~/.zshfunc "${fpath[@]}" )
+```
+
+And then redirect the output of `unikornctl completion zsh` to `~/.zshfunc/_unikornctl`.
 
 ### Installing the Service
 
