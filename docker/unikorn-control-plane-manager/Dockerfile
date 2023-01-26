@@ -1,6 +1,9 @@
 FROM scratch
 
-COPY bin/amd64-linux-gnu/unikorn-control-plane-manager /
+# This is implcitly created by 'docker buildx build'
+ARG TARGETARCH
+
+COPY bin/${TARGETARCH}-linux-gnu/unikorn-control-plane-manager /
 COPY hack/passwd.nonroot /etc/passwd
 
 USER 1000
