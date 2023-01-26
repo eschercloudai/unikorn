@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -80,6 +81,56 @@ func (p *Provisioner) Name() string {
 
 // Generate implements the application.Generator interface.
 func (p *Provisioner) Generate() (client.Object, error) {
+	// We limit images to those with the driver pre-installed as it's far quicker for UX.
+	// Also the default affinity is broken and prevents scale to zero, also tolerations
+	// don't allow execution using our default taints.
+	// TODO: This includes the node-feature-discovery as a subchart, and doesn't expose
+	// node selectors/tolerations, however, it does scale to zero.
+	valuesRaw := map[string]interface{}{
+		"driver": map[string]interface{}{
+			"enabled": false,
+			"licensingConfig": map[string]interface{}{
+				"configMapName": licenseConfigMapName,
+			},
+		},
+		"operator": map[string]interface{}{
+			"affinity": map[string]interface{}{
+				"nodeAffinity": map[string]interface{}{
+					"preferredDuringSchedulingIgnoredDuringExecution": nil,
+					"requiredDuringSchedulingIgnoredDuringExecution": map[string]interface{}{
+						"nodeSelectorTerms": []interface{}{
+							map[string]interface{}{
+								"matchExpressions": []interface{}{
+									map[string]interface{}{
+										"key":      "node-role.kubernetes.io/control-plane",
+										"operator": "Exists",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"tolerations": []interface{}{
+				map[string]interface{}{
+					"key":      "node-role.kubernetes.io/master",
+					"operator": "Equal",
+					"effect":   "NoSchedule",
+				},
+				map[string]interface{}{
+					"key":      "node-role.kubernetes.io/control-plane",
+					"operator": "Equal",
+					"effect":   "NoSchedule",
+				},
+			},
+		},
+	}
+
+	values, err := yaml.Marshal(valuesRaw)
+	if err != nil {
+		return nil, err
+	}
+
 	object := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"spec": map[string]interface{}{
@@ -90,16 +141,7 @@ func (p *Provisioner) Generate() (client.Object, error) {
 					"chart":          "gpu-operator",
 					"targetRevision": "v22.9.1",
 					"helm": map[string]interface{}{
-						"parameters": []interface{}{
-							map[string]interface{}{
-								"name":  "driver.enabled",
-								"value": "false",
-							},
-							map[string]interface{}{
-								"name":  "driver.licensingConfig.configMapName",
-								"value": licenseConfigMapName,
-							},
-						},
+						"values": string(values),
 					},
 				},
 				"syncPolicy": map[string]interface{}{
@@ -125,6 +167,7 @@ func (p *Provisioner) generateLicenseConfigMapProvisioner(ctx context.Context) (
 		},
 		Data: map[string]string{
 			// TODO: make configurable.
+			// TODO: make mutable.
 			"gridd.conf": "ServerAddress=gridlicense.nl1.eschercloud.com",
 		},
 	}
