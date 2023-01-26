@@ -298,23 +298,10 @@ func (p *Provisioner) Generate() (client.Object, error) {
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api-cluster-openstack",
-					"targetRevision": "v0.3.6",
+					"targetRevision": "v0.3.7",
 					"helm": map[string]interface{}{
 						"releaseName": p.cluster.Name,
 						"values":      string(values),
-					},
-				},
-				"ignoreDifferences": []interface{}{
-					// We use a JQ query to select machine deployments that
-					// have auto-scaling constraints on them.  If they do, then
-					// ignore the replicas field as the cluster autoscaler will
-					// update that and we don't want to revert it.
-					map[string]interface{}{
-						"group": "cluster.x-k8s.io/v1beta1",
-						"kind":  "MachineDeployments",
-						"jqPathExpressions": []interface{}{
-							`select(.metadata.annotations["capacity.cluster-autoscaler.kubernetes.io/cpu"] != null) | .spec.replicas`,
-						},
 					},
 				},
 				"syncPolicy": map[string]interface{}{
