@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -141,4 +142,45 @@ func (s *QuantityFlag) Set(in string) error {
 // Type returns the human readable type information.
 func (s QuantityFlag) Type() string {
 	return "quantity"
+}
+
+// StringMapFlag provides a flag that accumulates k/v string pairs.
+type StringMapFlag struct {
+	Map map[string]string
+}
+
+// Ensure the pflag.Value interface is implemented.
+var _ = pflag.Value(&StringMapFlag{})
+
+// String returns the current value.
+func (s StringMapFlag) String() string {
+	//nolint:prealloc
+	var pairs []string
+
+	for k, v := range s.Map {
+		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return strings.Join(pairs, ",")
+}
+
+// Set sets the value and does any error checking.
+func (s *StringMapFlag) Set(in string) error {
+	parts := strings.Split(in, "=")
+	if len(parts) != 2 {
+		return fmt.Errorf("%w: flag requires key=value format", ErrParseFlag)
+	}
+
+	if s.Map == nil {
+		s.Map = map[string]string{}
+	}
+
+	s.Map[parts[0]] = parts[1]
+
+	return nil
+}
+
+// Type returns the human readable type information.
+func (s StringMapFlag) Type() string {
+	return "pair"
 }

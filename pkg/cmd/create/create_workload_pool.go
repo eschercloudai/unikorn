@@ -87,6 +87,9 @@ type createWorkloadPoolOptions struct {
 	// maximumReplicas defines the maximum pool size for auto scaling.
 	maximumReplicas int
 
+	// labels defines labels on node creation.
+	labels flags.StringMapFlag
+
 	// client gives access to our custom resources.
 	client unikorn.Interface
 }
@@ -105,6 +108,7 @@ func (o *createWorkloadPoolOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 	flags.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
 	flags.StringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into. Will default to that specified for the control plane. (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
 	cmd.Flags().Var(&o.diskSize, "disk-size", "Disk size, defaults to that of the machine flavor.")
+	cmd.Flags().Var(&o.labels, "label", "Label to add on node creation.  May be set multiple times.")
 
 	// Feature enablement.
 	cmd.Flags().BoolVar(&o.autoscaling, "enable-autoscaling", false, "Enables workload pool auto-scaling. To function, you must enable autoscaling on the cluster.")
@@ -212,7 +216,8 @@ func (o *createWorkloadPoolOptions) run() error {
 			},
 		},
 		Spec: unikornv1alpha1.KubernetesWorkloadPoolSpec{
-			Name: &o.name,
+			Name:   &o.name,
+			Labels: o.labels.Map,
 			MachineGeneric: unikornv1alpha1.MachineGeneric{
 				Version:  &version,
 				Image:    &o.image,
