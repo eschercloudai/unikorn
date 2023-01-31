@@ -92,9 +92,9 @@ func (p *Provisioner) Generate() (client.Object, error) {
 				"project": "default",
 				"source": map[string]interface{}{
 					//TODO:  programmable
-					"repoURL":        "https://kubernetes.github.io/autoscaler",
-					"chart":          "cluster-autoscaler",
-					"targetRevision": "9.21.1",
+					"repoURL":        "https://github.com/yankcrime/autoscaler",
+					"path":           "charts/cluster-autoscaler",
+					"targetRevision": "openstack-sfz",
 					"helm": map[string]interface{}{
 						"parameters": []interface{}{
 							map[string]interface{}{
@@ -120,6 +120,10 @@ func (p *Provisioner) Generate() (client.Object, error) {
 							map[string]interface{}{
 								"name":  "extraArgs.scale-down-unneeded-time",
 								"value": "5m",
+							},
+							map[string]interface{}{
+								"name":  "image.tag",
+								"value": "v1.26.1",
 							},
 						},
 					},
