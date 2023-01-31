@@ -9,7 +9,6 @@ imagePullSecrets:
 {{ . }}
 {{- end }}
 ---
-# Bad, bad Simon
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -17,12 +16,67 @@ metadata:
   labels:
     {{- include "unikorn.labels" . | nindent 4 }}
 rules:
+# Manage kubernetes clusters (my job).
 - apiGroups:
-  - "*"
+  - unikorn.eschercloud.ai
   resources:
-  - "*"
+  - kubernetesclusters
+  - kubernetesworkloadpools
   verbs:
-  - "*"
+  - list
+  - get
+  - watch
+  - update
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - kubernetesclusters/status
+  verbs:
+  - update
+# ArgoCD integration.
+- apiGroups:
+  - argoproj.io
+  resources:
+  - applications
+  verbs:
+  - list
+  - get
+  - watch
+  - patch
+  - delete
+# V-cluster integration (access to kubeconfig).
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  - services
+  verbs:
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: unikorn-cluster-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+rules:
+# Controller prerequisites.
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -37,6 +91,21 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
+  name: unikorn-cluster-manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: unikorn-cluster-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: unikorn-cluster-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
   name: unikorn-cluster-manager
 ---
 apiVersion: apps/v1

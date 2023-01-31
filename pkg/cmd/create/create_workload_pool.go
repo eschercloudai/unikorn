@@ -32,6 +32,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/openstack"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	uflags "github.com/eschercloudai/unikorn/pkg/util/flags"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,7 +60,7 @@ type createWorkloadPoolOptions struct {
 	name string
 
 	// version defines the Kubernetes version to install.
-	version flags.SemverFlag
+	version uflags.SemverFlag
 
 	// image defines the Openstack image for Kubernetes nodes.
 	image string
@@ -71,7 +72,7 @@ type createWorkloadPoolOptions struct {
 	replicas int
 
 	// diskSize defines the persistent volume size to provision with.
-	diskSize flags.QuantityFlag
+	diskSize uflags.QuantityFlag
 
 	// availabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.
@@ -88,7 +89,7 @@ type createWorkloadPoolOptions struct {
 	maximumReplicas int
 
 	// labels defines labels on node creation.
-	labels flags.StringMapFlag
+	labels uflags.StringMapFlag
 
 	// client gives access to our custom resources.
 	client unikorn.Interface

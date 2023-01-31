@@ -84,6 +84,10 @@ Create the container images
 {{- .Values.clusterManager.image | default (printf "%s/unikorn-cluster-manager:%s" (include "unikorn.defaultRepositoryPath" .) (.Values.tag | default .Chart.Version)) }}
 {{- end }}
 
+{{- define "unikorn.serverImage" -}}
+{{- .Values.server.image | default (printf "%s/unikorn-server:%s" (include "unikorn.defaultRepositoryPath" .) (.Values.tag | default .Chart.Version)) }}
+{{- end }}
+
 {{/*
 Create Prometheus labels
 */}}

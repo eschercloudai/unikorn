@@ -16,6 +16,7 @@ metadata:
   labels:
     {{- include "unikorn.labels" . | nindent 4 }}
 rules:
+# Manage projects (my job).
 - apiGroups:
   - unikorn.eschercloud.ai
   resources:
@@ -28,25 +29,8 @@ rules:
 - apiGroups:
   - unikorn.eschercloud.ai
   resources:
-  - controlplanes
-  verbs:
-  - list
-  - get
-  - watch
-  - delete
-- apiGroups:
-  - unikorn.eschercloud.ai
-  resources:
   - projects/status
   verbs:
-  - update
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - create
-  - get
   - update
 - apiGroups:
   - ""
@@ -58,6 +42,33 @@ rules:
   - list
   - watch
   - delete
+# Manage projects (cascading deletion).
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - controlplanes
+  verbs:
+  - list
+  - get
+  - watch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: unikorn-project-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+rules:
+# Controller prerequisites.
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - update
 - apiGroups:
   - ""
   resources:
@@ -79,6 +90,21 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
+  name: unikorn-project-manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: unikorn-project-manager
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: unikorn-project-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
   name: unikorn-project-manager
 ---
 apiVersion: apps/v1

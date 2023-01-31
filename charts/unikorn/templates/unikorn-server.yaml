@@ -1,0 +1,179 @@
+{{- if .Values.server.enabled -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: unikorn-server
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+{{- with ( include "unikorn.imagePullSecrets" . ) }}
+imagePullSecrets:
+{{ . }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: unikorn-server
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+rules:
+# Orchestrate Unikorn resources (my job).
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - projects
+  - controlplanes
+  - kubernetesclusters
+  - kubernetesworkloadpools
+  verbs:
+  - list
+  - get
+  - watch
+  - update
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: unikorn-server
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: unikorn-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: unikorn-server
+---
+# This issuer is responsible for creating certificates to be used by
+# JWS and JWE.  The certificates themselves can be shared among all
+# pods in the delopyment to provide scale out.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: unikorn-server-jose
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: unikorn-server-jose-tls
+spec:
+  issuerRef:
+    kind: Issuer
+    name: unikorn-server-jose
+  privateKey:
+    algorithm: ECDSA
+    encoding: PKCS8
+    size: 521
+  commonName : Unikorn Server JOSE Key
+  secretName: unikorn-server-jose-tls
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unikorn-server
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unikorn-server
+  template:
+    metadata:
+      labels:
+        app: unikorn-server
+    spec:
+      containers:
+      - name: unikorn-server
+        image: {{ include "unikorn.serverImage" . }}
+        args:
+        - -jose-tls-key=/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.key
+        - -jose-tls-cert=/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.crt
+        volumeMounts:
+        - name: unikorn-server-jose-tls
+          mountPath: /var/lib/secrets/unikorn.eschercloud.ai/jose
+          readOnly: true
+        ports:
+        - name: http
+          containerPort: 6080
+        - name: prometheus
+          containerPort: 8080
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          readOnlyRootFilesystem: true
+      serviceAccountName: unikorn-server
+      securityContext:
+        runAsNonRoot: true
+      volumes:
+      - name: unikorn-server-jose-tls
+        secret:
+          secretName: unikorn-server-jose-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unikorn-server
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+    {{- include "unikorn.prometheusLabels" (dict "job" "unikorn-server") | nindent 4 }}
+spec:
+  selector:
+    app: unikorn-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 6080
+  - name: prometheus
+    port: 8080
+    targetPort: prometheus
+---
+# TODO: Use ACME for production releases.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: unikorn-server-ingress
+spec:
+  selfSigned: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: unikorn-server
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/issuer: unikorn-server-ingress
+spec:
+  ingressClassName: {{ .Values.server.ingressClass }}
+  # For development you will want to add these names to /etc/hosts for the ingress
+  # endpoint address.
+  tls:
+  - hosts:
+    - {{ .Values.server.host }}
+    secretName: unikorn-server-ingress-tls
+  rules:
+  # The the UI is written as a JAMstack application, so the API is accessed via
+  # the same host to avoid CORS, and therefore uses routing to hit the correct
+  # service.
+  - host: {{ .Values.server.host }}
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: unikorn-server
+            port:
+              name: http
+{{- end }}

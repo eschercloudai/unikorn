@@ -1,0 +1,40 @@
+/*
+Copyright 2022 EscherCloud.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package authorization
+
+import (
+	"net/http"
+	"strings"
+
+	"github.com/eschercloudai/unikorn/pkg/server/util"
+)
+
+// GetHTTPAuthenticationScheme grabs the scheme and token from the HTTP
+// Authorization header.
+func GetHTTPAuthenticationScheme(r *http.Request) (string, string, error) {
+	header := r.Header.Get("Authorization")
+	if header == "" {
+		return "", "", util.HTTPUnauthorized("authorization header missing")
+	}
+
+	parts := strings.Split(header, " ")
+	if len(parts) != 2 {
+		return "", "", util.HTTPUnauthorized("authorization header malformed")
+	}
+
+	return parts[0], parts[1], nil
+}

@@ -14,33 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package util
 
 import (
-	"flag"
-	"os"
-
-	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/managers/project"
+	"encoding/json"
+	"net/http"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-func main() {
-	options := &zap.Options{}
-	options.BindFlags(flag.CommandLine)
+// WriteJSONResponse is a generic wrapper for returning a JSON payload to the client.
+func WriteJSONResponse(w http.ResponseWriter, r *http.Request, code int, response interface{}) {
+	log := log.FromContext(r.Context())
 
-	flag.Parse()
+	body, err := json.Marshal(response)
+	if err != nil {
+		log.Error(err, "unable to marshal body")
 
-	log.SetLogger(zap.New(zap.UseFlagOptions(options)))
+		return
+	}
 
-	logger := log.Log.WithName("main")
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(code)
 
-	logger.Info("service starting", "application", constants.Application, "version", constants.Version, "revision", constants.Revision)
-
-	if err := project.Run(); err != nil {
-		logger.Error(err, "controller error")
-		os.Exit(1)
+	if _, err := w.Write(body); err != nil {
+		log.Error(err, "failed to write response")
 	}
 }
