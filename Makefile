@@ -16,6 +16,24 @@ CONTROLLERS = \
   unikorn-control-plane-manager \
   unikorn-cluster-manager
 
+# Release will do cross compliation of all images for the 'all' target.
+# Note we aren't fucking about with docker here because that opens up a
+# whole can of worms to do with caching modules and pisses on performance,
+# primarily making me rage.  For image creation, this, by necessity,
+# REQUIRES multiarch images to be pushed to a remote registry because
+# Docker apparently cannot support this after some 3 years...  So don't
+# run that target locally when compiling in release mode.
+ifdef RELEASE
+CONTROLLER_ARCH := amd64 arm64
+BUILDX_OUTPUT := --push
+else
+CONTROLLER_ARCH := $(shell go env GOARCH)
+BUILDX_OUTPUT := --load
+endif
+
+# Calculate the platform list to pass to docker buildx.
+BUILDX_PLATFORMS := $(shell echo $(patsubst %,linux/%,$(CONTROLLER_ARCH)) | sed 's/ /,/g')
+
 # Some constants to describe the repository.
 BINDIR = bin
 CMDDIR = cmd
@@ -28,7 +46,7 @@ PREFIX = $(HOME)/bin
 
 # List of binaries to build.
 BINARIES := $(patsubst %,$(BINDIR)/%,$(COMMANDS))
-CONTROLLER_BINARIES := $(patsubst %,$(BINDIR)/amd64-linux-gnu/%,$(CONTROLLERS))
+CONTROLLER_BINARIES := $(foreach arch,$(CONTROLLER_ARCH),$(foreach ctrl,$(CONTROLLERS),$(BINDIR)/$(arch)-linux-gnu/$(ctrl)))
 
 # And where to install them to.
 INSTALL_BINARIES := $(patsubst %,$(PREFIX)/%,$(COMMANDS))
@@ -82,7 +100,7 @@ DOCKER_ORG = ghcr.io/eschercloudai
 all: $(BINARIES) $(CONTROLLER_BINARIES) $(CRDDIR)
 
 # Create a binary output directory, this should be an order-only prerequisite.
-$(BINDIR) $(BINDIR)/amd64-linux-gnu:
+$(BINDIR) $(BINDIR)/amd64-linux-gnu $(BINDIR)/arm64-linux-gnu:
 	mkdir -p $@
 
 # Create a binary from a command.
@@ -91,6 +109,9 @@ $(BINDIR)/%: $(SOURCES) $(GENDIR) | $(BINDIR)
 
 $(BINDIR)/amd64-linux-gnu/%: $(SOURCES) $(GENDIR) | $(BINDIR)/amd64-linux-gnu
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
+
+$(BINDIR)/arm64-linux-gnu/%: $(SOURCES) $(GENDIR) | $(BINDIR)/arm64-linux-gnu
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
 
 # Installation target, to test out things like shell completion you'll
 # want to install it somewhere in your PATH.
@@ -101,7 +122,9 @@ install: $(INSTALL_BINARIES)
 # good things, like per file .dockerignores and all that jazz.
 .PHONY: images
 images: $(CONTROLLER_BINARIES)
-	for image in ${CONTROLLERS}; do docker buildx build --platform linux/amd64 . -f docker/$${image}/Dockerfile -t ${DOCKER_ORG}/$${image}:${VERSION}; done
+	if [ -n "$(RELEASE)" ]; then docker buildx create --name unikorn --use; fi
+	for image in ${CONTROLLERS}; do docker buildx build --platform $(BUILDX_PLATFORMS) $(BUILDX_OUTPUT) -f docker/$${image}/Dockerfile -t ${DOCKER_ORG}/$${image}:${VERSION} .; done;
+	if [ -n "$(RELEASE)" ]; then docker buildx rm unikorn; fi
 
 # Purely lazy command that builds and pushes to docker hub.
 .PHONY: images-push

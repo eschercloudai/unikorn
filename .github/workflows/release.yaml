@@ -18,8 +18,6 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
-    - name: Build Binaries
-      run: make touch all -e VERSION=${{ github.ref_name }}
     - name: Docker Login
       uses: docker/login-action@v2
       with:
@@ -27,7 +25,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Build and Push Images
-      run: make images-push -e VERSION=${{ github.ref_name }}
+      run: make touch all images -e RELEASE=1 VERSION=${{ github.ref_name }}
     - name: Release
       id: create_release
       uses: actions/create-release@v1
