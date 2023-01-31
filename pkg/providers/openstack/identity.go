@@ -1,0 +1,146 @@
+/*
+Copyright 2022 EscherCloud.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package openstack
+
+import (
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+)
+
+// IdentityClient wraps up gophercloud identity management.
+type IdentityClient struct {
+	client *gophercloud.ServiceClient
+}
+
+// NewIdentityClient returns a new identity client.
+func NewIdentityClient(provider Provider) (*IdentityClient, error) {
+	providerClient, err := provider.Client()
+	if err != nil {
+		return nil, err
+	}
+
+	identity, err := openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})
+	if err != nil {
+		return nil, err
+	}
+
+	client := &IdentityClient{
+		client: identity,
+	}
+
+	return client, nil
+}
+
+// CreateTokenOptions abstracts away how schizophrenic Openstack is
+// with its million options and million ways to fuck it up.
+type CreateTokenOptions interface {
+	// Options returns a valid set of authentication options.
+	Options() *tokens.AuthOptions
+}
+
+// CreateTokenOptionsUnscopedPassword is typically used when logging on to a UI
+// when you don't know anything other than username/password.
+type CreateTokenOptionsUnscopedPassword struct {
+	// domain a user belongs to.
+	domain string
+
+	// username of the user.
+	username string
+
+	// password of the user.
+	password string
+}
+
+// Ensure the CreateTokenOptions interface is implemented.
+var _ CreateTokenOptions = &CreateTokenOptionsUnscopedPassword{}
+
+// NewCreateTokenOptionsUnscopedPassword returns a new instance of unscoped username/password options.
+func NewCreateTokenOptionsUnscopedPassword(domain, username, password string) *CreateTokenOptionsUnscopedPassword {
+	return &CreateTokenOptionsUnscopedPassword{
+		domain:   domain,
+		username: username,
+		password: password,
+	}
+}
+
+// Options implements the CreateTokenOptions interface.
+func (o *CreateTokenOptionsUnscopedPassword) Options() *tokens.AuthOptions {
+	return &tokens.AuthOptions{
+		DomainName: o.domain,
+		Username:   o.username,
+		Password:   o.password,
+	}
+}
+
+// CreateTokenOptionsScopedToken is typically used to upgrade from an unscoped
+// password passed login to a project scoped one once you have determined
+// a valid project.
+type CreateTokenOptionsScopedToken struct {
+	// token is the authentication token, it's already scoped to a user and
+	// domain.
+	token string
+
+	// projectID is the project ID.  We expect an ID because the name/description
+	// is returned to thte user for context, however the ID being passed back in
+	// defines both the domain and project name, so is simpler and less error
+	// prone.
+	projectID string
+}
+
+// Ensure the CreateTokenOptions interface is implemented.
+var _ CreateTokenOptions = &CreateTokenOptionsScopedToken{}
+
+// NewCreateTokenOptionsScopedToken returns a new instance of project scoped token options.
+func NewCreateTokenOptionsScopedToken(token, projectID string) *CreateTokenOptionsScopedToken {
+	return &CreateTokenOptionsScopedToken{
+		token:     token,
+		projectID: projectID,
+	}
+}
+
+// Options implements the CreateTokenOptions interface.
+func (o *CreateTokenOptionsScopedToken) Options() *tokens.AuthOptions {
+	return &tokens.AuthOptions{
+		TokenID: o.token,
+		Scope: tokens.Scope{
+			ProjectID: o.projectID,
+		},
+	}
+}
+
+// CreateToken issues a new token.
+func (c *IdentityClient) CreateToken(options CreateTokenOptions) (*tokens.Token, error) {
+	return tokens.Create(c.client, options.Options()).ExtractToken()
+}
+
+// ListAvailableProjects lists projects that an authenticated (but unscoped) user can
+// scope to.
+func (c *IdentityClient) ListAvailableProjects() ([]projects.Project, error) {
+	page, err := projects.ListAvailable(c.client).AllPages()
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := projects.ExtractProjects(page)
+	if err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}

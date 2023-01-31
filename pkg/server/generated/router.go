@@ -666,7 +666,7 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackImages(w http.Respo
 func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{""})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetApiV1ProvidersOpenstackProjects(w, r)

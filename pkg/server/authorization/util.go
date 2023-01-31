@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/eschercloudai/unikorn/pkg/server/util"
+	"github.com/eschercloudai/unikorn/pkg/server/errors"
 )
 
 // GetHTTPAuthenticationScheme grabs the scheme and token from the HTTP
@@ -28,12 +28,12 @@ import (
 func GetHTTPAuthenticationScheme(r *http.Request) (string, string, error) {
 	header := r.Header.Get("Authorization")
 	if header == "" {
-		return "", "", util.HTTPUnauthorized("authorization header missing")
+		return "", "", errors.OAuth2InvalidRequest("authorization header missing")
 	}
 
 	parts := strings.Split(header, " ")
 	if len(parts) != 2 {
-		return "", "", util.HTTPUnauthorized("authorization header malformed")
+		return "", "", errors.OAuth2InvalidRequest("authorization header malformed")
 	}
 
 	return parts[0], parts[1], nil
