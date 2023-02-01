@@ -30,8 +30,8 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
-	"github.com/eschercloudai/unikorn/pkg/cmd/util/openstack"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	uflags "github.com/eschercloudai/unikorn/pkg/util/flags"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -149,7 +149,7 @@ func (o *createWorkloadPoolOptions) applyAutoscaling(workloadPool *unikornv1alph
 		return nil
 	}
 
-	compute, err := openstack.NewComputeClient(o.cloud)
+	compute, err := openstack.NewComputeClient(openstack.NewCloudsProvider(o.cloud))
 	if err != nil {
 		return err
 	}

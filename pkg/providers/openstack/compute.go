@@ -17,8 +17,6 @@ limitations under the License.
 package openstack
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/gophercloud/gophercloud"
@@ -27,33 +25,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/images"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-	"github.com/gophercloud/utils/openstack/clientconfig"
 )
-
-var (
-	ErrResourceNotFound = errors.New("requested resource not found")
-)
-
-// providerClient abstracts away a load of cruft when using gophercloud.
-// The provider client is used directly with each service.
-func providerClient(cloud string) (*gophercloud.ProviderClient, error) {
-	clientOpts := &clientconfig.ClientOpts{
-		Cloud: cloud,
-	}
-
-	authOpts, err := clientconfig.AuthOptions(clientOpts)
-	if err != nil {
-		return nil, err
-	}
-
-	provider, err := openstack.AuthenticatedClient(*authOpts)
-	if err != nil {
-		return nil, err
-	}
-
-	return provider, nil
-}
 
 // ComputeClient wraps the generic client because gophercloud is unsafe.
 type ComputeClient struct {
@@ -61,13 +33,13 @@ type ComputeClient struct {
 }
 
 // NewComputeClient provides a simple one-liner to start computing.
-func NewComputeClient(cloud string) (*ComputeClient, error) {
-	provider, err := providerClient(cloud)
+func NewComputeClient(provider Provider) (*ComputeClient, error) {
+	providerClient, err := provider.Client()
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := openstack.NewComputeV2(provider, gophercloud.EndpointOpts{})
+	client, err := openstack.NewComputeV2(providerClient, gophercloud.EndpointOpts{})
 	if err != nil {
 		return nil, err
 	}
@@ -77,81 +49,6 @@ func NewComputeClient(cloud string) (*ComputeClient, error) {
 	}
 
 	return c, nil
-}
-
-// NetworkClient wraps the generic client because gophercloud is unsafe.
-type NetworkClient struct {
-	client *gophercloud.ServiceClient
-}
-
-// NewNetworkClient provides a simple one-liner to start networking.
-func NewNetworkClient(cloud string) (*NetworkClient, error) {
-	provider, err := providerClient(cloud)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := openstack.NewNetworkV2(provider, gophercloud.EndpointOpts{})
-	if err != nil {
-		return nil, err
-	}
-
-	c := &NetworkClient{
-		client: client,
-	}
-
-	return c, nil
-}
-
-// Network allows us to extend gophercloud to get access to more interesting
-// fields not available in the standard data types.
-type Network struct {
-	// Network is the gophercloud network type.  This needs to be a field,
-	// not an embedded type, lest its UnmarshalJSON function get promoted...
-	Network networks.Network
-
-	// External is the bit we care about, is it an external network ID?
-	External bool `json:"router:external"`
-}
-
-// UnmarshalJSON does magic quite frankly.  We unmarshal directly into the
-// gophercloud network type, easy peasy.  When un marshalling into our network
-// type, we need to define a temporary type to avoid an infinite loop...
-func (n *Network) UnmarshalJSON(b []byte) error {
-	if err := json.Unmarshal(b, &n.Network); err != nil {
-		return err
-	}
-
-	type tmp Network
-
-	var s struct {
-		tmp
-	}
-
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-
-	n.External = s.tmp.External
-
-	return nil
-}
-
-// ExternalNetworks returns a list of external networks.
-func (c *NetworkClient) ExternalNetworks() ([]Network, error) {
-	// This sucks, you cannot directly query for external networks...
-	page, err := networks.List(c.client, &networks.ListOpts{}).AllPages()
-	if err != nil {
-		return nil, err
-	}
-
-	var results []Network
-
-	if err := networks.ExtractNetworksInto(page, &results); err != nil {
-		return nil, err
-	}
-
-	return results, nil
 }
 
 // KeyPairs returns a list of key pairs.

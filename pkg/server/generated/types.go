@@ -8,17 +8,43 @@ const (
 	Oauth2AuthenticationScopes    = "oauth2Authentication.Scopes"
 )
 
-// AuthenticationScope Password authentication scope.
-type AuthenticationScope struct {
-	// Project Openstack project.
-	Project *string `json:"project,omitempty"`
+// Defines values for Oauth2ErrorError.
+const (
+	AccessDenied            Oauth2ErrorError = "access_denied"
+	InvalidRequest          Oauth2ErrorError = "invalid_request"
+	InvalidScope            Oauth2ErrorError = "invalid_scope"
+	ServerError             Oauth2ErrorError = "server_error"
+	TemporarilyUnavailable  Oauth2ErrorError = "temporarily_unavailable"
+	UnauthorizedClient      Oauth2ErrorError = "unauthorized_client"
+	UnsupportedResponseType Oauth2ErrorError = "unsupported_response_type"
+)
+
+// Oauth2Error Generic error message.
+type Oauth2Error struct {
+	// Error A terse error string expaning on the HTTP error code.
+	Error Oauth2ErrorError `json:"error"`
+
+	// ErrorDescription Verbose message describing the error.
+	ErrorDescription string `json:"error_description"`
 }
 
-// GenericError Generic error message.
-type GenericError struct {
-	// Description Verbose message describing the error.
-	Description string `json:"description"`
+// Oauth2ErrorError A terse error string expaning on the HTTP error code.
+type Oauth2ErrorError string
+
+// OpenstackProject An Openstack project.
+type OpenstackProject struct {
+	// Description A verbose description of the project.
+	Description *string `json:"description,omitempty"`
+
+	// Id Globally unique project ID.
+	Id string `json:"id"`
+
+	// Name The name of the project within the scope of the domain.
+	Name string `json:"name"`
 }
+
+// OpenstackProjects A list of Openstack projects.
+type OpenstackProjects = []OpenstackProject
 
 // StringParameter A basic string parameter.
 type StringParameter = string
@@ -27,6 +53,15 @@ type StringParameter = string
 type Token struct {
 	// Token Authentication token.
 	Token string `json:"token"`
+}
+
+// TokenScope Password authentication scope.
+type TokenScope struct {
+	// Project Openstack project scoping.
+	Project struct {
+		// Id Openstack project ID.
+		Id string `json:"id"`
+	} `json:"project"`
 }
 
 // Cluster A basic string parameter.
@@ -39,28 +74,28 @@ type ControlPlane = StringParameter
 type Project = StringParameter
 
 // BadRequestResponse Generic error message.
-type BadRequestResponse = GenericError
+type BadRequestResponse = Oauth2Error
 
 // InternalServerErrorResponse Generic error message.
-type InternalServerErrorResponse = GenericError
+type InternalServerErrorResponse = Oauth2Error
 
 // NullResponse defines model for nullResponse.
 type NullResponse interface{}
+
+// OpenstackProjectsResponse A list of Openstack projects.
+type OpenstackProjectsResponse = OpenstackProjects
 
 // TokenResponse defines model for tokenResponse.
 type TokenResponse = Token
 
 // UnauthorizedResponse Generic error message.
-type UnauthorizedResponse = GenericError
+type UnauthorizedResponse = Oauth2Error
 
 // UnsupportedMediaTypeResponse Generic error message.
-type UnsupportedMediaTypeResponse = GenericError
+type UnsupportedMediaTypeResponse = Oauth2Error
 
-// AuthenticationScopeRequest Password authentication scope.
-type AuthenticationScopeRequest = AuthenticationScope
-
-// PostApiV1AuthTokensPasswordJSONRequestBody defines body for PostApiV1AuthTokensPassword for application/json ContentType.
-type PostApiV1AuthTokensPasswordJSONRequestBody = AuthenticationScope
+// TokenScopeRequest Password authentication scope.
+type TokenScopeRequest = TokenScope
 
 // PostApiV1AuthTokensTokenJSONRequestBody defines body for PostApiV1AuthTokensToken for application/json ContentType.
-type PostApiV1AuthTokensTokenJSONRequestBody = AuthenticationScope
+type PostApiV1AuthTokensTokenJSONRequestBody = TokenScope

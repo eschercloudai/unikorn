@@ -144,12 +144,23 @@ func (l *ScopeList) MarshalJSON() ([]byte, error) {
 		scopes[i] = string(l.Scopes[i])
 	}
 
-	return []byte(strings.Join(scopes, " ")), nil
+	data, err := json.Marshal(strings.Join(scopes, " "))
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // UnmarshalJSON implments json.Unmarshaller.
 func (l *ScopeList) UnmarshalJSON(value []byte) error {
-	scopes := strings.Split(string(value), " ")
+	var list string
+
+	if err := json.Unmarshal(value, &list); err != nil {
+		return err
+	}
+
+	scopes := strings.Split(list, " ")
 
 	l.Scopes = make([]Scope, len(scopes))
 

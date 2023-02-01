@@ -24,11 +24,20 @@ import (
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
+	"github.com/eschercloudai/unikorn/pkg/server/context"
+	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
-	"github.com/eschercloudai/unikorn/pkg/server/util"
-
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+// authorizationContext is passed through the middleware to propagate
+// information back to the top level handler.
+type authorizationContext struct {
+	// subject is the token subject.
+	subject string
+
+	// token is the Openstack token from password authentication.
+	token string
+}
 
 // Authorizer provides OpenAPI based authorization middleware.
 type Authorizer struct {
@@ -52,75 +61,80 @@ func NewAuthorizer(issuer *authorization.JWTIssuer) *Authorizer {
 // authorizeHTTP checks basic authentication information is there then
 // lets this request bubble up to the handler for processing.  The ONLY
 // API that uses this is the one that does basic auth to oauth token issue.
-func authorizeHTTP(scheme *openapi3.SecurityScheme, r *http.Request) error {
+func authorizeHTTP(r *http.Request, scheme *openapi3.SecurityScheme) error {
 	authorizationScheme, _, err := authorization.GetHTTPAuthenticationScheme(r)
 	if err != nil {
 		return err
 	}
 
 	if !strings.EqualFold(authorizationScheme, scheme.Scheme) {
-		return util.HTTPUnauthorized("authorization scheme mismatch", "scheme", authorizationScheme)
+		return errors.OAuth2InvalidRequest("authorization scheme not allowed").WithValues("scheme", authorizationScheme)
 	}
 
 	return nil
 }
 
 // authorizeOAuth2 checks APIs that require and oauth2 bearer token.
-func (a *Authorizer) authorizeOAuth2(scopes []string, r *http.Request) error {
+func (a *Authorizer) authorizeOAuth2(ctx *authorizationContext, r *http.Request, scopes []string) error {
 	authorizationScheme, token, err := authorization.GetHTTPAuthenticationScheme(r)
 	if err != nil {
 		return err
 	}
 
 	if !strings.EqualFold(authorizationScheme, "bearer") {
-		return util.HTTPUnauthorized("authorization scheme mismatch", "scheme", authorizationScheme)
+		return errors.OAuth2InvalidRequest("authorization scheme not allowed").WithValues("scheme", authorizationScheme)
 	}
 
 	// Check the token is from us, for us, and in date.
 	claims, err := a.issuer.Verify(r, token)
 	if err != nil {
-		return util.HTTPUnauthorizedWithError(err, "token validation failed")
+		return errors.OAuth2AccessDenied("token validation failed").WithError(err)
 	}
 
 	// Check the token is authorized to do what the schema says.
 	for _, scope := range scopes {
 		if !claims.Scope.Includes(authorization.Scope(scope)) {
-			return util.HTTPUnauthorized("token missing required scope", "scope", scope)
+			return errors.OAuth2AccessDenied("token missing required scope").WithValues("scope", scope)
 		}
 	}
+
+	// Set the Keystone token in the context for use by the handlers.
+	// TODO: if this gets too crazy, just add the claims.
+	ctx.subject = claims.Subject
+	ctx.token = claims.Token
 
 	return nil
 }
 
 // authorizeScheme requires the individual scheme to match.
-func (a *Authorizer) authorizeScheme(scheme *openapi3.SecurityScheme, scopes []string, r *http.Request) error {
+func (a *Authorizer) authorizeScheme(ctx *authorizationContext, r *http.Request, scheme *openapi3.SecurityScheme, scopes []string) error {
 	switch scheme.Type {
 	case "http":
-		return authorizeHTTP(scheme, r)
+		return authorizeHTTP(r, scheme)
 	case "oauth2":
-		return a.authorizeOAuth2(scopes, r)
+		return a.authorizeOAuth2(ctx, r, scopes)
 	}
 
-	return util.HTTPInternalServerError("authorization scheme unsupported", "scheme", scheme.Type)
+	return errors.OAuth2InvalidRequest("authorization scheme unsupported").WithValues("scheme", scheme.Type)
 }
 
 // authorizeSchemes requires all schemes to be fulfilled.
-func (a *Authorizer) authorizeSchemes(spec *openapi3.T, requirement openapi3.SecurityRequirement, r *http.Request) error {
+func (a *Authorizer) authorizeSchemes(ctx *authorizationContext, r *http.Request, spec *openapi3.T, requirement openapi3.SecurityRequirement) error {
 	if len(requirement) == 0 {
-		return util.HTTPInternalServerError("no security schemes specified for route operation security requirement")
+		return errors.OAuth2ServerError("no security schemes specified for operation")
 	}
 
 	for schemeName, scopes := range requirement {
 		scheme, ok := spec.Components.SecuritySchemes[schemeName]
 		if !ok {
-			return util.HTTPInternalServerError("security scheme missing from schema")
+			return errors.OAuth2ServerError("security scheme missing from schema")
 		}
 
 		if scheme.Value == nil {
-			return util.HTTPInternalServerError("security scheme reference not supported")
+			return errors.OAuth2ServerError("security scheme reference not supported")
 		}
 
-		if err := a.authorizeScheme(scheme.Value, scopes, r); err != nil {
+		if err := a.authorizeScheme(ctx, r, scheme.Value, scopes); err != nil {
 			return err
 		}
 	}
@@ -129,37 +143,32 @@ func (a *Authorizer) authorizeSchemes(spec *openapi3.T, requirement openapi3.Sec
 }
 
 // authorizeReqirements requires at least one set of requirements to be fulfilled.
-func (a *Authorizer) authorizeReqirements(spec *openapi3.T, requirements openapi3.SecurityRequirements, r *http.Request) error {
-	log := log.FromContext(r.Context())
-
-	if len(requirements) == 0 {
-		return util.HTTPInternalServerError("no security requirements specified for route operation")
+func (a *Authorizer) authorizeReqirements(ctx *authorizationContext, r *http.Request, spec *openapi3.T, requirements openapi3.SecurityRequirements) error {
+	// Why you ask?  Well if we allowed multiple, that means any must be authoried
+	// to succeed, but then that raises the problem of how do you report multiple
+	// errors to the client if they all fail in a meaningful way?
+	if len(requirements) != 1 {
+		return errors.OAuth2ServerError("single security requirements required")
 	}
 
-	for _, requirement := range requirements {
-		if err := a.authorizeSchemes(spec, requirement, r); err != nil {
-			log.V(1).Info("security requirements rejection", util.LogValues(err)...)
-
-			continue
-		}
-
-		return nil
+	if err := a.authorizeSchemes(ctx, r, spec, requirements[0]); err != nil {
+		return err
 	}
 
-	return util.HTTPUnauthorized("no security requirement was met")
+	return nil
 }
 
 // authorize performs any authorization of the request before allowing access to
 // the resources via the handler.
-func (a *Authorizer) authorize(r *http.Request) error {
+func (a *Authorizer) authorize(ctx *authorizationContext, r *http.Request) error {
 	spec, err := generated.GetSwagger()
 	if err != nil {
-		return util.HTTPInternalServerErrorWithError(err, "unable to decode openapi schema")
+		return errors.OAuth2ServerError("unable to decode openapi schema").WithError(err)
 	}
 
 	router, err := gorillamux.NewRouter(spec)
 	if err != nil {
-		return util.HTTPInternalServerErrorWithError(err, "unable to create router")
+		return errors.OAuth2ServerError("unable to create router").WithError(err)
 	}
 
 	// Authentication is dependant on route, so we insert this middleware
@@ -167,20 +176,20 @@ func (a *Authorizer) authorize(r *http.Request) error {
 	// logic should always work.
 	route, _, err := router.FindRoute(r)
 	if err != nil {
-		return util.HTTPInternalServerErrorWithError(err, "unable to find route")
+		return errors.OAuth2ServerError("unable to find route").WithError(err)
 	}
 
 	// You must have specified a security requirement in the schema.
 	if route.Operation == nil {
-		return util.HTTPInternalServerError("unable to find route operation")
+		return errors.OAuth2ServerError("unable to find route operation")
 	}
 
 	if route.Operation.Security == nil {
-		return util.HTTPInternalServerError("unable to find route operation security requirements")
+		return errors.OAuth2ServerError("unable to find route operation security requirements")
 	}
 
 	// Check the necessary security is in place.
-	if err := a.authorizeReqirements(spec, *route.Operation.Security, r); err != nil {
+	if err := a.authorizeReqirements(ctx, r, spec, *route.Operation.Security); err != nil {
 		return err
 	}
 
@@ -189,11 +198,21 @@ func (a *Authorizer) authorize(r *http.Request) error {
 
 // ServeHTTP implements the http.Handler interface.
 func (a *Authorizer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := a.authorize(r); err != nil {
-		util.HandleError(w, r, err)
+	ctx := &authorizationContext{}
+
+	if err := a.authorize(ctx, r); err != nil {
+		errors.HandleError(w, r, err)
 
 		return
 	}
+
+	c := r.Context()
+
+	// Add any contextual information to bubble up to the handler.
+	c = context.NewContextWithSubject(c, ctx.subject)
+	c = context.NewContextWithToken(c, ctx.token)
+
+	r = r.WithContext(c)
 
 	a.next.ServeHTTP(w, r)
 }

@@ -8,16 +8,12 @@ paths:
     description: Password based authentication services.
     post:
       description: |-
-        Authenticates against Openstack, caches a scoped Keystone V3 token
-        in the local in-memory cache - so not leaked to the client - and returns
-        a Unikorn token, when it expires and the selected OpenStack project.
-        This token must be presented as a bearer authentication header in subsequent
-        requests to other endpoints. This is typically used for initial login via
-        a UI.
+        Authenticates against Openstack, and returns a signed and encrypted oauth2
+        JWT.  This token has a claim that contains the Openstack authorization token.
+        This token can be used to poll allowed Openstack projects and upgrade to a
+        project scoped token.
       security:
       - httpBasicAuthentication: []
-      requestBody:
-        $ref: '#/components/requestBodies/authenticationScopeRequest'
       responses:
         '200':
           $ref: '#/components/responses/tokenResponse'
@@ -33,25 +29,19 @@ paths:
     description: Token based authentication services.
     post:
       description: |-
-        Authenticates against OpenStack, caches a scoped Keystone V3 token
-        in the local in-memory cache - so not leaked to the client - and returns
-        a Unikorn token, when it expires and the selected OpenStack project.
-        This token must be presented as a bearer authentication header in subsequent
-        requests to other endpoints. This is typically used to refresh an issued
-        token that is about to expire, or to change the scope of the OpenStack token.
+        Authenticates against OpenStack, and returns a signed and encrypted oauth2
+        JWT.  This token has a claim that contains the Openstack authorization token.
+        The Openstack authorization token is project scoped, so the JWT is granted
+        the "project" scope, allowing more APIs to be accessed.
       security:
       - oauth2Authentication: []
       requestBody:
-        $ref: '#/components/requestBodies/authenticationScopeRequest'
+        $ref: '#/components/requestBodies/tokenScopeRequest'
       responses:
         '200':
           $ref: '#/components/responses/tokenResponse'
-        '400':
-          $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/projects:
@@ -225,11 +215,14 @@ paths:
       description: |-
         Lists all OpenStack projects that the authenticated user is a member of.
       security:
-      - oauth2Authentication:
-        - project
+      - oauth2Authentication: []
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/openstackProjectsResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/flavors:
     description: OpenStack compute flavor services.
     get:
@@ -317,22 +310,42 @@ components:
     stringParameter:
       description: A basic string parameter.
       type: string
-    genericError:
+    oauth2Error:
       description: Generic error message.
       type: object
       required:
-      - description
+      - error
+      - error_description
       properties:
-        description:
+        error:
+          description: A terse error string expaning on the HTTP error code.
+          type: string
+          enum:
+          - invalid_request
+          - unauthorized_client
+          - access_denied
+          - unsupported_response_type
+          - invalid_scope
+          - server_error
+          - temporarily_unavailable
+        error_description:
           description: Verbose message describing the error.
           type: string
-    authenticationScope:
+    tokenScope:
       description: Password authentication scope.
       type: object
+      required:
+      - project
       properties:
         project:
-          description: Openstack project.
-          type: string
+          description: Openstack project scoping.
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              description: Openstack project ID.
+              type: string
     token:
       desctiption: Authentication token result.
       type: object
@@ -342,14 +355,35 @@ components:
         token:
           description: Authentication token.
           type: string
+    openstackProject:
+      description: An Openstack project.
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          description: Globally unique project ID.
+          type: string
+        name:
+          description: The name of the project within the scope of the domain.
+          type: string
+        description:
+          description: A verbose description of the project.
+          type: string
+    openstackProjects:
+      description: A list of Openstack projects.
+      type: array
+      items:
+        $ref: '#/components/schemas/openstackProject'
   requestBodies:
-    authenticationScopeRequest:
+    tokenScopeRequest:
       description: Openstack authentication scoping information.
       required: true
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/authenticationScope'
+            $ref: '#/components/schemas/tokenScope'
   responses:
     nullResponse:
       description: Delete Me
@@ -360,31 +394,37 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/genericError'
+            $ref: '#/components/schemas/oauth2Error'
     unauthorizedResponse:
       description: Authentication failed.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/genericError'
+            $ref: '#/components/schemas/oauth2Error'
     unsupportedMediaTypeResponse:
       description: Requested media type unspecified or unsupported.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/genericError'
+            $ref: '#/components/schemas/oauth2Error'
     internalServerErrorResponse:
       description: An unexpected error occurred, please report.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/genericError'
+            $ref: '#/components/schemas/oauth2Error'
     tokenResponse:
       description: Authentication was successful.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/token'
+    openstackProjectsResponse:
+      description: A list of Openstack projects.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/openstackProjects'
   securitySchemes:
     httpBasicAuthentication:
       description: Operation requires HTTP basic authentication.

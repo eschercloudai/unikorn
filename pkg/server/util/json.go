@@ -18,7 +18,10 @@ package util
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+
+	"github.com/eschercloudai/unikorn/pkg/server/errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -35,9 +38,25 @@ func WriteJSONResponse(w http.ResponseWriter, r *http.Request, code int, respons
 	}
 
 	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Cache-Control", "no-cache")
+
 	w.WriteHeader(code)
 
 	if _, err := w.Write(body); err != nil {
 		log.Error(err, "failed to write response")
 	}
+}
+
+// ReadJSONBody is a generic request reader to unmarshal JSON bodies.
+func ReadJSONBody(r *http.Request, v interface{}) error {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return errors.OAuth2ServerError("unable to read request body").WithError(err)
+	}
+
+	if err := json.Unmarshal(body, v); err != nil {
+		return errors.OAuth2ServerError("unable to unmarshal request body").WithError(err)
+	}
+
+	return nil
 }
