@@ -79,7 +79,7 @@ func (p *Provisioner) Generate() (client.Object, error) {
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api",
-					"targetRevision": "v0.1.3",
+					"targetRevision": "v0.1.4",
 				},
 				"ignoreDifferences": []map[string]interface{}{
 					{

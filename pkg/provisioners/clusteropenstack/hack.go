@@ -103,7 +103,7 @@ func (p *Provisioner) getKubeadmControlPlanes(ctx context.Context, c client.Clie
 // getOpenstackMachineTemplates gets all live machine templates for the cluster.
 func (p *Provisioner) getOpenstackMachineTemplates(ctx context.Context, c client.Client) ([]unstructured.Unstructured, error) {
 	// TODO: this is flaky as hell, due to hard coded versions, needs a fix upstream.
-	return p.getOwnedResource(ctx, c, "infrastructure.cluster.x-k8s.io/v1alpha5", "OpenStackMachineTemplate")
+	return p.getOwnedResource(ctx, c, "infrastructure.cluster.x-k8s.io/v1alpha6", "OpenStackMachineTemplate")
 }
 
 // resourceExistsUnstructured tells whether the resource exists in the
