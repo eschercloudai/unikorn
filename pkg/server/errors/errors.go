@@ -133,6 +133,14 @@ func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func HTTPNotFound() *HTTPError {
+	return newHTTPError(http.StatusNotFound, generated.NotFound, "the requested path was not found")
+}
+
+func HTTPMethodNotAllowed() *HTTPError {
+	return newHTTPError(http.StatusMethodNotAllowed, generated.MethodNotAllowed, "the requested method was not allowed")
+}
+
 // OAuth2InvalidRequest indicates a client error.
 func OAuth2InvalidRequest(description string) *HTTPError {
 	return newHTTPError(http.StatusBadRequest, generated.InvalidRequest, description)

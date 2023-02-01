@@ -20,13 +20,10 @@ package handler
 import (
 	"net/http"
 
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
-
-	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
-	"github.com/eschercloudai/unikorn/pkg/server/context"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/providers"
 	"github.com/eschercloudai/unikorn/pkg/server/util"
 )
 
@@ -121,57 +118,67 @@ func (h *Handler) PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluste
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZones(w http.ResponseWriter, r *http.Request) {
-}
-
-func (h *Handler) GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWriter, r *http.Request) {
-}
-
-func (h *Handler) GetApiV1ProvidersOpenstackFlavors(w http.ResponseWriter, r *http.Request) {
-}
-
-func (h *Handler) GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *http.Request) {
-}
-
-func ListAvailableProjects(r *http.Request) ([]projects.Project, error) {
-	token, err := context.TokenFromContext(r.Context())
-	if err != nil {
-		return nil, errors.OAuth2ServerError("failed get authorization token").WithError(err)
-	}
-
-	identity, err := openstack.NewIdentityClient(openstack.NewTokenProvider("https://nl1.eschercloud.com:5000", token))
-	if err != nil {
-		return nil, errors.OAuth2ServerError("failed get identity client").WithError(err)
-	}
-
-	projects, err := identity.ListAvailableProjects()
-	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list projects").WithError(err)
-	}
-
-	return projects, nil
-}
-
-func (h *Handler) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request) {
-	projects, err := ListAvailableProjects(r)
+	result, err := providers.NewOpenstack(h.authenticator).ListAvailabilityZones(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 
 		return
 	}
 
-	result := make(generated.OpenstackProjects, len(projects))
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
 
-	for i, project := range projects {
-		result[i].Id = project.ID
-		result[i].Name = project.Name
+func (h *Handler) GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWriter, r *http.Request) {
+	result, err := providers.NewOpenstack(h.authenticator).ListExternalNetworks(r)
+	if err != nil {
+		errors.HandleError(w, r, err)
 
-		if project.Description != "" {
-			result[i].Description = &projects[i].Description
-		}
+		return
 	}
 
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
-func (h *Handler) GetApiV1ProvidersOpenstackSshKeys(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetApiV1ProvidersOpenstackFlavors(w http.ResponseWriter, r *http.Request) {
+	result, err := providers.NewOpenstack(h.authenticator).ListFlavors(r)
+	if err != nil {
+		errors.HandleError(w, r, err)
+
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *http.Request) {
+	result, err := providers.NewOpenstack(h.authenticator).ListImages(r)
+	if err != nil {
+		errors.HandleError(w, r, err)
+
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *http.Request) {
+	result, err := providers.NewOpenstack(h.authenticator).ListKeyPairs(r)
+	if err != nil {
+		errors.HandleError(w, r, err)
+
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request) {
+	result, err := providers.NewOpenstack(h.authenticator).ListAvailableProjects(r)
+	if err != nil {
+		errors.HandleError(w, r, err)
+
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }

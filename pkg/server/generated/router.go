@@ -75,11 +75,11 @@ type ServerInterface interface {
 	// (GET /api/v1/providers/openstack/images)
 	GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *http.Request)
 
+	// (GET /api/v1/providers/openstack/key-pairs)
+	GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *http.Request)
+
 	// (GET /api/v1/providers/openstack/projects)
 	GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request)
-
-	// (GET /api/v1/providers/openstack/ssh-keys)
-	GetApiV1ProvidersOpenstackSshKeys(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -662,14 +662,14 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackImages(w http.Respo
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ProvidersOpenstackProjects operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ProvidersOpenstackKeyPairs operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{""})
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ProvidersOpenstackProjects(w, r)
+		siw.Handler.GetApiV1ProvidersOpenstackKeyPairs(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -679,14 +679,14 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackProjects(w http.Res
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ProvidersOpenstackSshKeys operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackSshKeys(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ProvidersOpenstackProjects operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{""})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ProvidersOpenstackSshKeys(w, r)
+		siw.Handler.GetApiV1ProvidersOpenstackProjects(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -870,10 +870,10 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/providers/openstack/images", wrapper.GetApiV1ProvidersOpenstackImages)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/providers/openstack/projects", wrapper.GetApiV1ProvidersOpenstackProjects)
+		r.Get(options.BaseURL+"/api/v1/providers/openstack/key-pairs", wrapper.GetApiV1ProvidersOpenstackKeyPairs)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/providers/openstack/ssh-keys", wrapper.GetApiV1ProvidersOpenstackSshKeys)
+		r.Get(options.BaseURL+"/api/v1/providers/openstack/projects", wrapper.GetApiV1ProvidersOpenstackProjects)
 	})
 
 	return r

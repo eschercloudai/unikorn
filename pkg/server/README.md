@@ -49,3 +49,9 @@ It is anticipated that this step can be omitted most of the time for a Web appli
 ```bash
 curl -vkq https://kubernetes.eschercloud.com/api/v1/providers/openstack/projects -H "Authorization: Bearer ${TOKEN}" | jq  .
 ```
+
+=== Get a Scoped Token
+
+```bash
+export TOKEN=$(curl -vkq https://kubernetes.eschercloud.com/api/v1/auth/tokens/token -H "Authorization: Bearer ${TOKEN}" -d '{"project":{"id":"23a9e437091d481da99f2aa07180b4ea"}}' | jq  -r token)
+```

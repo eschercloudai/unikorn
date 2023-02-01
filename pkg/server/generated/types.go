@@ -13,6 +13,8 @@ const (
 	AccessDenied            Oauth2ErrorError = "access_denied"
 	InvalidRequest          Oauth2ErrorError = "invalid_request"
 	InvalidScope            Oauth2ErrorError = "invalid_scope"
+	MethodNotAllowed        Oauth2ErrorError = "method_not_allowed"
+	NotFound                Oauth2ErrorError = "not_found"
 	ServerError             Oauth2ErrorError = "server_error"
 	TemporarilyUnavailable  Oauth2ErrorError = "temporarily_unavailable"
 	UnauthorizedClient      Oauth2ErrorError = "unauthorized_client"

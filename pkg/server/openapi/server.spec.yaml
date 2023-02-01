@@ -271,11 +271,11 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
-  /api/v1/providers/openstack/ssh-keys:
-    description: OpenStack SSH key services.
+  /api/v1/providers/openstack/key-pairs:
+    description: OpenStack key pair services.
     get:
       description: |-
-        Lists all OpenStack SSH keys the authenticated user has access to within
+        Lists all OpenStack key pairs the authenticated user has access to within
         the scope of the OpenStack project.
       security:
       - oauth2Authentication:
@@ -321,6 +321,7 @@ components:
           description: A terse error string expaning on the HTTP error code.
           type: string
           enum:
+          # Defined by OAuth2
           - invalid_request
           - unauthorized_client
           - access_denied
@@ -328,6 +329,9 @@ components:
           - invalid_scope
           - server_error
           - temporarily_unavailable
+          # Proprietary
+          - not_found
+          - method_not_allowed
         error_description:
           description: Verbose message describing the error.
           type: string
