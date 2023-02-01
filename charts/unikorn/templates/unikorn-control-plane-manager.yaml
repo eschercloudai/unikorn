@@ -58,6 +58,7 @@ rules:
   resources:
   - applications
   verbs:
+  - create
   - list
   - get
   - watch
