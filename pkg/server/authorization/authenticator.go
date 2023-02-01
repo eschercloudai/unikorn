@@ -18,6 +18,7 @@ package authorization
 
 import (
 	"encoding/base64"
+	"flag"
 	"net/http"
 	"strings"
 
@@ -29,16 +30,33 @@ import (
 
 // Authenticator provides Keystone authentication functionality.
 type Authenticator struct {
-	// Issuer allows creation and validation of JWT bearer tokens.
-	Issuer *JWTIssuer
+	// issuer allows creation and validation of JWT bearer tokens.
+	issuer *JWTIssuer
 
-	// Endpoint is the Keystone endpoint.
-	Endpoint string
+	// endpoint is the Keystone endpoint.
+	endpoint string
 
-	// Domain is the default domain users live under.
-	// TODO: Hierarchical domains should be supported, but aren't needed
-	// for now.
-	Domain string
+	// domain is the default domain users live under.
+	domain string
+}
+
+// NewAuthenticator returns a new authenticator with required fields populated.
+// You must call AddFlags after this.
+func NewAuthenticator(issuer *JWTIssuer) *Authenticator {
+	return &Authenticator{
+		issuer: issuer,
+	}
+}
+
+// AddFlags to the specified flagset.
+func (a *Authenticator) AddFlags(f *flag.FlagSet) {
+	f.StringVar(&a.endpoint, "keystone-endpoint", "https://nl1.eschercloud.com:5000", "Keystone endpoint to use for authn/authz.")
+	f.StringVar(&a.domain, "keystone-user-domain-name", "Default", "Keystone user domain name for password authentication.")
+}
+
+// Endpoint returns the endpoint host.
+func (a *Authenticator) Endpoint() string {
+	return a.endpoint
 }
 
 // Basic performs basic authentication against Keystone and returns a token.
@@ -61,7 +79,7 @@ func (a *Authenticator) Basic(r *http.Request) (string, error) {
 	username := parts[0]
 	password := parts[1]
 
-	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.Endpoint))
+	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.endpoint))
 	if err != nil {
 		return "", errors.OAuth2ServerError("unable to initialize identity").WithError(err)
 	}
@@ -69,12 +87,12 @@ func (a *Authenticator) Basic(r *http.Request) (string, error) {
 	// Do an unscoped authentication against Keystone.  The client is expected
 	// to list visible projects (or indeed cache them in local web-storage) then
 	// use that to do a scoped bearer token based upgrade.
-	keystoneToken, err := identity.CreateToken(openstack.NewCreateTokenOptionsUnscopedPassword(a.Domain, username, password))
+	keystoneToken, err := identity.CreateToken(openstack.NewCreateTokenOptionsUnscopedPassword(a.domain, username, password))
 	if err != nil {
 		return "", errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
 
-	jwToken, err := a.Issuer.Issue(r, username, keystoneToken.ID, nil, keystoneToken.ExpiresAt)
+	jwToken, err := a.issuer.Issue(r, username, keystoneToken.ID, nil, keystoneToken.ExpiresAt)
 	if err != nil {
 		return "", errors.OAuth2ServerError("unable to create access token").WithError(err)
 	}
@@ -95,7 +113,7 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (str
 		return "", errors.OAuth2ServerError("failed get authorization token").WithError(err)
 	}
 
-	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.Endpoint))
+	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.endpoint))
 	if err != nil {
 		return "", errors.OAuth2ServerError("unable to initialize identity").WithError(err)
 	}
@@ -112,7 +130,7 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (str
 		},
 	}
 
-	jwToken, err := a.Issuer.Issue(r, subject, keystoneToken.ID, oAuth2Scope, keystoneToken.ExpiresAt)
+	jwToken, err := a.issuer.Issue(r, subject, keystoneToken.ID, oAuth2Scope, keystoneToken.ExpiresAt)
 	if err != nil {
 		return "", errors.OAuth2ServerError("unable to create access token").WithError(err)
 	}

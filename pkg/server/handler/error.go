@@ -18,8 +18,21 @@ package handler
 
 import (
 	"net/http"
+
+	"github.com/eschercloudai/unikorn/pkg/server/errors"
 )
 
+// NotFound is called from the router when a path is not found.
+func NotFound(w http.ResponseWriter, r *http.Request) {
+	errors.HTTPNotFound().Write(w, r)
+}
+
+// MethodNotAllowed is called from the router when a method is not found for a path.
+func MethodNotAllowed(w http.ResponseWriter, r *http.Request) {
+	errors.HTTPMethodNotAllowed().Write(w, r)
+}
+
+// HandleError is called when the router has trouble parsong paths.
 func HandleError(w http.ResponseWriter, r *http.Request, err error) {
-	// Handle error in router processing.
+	errors.OAuth2InvalidRequest("invalid path/query element").WithError(err).Write(w, r)
 }
