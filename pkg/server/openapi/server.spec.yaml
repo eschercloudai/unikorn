@@ -7,6 +7,7 @@ paths:
   /api/v1/auth/tokens/password:
     description: Password based authentication services.
     post:
+      x-no-body: true
       description: |-
         Authenticates against Openstack, and returns a signed and encrypted oauth2
         JWT.  This token has a claim that contains the Openstack authorization token.
@@ -40,8 +41,12 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/tokenResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/projects:
@@ -63,6 +68,8 @@ paths:
       security:
       - oauth2Authentication:
         - project
+      requestBody:
+        $ref: "#/components/requestBodies/nullRequest"
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
@@ -111,6 +118,8 @@ paths:
       security:
       - oauth2Authentication:
         - project
+      requestBody:
+        $ref: "#/components/requestBodies/nullRequest"
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
@@ -136,6 +145,8 @@ paths:
       security:
       - oauth2Authentication:
         - project
+      requestBody:
+        $ref: "#/components/requestBodies/nullRequest"
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
@@ -169,6 +180,8 @@ paths:
       security:
       - oauth2Authentication:
         - project
+      requestBody:
+        $ref: "#/components/requestBodies/nullRequest"
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
@@ -197,6 +210,8 @@ paths:
       security:
       - oauth2Authentication:
         - project
+      requestBody:
+        $ref: "#/components/requestBodies/nullRequest"
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
@@ -219,8 +234,12 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/openstackProjectsResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/flavors:
@@ -235,6 +254,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/images:
     description: OpenStack compute image services.
     get:
@@ -247,6 +274,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/availability-zones:
     description: OpenStack compure availability zone services.
     get:
@@ -259,6 +294,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/external-networks:
     description: OpenStack external network services.
     get:
@@ -271,6 +314,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/key-pairs:
     description: OpenStack key pair services.
     get:
@@ -283,6 +334,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
 components:
   parameters:
     project:
@@ -332,6 +391,7 @@ components:
           # Proprietary
           - not_found
           - method_not_allowed
+          - unsupported_media_type
         error_description:
           description: Verbose message describing the error.
           type: string
@@ -350,6 +410,7 @@ components:
             id:
               description: Openstack project ID.
               type: string
+          additionalProperties: false
     token:
       desctiption: Authentication token result.
       type: object
@@ -388,11 +449,16 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/tokenScope'
+    nullRequest:
+      description: Delete me
+      content: {}
   responses:
     nullResponse:
       description: Delete Me
       content:
-        application/json: {}
+        application/json:
+          schema:
+            type: object
     badRequestResponse:
       description: Request body failed schema validation.
       content:
