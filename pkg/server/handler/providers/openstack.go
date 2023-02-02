@@ -18,6 +18,7 @@ package providers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
@@ -122,7 +123,7 @@ func (o *Openstack) ListFlavors(r *http.Request) (interface{}, error) {
 	return result, nil
 }
 
-func (o *Openstack) ListImages(r *http.Request) (interface{}, error) {
+func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
@@ -133,7 +134,39 @@ func (o *Openstack) ListImages(r *http.Request) (interface{}, error) {
 		return nil, errors.OAuth2ServerError("failed list images").WithError(err)
 	}
 
-	return result, nil
+	images := make(generated.OpenstackImages, len(result))
+
+	for i, image := range result {
+		created, err := time.Parse(time.RFC3339, image.Created)
+		if err != nil {
+			return nil, errors.OAuth2ServerError("failed parse image creation time").WithError(err)
+		}
+
+		modified, err := time.Parse(time.RFC3339, image.Updated)
+		if err != nil {
+			return nil, errors.OAuth2ServerError("failed parse image modification time").WithError(err)
+		}
+
+		// images are pre-filtered by the provider library, so these keys exist.
+		kubernetesVersion, ok := image.Metadata["k8s"].(string)
+		if !ok {
+			return nil, errors.OAuth2ServerError("failed parse image kubernetes version")
+		}
+
+		nvidiaDriverVersion, ok := image.Metadata["gpu"].(string)
+		if !ok {
+			return nil, errors.OAuth2ServerError("failed parse image gpu driver version")
+		}
+
+		images[i].Id = image.ID
+		images[i].Name = image.Name
+		images[i].Created = created
+		images[i].Modified = modified
+		images[i].Versions.Kubernetes = kubernetesVersion
+		images[i].Versions.NvidiaDriver = nvidiaDriverVersion
+	}
+
+	return images, nil
 }
 
 // ListAvailableProjects lists projects that the token has roles associated with.
