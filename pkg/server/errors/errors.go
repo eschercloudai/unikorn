@@ -141,6 +141,10 @@ func HTTPMethodNotAllowed() *HTTPError {
 	return newHTTPError(http.StatusMethodNotAllowed, generated.MethodNotAllowed, "the requested method was not allowed")
 }
 
+func HTTPUnsupportedMediaType() *HTTPError {
+	return newHTTPError(http.StatusUnsupportedMediaType, generated.UnsupportedMediaType, "the requested content type was not allowed")
+}
+
 // OAuth2InvalidRequest indicates a client error.
 func OAuth2InvalidRequest(description string) *HTTPError {
 	return newHTTPError(http.StatusBadRequest, generated.InvalidRequest, description)
@@ -156,6 +160,12 @@ func OAuth2AccessDenied(description string) *HTTPError {
 // in production.  If so then our testing needs to improve.
 func OAuth2ServerError(description string) *HTTPError {
 	return newHTTPError(http.StatusInternalServerError, generated.ServerError, description)
+}
+
+// OAuth2InvalidScope tells the client it doesn't have the necessary scope
+// to access the resource.
+func OAuth2InvalidScope(description string) *HTTPError {
+	return newHTTPError(http.StatusUnauthorized, generated.InvalidScope, description)
 }
 
 // toHTTPError is a handy unwrapper to get a HTTP error from a generic one.

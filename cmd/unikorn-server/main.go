@@ -111,12 +111,15 @@ func main() {
 	router.NotFound(http.HandlerFunc(handler.NotFound))
 	router.MethodNotAllowed(http.HandlerFunc(handler.MethodNotAllowed))
 
+	authorizer := middleware.NewAuthorizer(issuer)
+
 	// Middleware specified here is applied to all requests post-routing.
+	// NOTE: these are applied in reverse order!!
 	chiServerOptions := generated.ChiServerOptions{
 		BaseRouter:       router,
 		ErrorHandlerFunc: handler.HandleError,
 		Middlewares: []generated.MiddlewareFunc{
-			middleware.NewAuthorizer(issuer).Middleware,
+			middleware.NewOpenAPIValidator(authorizer).Middleware,
 		},
 	}
 

@@ -18,6 +18,7 @@ const (
 	ServerError             Oauth2ErrorError = "server_error"
 	TemporarilyUnavailable  Oauth2ErrorError = "temporarily_unavailable"
 	UnauthorizedClient      Oauth2ErrorError = "unauthorized_client"
+	UnsupportedMediaType    Oauth2ErrorError = "unsupported_media_type"
 	UnsupportedResponseType Oauth2ErrorError = "unsupported_response_type"
 )
 
@@ -82,7 +83,7 @@ type BadRequestResponse = Oauth2Error
 type InternalServerErrorResponse = Oauth2Error
 
 // NullResponse defines model for nullResponse.
-type NullResponse interface{}
+type NullResponse = map[string]interface{}
 
 // OpenstackProjectsResponse A list of Openstack projects.
 type OpenstackProjectsResponse = OpenstackProjects
