@@ -273,7 +273,7 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/openstackImagesResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -441,6 +441,48 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackProject'
+    openstackImage:
+      description: And Openstack image.
+      type: object
+      required:
+      - id
+      - name
+      - created
+      - modified
+      - versions
+      properties:
+        id:
+          description: The unique image ID.
+          type: string
+        name:
+          description: The image name.
+          type: string
+        created:
+          description: Time when the image was created.
+          type: string
+          format: date-time
+        modified:
+          description: Time when the image was last modified.
+          type: string
+          format: date-time
+        versions:
+          description: Image version metadata.
+          type: object
+          required:
+          - kubernetes
+          - nvidia_driver
+          properties:
+            kubernetes:
+              description: The kubernetes semantic version.
+              type: string
+            nvidia_driver:
+              description: The nvidia driver version.
+              type: string
+    openstackImages:
+      description: A list of Openstack images that are compatible with this platform.
+      type: array
+      items:
+        $ref: '#/components/schemas/openstackImage'
   requestBodies:
     tokenScopeRequest:
       description: Openstack authentication scoping information.
@@ -495,6 +537,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackProjects'
+    openstackImagesResponse:
+      description: A list of Openstack images that are compatible with this platform.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/openstackImages'
   securitySchemes:
     httpBasicAuthentication:
       description: Operation requires HTTP basic authentication.

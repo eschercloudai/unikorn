@@ -102,12 +102,46 @@ func (c *ComputeClient) FlavorExtraSpecs(flavor *flavors.Flavor) (map[string]str
 
 // Images returns a list of images.
 func (c *ComputeClient) Images() ([]images.Image, error) {
-	page, err := images.ListDetail(c.client, &images.ListOpts{}).AllPages()
+	// Only return active images that are ready to be used.
+	opts := &images.ListOpts{
+		Status: "ACTIVE",
+	}
+
+	page, err := images.ListDetail(c.client, opts).AllPages()
 	if err != nil {
 		return nil, err
 	}
 
-	return images.ExtractImages(page)
+	result, err := images.ExtractImages(page)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter out images that aren't compatible.
+	//nolint:prealloc
+	var filtered []images.Image
+
+	for _, image := range result {
+		// Only accept images in scope that we know conform to our requirements.
+		// TODO: we need a formal specification for this.
+		if image.Metadata == nil {
+			continue
+		}
+
+		// TODO: value checking shouldn't be required, but we have some duff images
+		// in the system.
+		if value, ok := image.Metadata["k8s"]; !ok || value == "" {
+			continue
+		}
+
+		if value, ok := image.Metadata["gpu"]; !ok || value == "" {
+			continue
+		}
+
+		filtered = append(filtered, image)
+	}
+
+	return filtered, nil
 }
 
 // AvailabilityZones returns a list of availability zones.
