@@ -64,6 +64,14 @@ If you are doing local development, and using `kind` or similar, you can omit th
 make images-kind-load
 ```
 
+The recommendation on macOS is to make use of [Colima](https://github.com/abiosoft/colima) and to create a single-node Kubernetes cluster sufficient for local development and test with the following:
+
+```
+colima start --cpu 4 --memory 8 --network-address --kubernetes
+```
+
+Images are built in the same VM and the same containerd namespace as the Kubernetes cluster that Colima provisions on your behalf, so there is no need for an equivalent command like `make images-kind-load` - images are immediately available in the cluster.
+
 By default, development images will have a tag/version of `0.0.0` so as not to be confused with official releases.
 
 Your Helm configuration later should look like `--set tag=0.0.0`.
@@ -72,12 +80,52 @@ Your Helm configuration later should look like `--set tag=0.0.0`.
 
 #### Installing
 
-Is all done via Helm.
-Remember to override the chart values as described above.
-You can install using the local repo:
+ArgoCD is a prerequisite, install with the following commands:
 
-```shell
-helm install unikorn charts/unikorn --namespace unikorn --create-namespace --set repository=null --set tag=0.0.0
+```
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+helm install argocd argo/argo-cd -n argocd --create-namespace
+```
+
+Once ArgoCD is up and running, retrieve the password for the `admin` account with the following command:
+
+```
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+
+And then set up port forwarding so that the dashboard can be accessed locally via https://localhost:8080
+
+```
+kubectl -n argocd port-forward svc/argocd-server 8080:80 --address 0.0.0.0
+```
+
+Finally, create an ArgoCD Application definition in order to deploy Unikorn:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: unikorn
+  namespace: argocd
+spec:
+  project: default
+  source:
+    path: charts/unikorn
+    repoURL: https://github.com/eschercloudai/unikorn.git
+    targetRevision: 0.3.9
+    helm:
+      values: |
+        tag: 0.0.0
+  destination:
+    namespace: unikorn
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
 ```
 
 #### LoadBalancer Service Support
@@ -88,3 +136,5 @@ There's a script provided that will setup Metallb for you if require e.g. kubect
 ```shell
 go run hack/install_metallb
 ```
+
+There is no need to run this step when using a cluster provisioned using macOS via Colima, support is automatically provided out of the box for LoadBalancer Services as these inherit the host's IP address thanks to the use of [Klipper](https://docs.k3s.io/networking#service-load-balancer) which is bundled with K3s.
