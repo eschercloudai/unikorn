@@ -18,7 +18,11 @@ package providers
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
@@ -109,6 +113,47 @@ func (o *Openstack) ListExternalNetworks(r *http.Request) (interface{}, error) {
 	return result, nil
 }
 
+// convertFlavor traslates from Openstack's mess into our API types.
+func convertFlavor(flavor *flavors.Flavor, extraSpecs map[string]string) (*generated.OpenstackFlavor, error) {
+	f := &generated.OpenstackFlavor{
+		Id:   flavor.ID,
+		Name: flavor.Name,
+		Cpu:  flavor.VCPUs,
+		// Convert MiB to GiB
+		// TODO: Should probably specify units too to disambiguate.
+		Memory: flavor.RAM >> 10,
+	}
+
+	// TODO: Steve needs to provide an official specification for this.
+	// It's not particularly nice at present!
+	if value, ok := extraSpecs["resources:VGPU"]; ok {
+		// These lie, some flavors have like 1/2, 2/7 etc. GPUs but
+		// actually return 1.  May be misleading to end users.
+		gpus, err := strconv.Atoi(value)
+		if err != nil {
+			return nil, errors.OAuth2ServerError("unable to parse VGPU flavor metadata").WithError(err)
+		}
+
+		f.Gpu = &gpus
+	}
+
+	if value, ok := extraSpecs["pci_passthrough:alias"]; ok {
+		parts := strings.Split(value, ":")
+		if len(parts) != 2 {
+			return nil, errors.OAuth2ServerError("unable to parse VGPU flavor metadata")
+		}
+
+		gpus, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, errors.OAuth2ServerError("unable to parse VGPU flavor metadata").WithError(err)
+		}
+
+		f.Gpu = &gpus
+	}
+
+	return f, nil
+}
+
 func (o *Openstack) ListFlavors(r *http.Request) (interface{}, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
@@ -120,7 +165,31 @@ func (o *Openstack) ListFlavors(r *http.Request) (interface{}, error) {
 		return nil, errors.OAuth2ServerError("failed list flavors").WithError(err)
 	}
 
-	return result, nil
+	//nolint:prealloc
+	var flavors []generated.OpenstackFlavor
+
+	for i := range result {
+		f := &result[i]
+
+		extraSpecs, err := client.FlavorExtraSpecs(f)
+		if err != nil {
+			return nil, errors.OAuth2ServerError("failed list flavor extra specs").WithError(err)
+		}
+
+		// Filter out baremetal nodes.
+		if _, ok := extraSpecs["resources:CUSTOM_BAREMETAL"]; ok {
+			continue
+		}
+
+		flavor, err := convertFlavor(f, extraSpecs)
+		if err != nil {
+			return nil, err
+		}
+
+		flavors = append(flavors, *flavor)
+	}
+
+	return flavors, nil
 }
 
 func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, error) {
