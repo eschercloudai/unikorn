@@ -19,7 +19,6 @@ package create
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -178,17 +177,17 @@ func (o *createWorkloadPoolOptions) applyAutoscaling(workloadPool *unikornv1alph
 		},
 	}
 
-	if value, ok := flavorExtraSpecs["resources:VGPU"]; ok {
-		gpuType := nvidiaGPUType
+	gpu, ok, err := openstack.FlavorGPUs(flavor, flavorExtraSpecs)
+	if err != nil {
+		return err
+	}
 
-		gpus, err := strconv.Atoi(value)
-		if err != nil {
-			return err
-		}
+	if ok {
+		gpuType := nvidiaGPUType
 
 		workloadPool.Spec.Autoscaling.Scheduler.GPU = &unikornv1alpha1.MachineGenericAutoscalingSchedulerGPU{
 			Type:  &gpuType,
-			Count: &gpus,
+			Count: &gpu.GPUs,
 		}
 	}
 
