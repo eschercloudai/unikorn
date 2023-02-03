@@ -38,6 +38,26 @@ type Oauth2Error struct {
 // Oauth2ErrorError A terse error string expaning on the HTTP error code.
 type Oauth2ErrorError string
 
+// OpenstackFlavor An Openstack flavor.
+type OpenstackFlavor struct {
+	Cpu int `json:"cpu"`
+
+	// Gpu The number of GPUs.
+	Gpu *int `json:"gpu,omitempty"`
+
+	// Id The unique flavor ID.
+	Id string `json:"id"`
+
+	// Memory The amount of memory in GiB.
+	Memory int `json:"memory"`
+
+	// Name The flavor name.
+	Name string `json:"name"`
+}
+
+// OpenstackFlavors A list of Openstack flavors.
+type OpenstackFlavors = []OpenstackFlavor
+
 // OpenstackImage And Openstack image.
 type OpenstackImage struct {
 	// Created Time when the image was created.
@@ -115,6 +135,9 @@ type InternalServerErrorResponse = Oauth2Error
 
 // NullResponse defines model for nullResponse.
 type NullResponse = map[string]interface{}
+
+// OpenstackFlavorsResponse A list of Openstack flavors.
+type OpenstackFlavorsResponse = OpenstackFlavors
 
 // OpenstackImagesResponse A list of Openstack images that are compatible with this platform.
 type OpenstackImagesResponse = OpenstackImages

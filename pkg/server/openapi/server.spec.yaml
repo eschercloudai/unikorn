@@ -253,7 +253,7 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/openstackFlavorsResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -483,6 +483,35 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackImage'
+    openstackFlavor:
+      description: An Openstack flavor.
+      type: object
+      required:
+      - id
+      - name
+      - cpu
+      - memory
+      properties:
+        id:
+          description: The unique flavor ID.
+          type: string
+        name:
+          description: The flavor name.
+          type: string
+        cpu:
+          descritpion: The number of CPUs.
+          type: integer
+        memory:
+          description: The amount of memory in GiB.
+          type: integer
+        gpu:
+          description: The number of GPUs.
+          type: integer
+    openstackFlavors:
+      description: A list of Openstack flavors.
+      type: array
+      items:
+        $ref: '#/components/schemas/openstackFlavor'
   requestBodies:
     tokenScopeRequest:
       description: Openstack authentication scoping information.
@@ -543,6 +572,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackImages'
+    openstackFlavorsResponse:
+      description: A list of Openstack flavors.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/openstackFlavors'
   securitySchemes:
     httpBasicAuthentication:
       description: Operation requires HTTP basic authentication.
