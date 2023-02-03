@@ -19,6 +19,7 @@ package flags
 import (
 	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 	"time"
@@ -169,4 +170,37 @@ func (s *DurationFlag) Set(in string) error {
 // Type returns the human readable type information.
 func (s DurationFlag) Type() string {
 	return "duration"
+}
+
+// IPNetSliceFlag provides a way to accumulate IP networks.
+type IPNetSliceFlag struct {
+	IPNetworks []net.IPNet
+}
+
+// String returns the current value.
+func (s IPNetSliceFlag) String() string {
+	l := make([]string, len(s.IPNetworks))
+
+	for i, network := range s.IPNetworks {
+		l[i] = network.String()
+	}
+
+	return strings.Join(l, ",")
+}
+
+// Set sets the value and does any error checking.
+func (s *IPNetSliceFlag) Set(in string) error {
+	_, n, err := net.ParseCIDR(in)
+	if err != nil {
+		return err
+	}
+
+	s.IPNetworks = append(s.IPNetworks, *n)
+
+	return nil
+}
+
+// Type returns the human readable type information.
+func (s IPNetSliceFlag) Type() string {
+	return "ipNetwork"
 }
