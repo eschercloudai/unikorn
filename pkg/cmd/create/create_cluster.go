@@ -137,6 +137,13 @@ type createClusterOptions struct {
 	// user.
 	autoscaling bool
 
+	// SANs allows the Kuberenetes API to generate a set of X.509 SANs
+	// in its certificate.
+	SANs []string
+
+	// allowedPrefixes allows the Kubernetes API firewall.
+	allowedPrefixes uflags.IPNetSliceFlag
+
 	// client gives access to our custom resources.
 	client unikorn.Interface
 }
@@ -157,6 +164,8 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	cmd.Flags().IPNetVar(&o.podNetwork, "pod-network", defaultPodNetwork, "Pod network prefix.")
 	cmd.Flags().IPNetVar(&o.serviceNetwork, "service-network", defaultServiceNetwork, "Service network prefix.")
 	cmd.Flags().IPSliceVar(&o.dnsNameservers, "dns-nameservers", defaultDNSNameservers, "DNS nameservers for pods.")
+	cmd.Flags().StringSliceVar(&o.SANs, "api-san", nil, "Specifies an X.509 subject alternative name to generate in the API certificate. May be specified multiple times.")
+	cmd.Flags().Var(&o.allowedPrefixes, "api-allowed-prefix", "Specifies a network prefix allowed to use the Kubernetes API. May be specified multiple times.")
 
 	// Kubernetes control plane options.
 	flags.RequiredStringVarWithCompletion(cmd, &o.flavor, "flavor", "", "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
@@ -265,6 +274,14 @@ func (o *createClusterOptions) run() error {
 		return err
 	}
 
+	allowedPrefixes := make([]unikornv1alpha1.IPv4Prefix, len(o.allowedPrefixes.IPNetworks))
+
+	for i, prefix := range o.allowedPrefixes.IPNetworks {
+		allowedPrefixes[i] = unikornv1alpha1.IPv4Prefix{
+			IPNet: prefix,
+		}
+	}
+
 	version := unikornv1alpha1.SemanticVersion(o.version.Semver)
 
 	cluster := &unikornv1alpha1.KubernetesCluster{
@@ -290,6 +307,10 @@ func (o *createClusterOptions) run() error {
 				PodNetwork:     &unikornv1alpha1.IPv4Prefix{IPNet: o.podNetwork},
 				ServiceNetwork: &unikornv1alpha1.IPv4Prefix{IPNet: o.serviceNetwork},
 				DNSNameservers: unikornv1alpha1.IPv4AddressSliceFromIPSlice(o.dnsNameservers),
+			},
+			API: &unikornv1alpha1.KubernetesClusterAPISpec{
+				SubjectAlternativeNames: o.SANs,
+				AllowedPrefixes:         allowedPrefixes,
 			},
 			ControlPlane: &unikornv1alpha1.KubernetesClusterControlPlaneSpec{
 				MachineGeneric: unikornv1alpha1.MachineGeneric{

@@ -250,7 +250,6 @@ func (p *Provisioner) Generate() (client.Object, error) {
 	}
 
 	// TODO: generate types from the Helm values schema.
-	// TODO: add in API configuration.
 	valuesRaw := map[string]interface{}{
 		"openstack": openstackValues,
 		"cluster": map[string]interface{}{
@@ -280,6 +279,20 @@ func (p *Provisioner) Generate() (client.Object, error) {
 			},
 			"dnsNameservers": nameservers,
 		},
+	}
+
+	if p.cluster.Spec.API != nil {
+		apiValues := map[string]interface{}{}
+
+		if p.cluster.Spec.API.SubjectAlternativeNames != nil {
+			apiValues["certificateSANs"] = p.cluster.Spec.API.SubjectAlternativeNames
+		}
+
+		if p.cluster.Spec.API.AllowedPrefixes != nil {
+			apiValues["allowList"] = p.cluster.Spec.API.AllowedPrefixes
+		}
+
+		valuesRaw["api"] = apiValues
 	}
 
 	values, err := yaml.Marshal(valuesRaw)
