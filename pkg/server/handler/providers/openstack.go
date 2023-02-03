@@ -18,8 +18,6 @@ package providers
 
 import (
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
@@ -124,31 +122,20 @@ func convertFlavor(flavor *flavors.Flavor, extraSpecs map[string]string) (*gener
 		Memory: flavor.RAM >> 10,
 	}
 
-	// TODO: Steve needs to provide an official specification for this.
-	// It's not particularly nice at present!
-	if value, ok := extraSpecs["resources:VGPU"]; ok {
-		// These lie, some flavors have like 1/2, 2/7 etc. GPUs but
-		// actually return 1.  May be misleading to end users.
-		gpus, err := strconv.Atoi(value)
-		if err != nil {
-			return nil, errors.OAuth2ServerError("unable to parse VGPU flavor metadata").WithError(err)
-		}
-
-		f.Gpu = &gpus
+	gpu, ok, err := openstack.FlavorGPUs(flavor, extraSpecs)
+	if err != nil {
+		return nil, errors.OAuth2ServerError("unable to get GPU flavor metadata").WithError(err)
 	}
 
-	if value, ok := extraSpecs["pci_passthrough:alias"]; ok {
-		parts := strings.Split(value, ":")
-		if len(parts) != 2 {
-			return nil, errors.OAuth2ServerError("unable to parse VGPU flavor metadata")
-		}
+	if ok {
+		f.Gpus = &gpu.GPUs
 
-		gpus, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, errors.OAuth2ServerError("unable to parse VGPU flavor metadata").WithError(err)
+		if gpu.VGPU != nil {
+			f.Vgpu = &generated.Vgpu{
+				Slices:    gpu.VGPU.Slices,
+				NumSlices: gpu.VGPU.NumSlices,
+			}
 		}
-
-		f.Gpu = &gpus
 	}
 
 	return f, nil
