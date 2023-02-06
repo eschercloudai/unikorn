@@ -27,6 +27,7 @@ var (
 	// ControlPlane defines cobra aliases for "control-plane" commands.
 	//nolint:gochecknoglobals
 	ControlPlane = []string{
+		"control-planes",
 		"controlplanes",
 		"cp",
 	}
