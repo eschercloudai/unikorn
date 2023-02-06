@@ -102,7 +102,15 @@ func (p *Provisioner) generateMachineHelmValues(machine *unikornv1alpha1.Machine
 	}
 
 	if machine.DiskSize != nil {
-		object["diskSize"] = machine.DiskSize.Value() >> 30
+		disk := map[string]interface{}{
+			"size": machine.DiskSize.Value() >> 30,
+		}
+
+		if machine.VolumeFailureDomain != nil {
+			disk["failureDomain"] = *machine.VolumeFailureDomain
+		}
+
+		object["disk"] = disk
 	}
 
 	return object
@@ -252,12 +260,19 @@ func (p *Provisioner) Generate() (client.Object, error) {
 		nameservers[i] = nameserver.IP.String()
 	}
 
+	// Support interim legacy behavior.
+	volumeFailureDomain := p.cluster.Spec.Openstack.VolumeFailureDomain
+	if volumeFailureDomain == nil {
+		volumeFailureDomain = p.cluster.Spec.Openstack.FailureDomain
+	}
+
 	openstackValues := map[string]interface{}{
-		"cloud":             *p.cluster.Spec.Openstack.Cloud,
-		"cloudsYAML":        base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
-		"ca":                base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
-		"failureDomain":     *p.cluster.Spec.Openstack.FailureDomain,
-		"externalNetworkID": *p.cluster.Spec.Openstack.ExternalNetworkID,
+		"cloud":                *p.cluster.Spec.Openstack.Cloud,
+		"cloudsYAML":           base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
+		"ca":                   base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
+		"computeFailureDomain": *p.cluster.Spec.Openstack.FailureDomain,
+		"volumeFailureDomain":  *volumeFailureDomain,
+		"externalNetworkID":    *p.cluster.Spec.Openstack.ExternalNetworkID,
 	}
 
 	if p.cluster.Spec.Openstack.SSHKeyName != nil {
@@ -335,7 +350,7 @@ func (p *Provisioner) Generate() (client.Object, error) {
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api-cluster-openstack",
-					"targetRevision": "v0.3.8",
+					"targetRevision": "v0.3.9",
 					"helm": map[string]interface{}{
 						"releaseName": p.cluster.Name,
 						"values":      string(values),

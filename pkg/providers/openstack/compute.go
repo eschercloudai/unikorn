@@ -184,8 +184,7 @@ func (c *ComputeClient) Images() ([]images.Image, error) {
 	}
 
 	// Filter out images that aren't compatible.
-	//nolint:prealloc
-	var filtered []images.Image
+	filtered := []images.Image{}
 
 	for _, image := range result {
 		// Only accept images in scope that we know conform to our requirements.
@@ -217,5 +216,20 @@ func (c *ComputeClient) AvailabilityZones() ([]availabilityzones.AvailabilityZon
 		return nil, err
 	}
 
-	return availabilityzones.ExtractAvailabilityZones(page)
+	result, err := availabilityzones.ExtractAvailabilityZones(page)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := []availabilityzones.AvailabilityZone{}
+
+	for _, az := range result {
+		if !az.ZoneState.Available {
+			continue
+		}
+
+		filtered = append(filtered, az)
+	}
+
+	return filtered, nil
 }

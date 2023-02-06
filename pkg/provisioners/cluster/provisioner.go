@@ -78,6 +78,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	// TODO: you can create with autoscaling on, turn it on, but not remove it.
 	// That would require tracking of some variety.
 	provisioner := &serial.Provisioner{
+		Name: "kubernetes cluster",
 		Provisioners: []provisioners.Provisioner{
 			&concurrent.Provisioner{
 				Group: "kubernetes cluster",
