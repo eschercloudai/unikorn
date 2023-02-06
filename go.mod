@@ -8,7 +8,7 @@ require (
 	github.com/getkin/kin-openapi v0.107.0
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/google/uuid v1.3.0
-	github.com/gophercloud/gophercloud v0.20.0
+	github.com/gophercloud/gophercloud v1.0.0
 	github.com/gophercloud/utils v0.0.0-20220927104426-4113af8d2663
 	github.com/prometheus/client_golang v1.12.2
 	github.com/spf13/cobra v1.5.0

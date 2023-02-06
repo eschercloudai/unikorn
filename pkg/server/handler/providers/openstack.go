@@ -145,8 +145,7 @@ func (o *Openstack) ListFlavors(r *http.Request) (interface{}, error) {
 		return nil, errors.OAuth2ServerError("failed list flavors").WithError(err)
 	}
 
-	//nolint:prealloc
-	var flavors []generated.OpenstackFlavor
+	flavors := []generated.OpenstackFlavor{}
 
 	for i := range result {
 		f := &result[i]
@@ -255,5 +254,22 @@ func (o *Openstack) ListKeyPairs(r *http.Request) (interface{}, error) {
 		return nil, errors.OAuth2ServerError("failed list key pairs").WithError(err)
 	}
 
-	return result, nil
+	keyPairs := []generated.OpenstackKeyPair{}
+
+	for _, keyPair := range result {
+		// Undocumented (what a shocker), but absence means SSH as that's
+		// all that used to be supported.  Obviously it could be something else
+		// being odd that means we have to parse the public key...
+		if keyPair.Type != "" && keyPair.Type != "ssh" {
+			continue
+		}
+
+		k := generated.OpenstackKeyPair{
+			Name: keyPair.Name,
+		}
+
+		keyPairs = append(keyPairs, k)
+	}
+
+	return keyPairs, nil
 }

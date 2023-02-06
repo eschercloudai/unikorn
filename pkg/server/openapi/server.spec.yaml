@@ -283,7 +283,7 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/availability-zones:
-    description: OpenStack compure availability zone services.
+    description: OpenStack compute availability zone services.
     get:
       description: |-
         Lists all OpenStack compute availability zones the authenticated user has
@@ -333,7 +333,7 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/openstackKeyPairsResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -512,6 +512,19 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackFlavor'
+    openstackKeyPair:
+      description: An Openstack key pair.
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          description: The key pair name.
+          type: string
+    openstackKeyPairs:
+      description: A list of Openstack key pairs.
+      items:
+        $ref: '#/components/schemas/openstackKeyPair'
   requestBodies:
     tokenScopeRequest:
       description: Openstack authentication scoping information.
@@ -578,6 +591,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackFlavors'
+    openstackKeyPairsResponse:
+      description: A list of Openstack key pairs.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/openstackKeyPairs'
   securitySchemes:
     httpBasicAuthentication:
       description: Operation requires HTTP basic authentication.

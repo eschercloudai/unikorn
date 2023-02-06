@@ -85,6 +85,15 @@ type OpenstackImage struct {
 // OpenstackImages A list of Openstack images that are compatible with this platform.
 type OpenstackImages = []OpenstackImage
 
+// OpenstackKeyPair An Openstack key pair.
+type OpenstackKeyPair struct {
+	// Name The key pair name.
+	Name string `json:"name"`
+}
+
+// OpenstackKeyPairs A list of Openstack key pairs.
+type OpenstackKeyPairs = interface{}
+
 // OpenstackProject An Openstack project.
 type OpenstackProject struct {
 	// Description A verbose description of the project.
@@ -141,6 +150,9 @@ type OpenstackFlavorsResponse = OpenstackFlavors
 
 // OpenstackImagesResponse A list of Openstack images that are compatible with this platform.
 type OpenstackImagesResponse = OpenstackImages
+
+// OpenstackKeyPairsResponse A list of Openstack key pairs.
+type OpenstackKeyPairsResponse = OpenstackKeyPairs
 
 // OpenstackProjectsResponse A list of Openstack projects.
 type OpenstackProjectsResponse = OpenstackProjects
