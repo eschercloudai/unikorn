@@ -313,7 +313,7 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/openstackExternalNetworksResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -512,6 +512,24 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackFlavor'
+    openstackExternalNetwork:
+      description: An Openstack external network.
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          description: Openstack external network ID.
+          type: string
+        name:
+          description: Opestack external network name.
+          type: string
+    openstackExternalNetworks:
+      description: A list of Openstack external networks.
+      type: array
+      items:
+        $ref: '#/components/schemas/openstackExternalNetwork'
     openstackKeyPair:
       description: An Openstack key pair.
       type: object
@@ -523,6 +541,7 @@ components:
           type: string
     openstackKeyPairs:
       description: A list of Openstack key pairs.
+      type: array
       items:
         $ref: '#/components/schemas/openstackKeyPair'
   requestBodies:
@@ -591,6 +610,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackFlavors'
+    openstackExternalNetworksResponse:
+      description: A list of Openstack external networks.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/openstackExternalNetworks'
     openstackKeyPairsResponse:
       description: A list of Openstack key pairs.
       content:
