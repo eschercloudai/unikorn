@@ -8,6 +8,7 @@ FROM scratch
 # This is implcitly created by 'docker buildx build'
 ARG TARGETARCH
 
+# Required as we are talking to Openstack public endpoints.
 COPY --from=base /etc/ssl/certs/ca-certificates.crt /ca-certificates.crt
 COPY bin/${TARGETARCH}-linux-gnu/unikorn-server /
 COPY hack/passwd.nonroot /etc/passwd

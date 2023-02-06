@@ -40,7 +40,7 @@ type Oauth2ErrorError string
 
 // OpenstackFlavor An Openstack flavor.
 type OpenstackFlavor struct {
-	Cpu int `json:"cpu"`
+	Cpus int `json:"cpus"`
 
 	// Gpus The number of GPUs, if not set there are none.
 	Gpus *int `json:"gpus,omitempty"`
@@ -53,9 +53,6 @@ type OpenstackFlavor struct {
 
 	// Name The flavor name.
 	Name string `json:"name"`
-
-	// Vgpu If the GPU is virtual, this describes it.
-	Vgpu *Vgpu `json:"vgpu,omitempty"`
 }
 
 // OpenstackFlavors A list of Openstack flavors.
@@ -119,15 +116,6 @@ type TokenScope struct {
 		// Id Openstack project ID.
 		Id string `json:"id"`
 	} `json:"project"`
-}
-
-// Vgpu If the GPU is virtual, this describes it.
-type Vgpu struct {
-	// NumSlices Total number of slices that can be allocated.
-	NumSlices int `json:"numSlices"`
-
-	// Slices Number of slices allocated to the flavor.
-	Slices int `json:"slices"`
 }
 
 // Cluster A basic string parameter.

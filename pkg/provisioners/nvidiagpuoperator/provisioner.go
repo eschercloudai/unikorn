@@ -186,28 +186,20 @@ func (p *Provisioner) generateLicenseConfigMapProvisioner(ctx context.Context) (
 	return provisioners.NewResourceProvisioner(client, object), nil
 }
 
-// getProvisioner returns a generic provisioner for this component.
-func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
+// Provision implements the Provision interface.
+func (p *Provisioner) Provision(ctx context.Context) error {
+	// TODO: delete me when baked into the image.
 	licenceConfigMapProvisioner, err := p.generateLicenseConfigMapProvisioner(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	provisioner := &serial.Provisioner{
+		Name: "nvidia GPU operator",
 		Provisioners: []provisioners.Provisioner{
 			licenceConfigMapProvisioner,
 			application.New(p.client, p).OnRemote(p.remote).InNamespace(namespace),
 		},
-	}
-
-	return provisioner, nil
-}
-
-// Provision implements the Provision interface.
-func (p *Provisioner) Provision(ctx context.Context) error {
-	provisioner, err := p.getProvisioner(ctx)
-	if err != nil {
-		return err
 	}
 
 	if err := provisioner.Provision(ctx); err != nil {
@@ -219,12 +211,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	provisioner, err := p.getProvisioner(ctx)
-	if err != nil {
-		return err
-	}
-
-	if err := provisioner.Deprovision(ctx); err != nil {
+	// Ignore the config map, that will be deleted by the cluster.
+	if err := application.New(p.client, p).OnRemote(p.remote).InNamespace(namespace).Deprovision(ctx); err != nil {
 		return err
 	}
 

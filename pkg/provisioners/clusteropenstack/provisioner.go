@@ -25,6 +25,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,6 +54,10 @@ type Provisioner struct {
 	// workloadPools is a snapshot of the workload pool members at
 	// creation time.
 	workloadPools *unikornv1alpha1.KubernetesWorkloadPoolList
+
+	// controlPlanePrefix contains the IP address prefix to add
+	// to the cluster firewall if, required.
+	controlPlanePrefix string
 }
 
 // New returns a new initialized provisioner object.
@@ -64,11 +69,21 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1alpha1.Kub
 		return nil, err
 	}
 
+	// Add the SNAT address of the control plane's default route.
+	// Sadly, we are the only thing guaranteed to live behind the same
+	// router, the CLI tools and UI are or can be used anywhere, so
+	// we'll take on this hack.
+	controlPlanePrefix, err := util.GetNATPrefix(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	provisioner := &Provisioner{
-		client:        client,
-		cluster:       cluster,
-		remote:        remote,
-		workloadPools: workloadPools,
+		client:             client,
+		cluster:            cluster,
+		remote:             remote,
+		workloadPools:      workloadPools,
+		controlPlanePrefix: controlPlanePrefix,
 	}
 
 	return provisioner, nil
@@ -289,7 +304,16 @@ func (p *Provisioner) Generate() (client.Object, error) {
 		}
 
 		if p.cluster.Spec.API.AllowedPrefixes != nil {
-			apiValues["allowList"] = p.cluster.Spec.API.AllowedPrefixes
+			// Add the SNAT IP so CAPI can manage the cluster.
+			allowList := []interface{}{
+				p.controlPlanePrefix,
+			}
+
+			for _, prefix := range p.cluster.Spec.API.AllowedPrefixes {
+				allowList = append(allowList, prefix.IPNet.String())
+			}
+
+			apiValues["allowList"] = allowList
 		}
 
 		valuesRaw["api"] = apiValues

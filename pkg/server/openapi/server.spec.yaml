@@ -483,26 +483,13 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackImage'
-    vgpu:
-      description: If the GPU is virtual, this describes it.
-      type: object
-      required:
-      - slices
-      - numSlices
-      properties:
-        slices:
-          description: Number of slices allocated to the flavor.
-          type: integer
-        numSlices:
-          description: Total number of slices that can be allocated.
-          type: integer
     openstackFlavor:
       description: An Openstack flavor.
       type: object
       required:
       - id
       - name
-      - cpu
+      - cpus
       - memory
       properties:
         id:
@@ -511,7 +498,7 @@ components:
         name:
           description: The flavor name.
           type: string
-        cpu:
+        cpus:
           descritpion: The number of CPUs.
           type: integer
         memory:
@@ -520,8 +507,6 @@ components:
         gpus:
           description: The number of GPUs, if not set there are none.
           type: integer
-        vgpu:
-          $ref: '#/components/schemas/vgpu'
     openstackFlavors:
       description: A list of Openstack flavors.
       type: array
