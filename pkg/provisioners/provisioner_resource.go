@@ -82,7 +82,7 @@ func (p *ResourceProvisioner) Provision(ctx context.Context) error {
 		}
 	}
 
-	log.Info("creating object", "key", objectKey /*, "gvk", object.GroupVersionKind()*/)
+	log.Info("creating object", "key", objectKey)
 
 	// This treats the resource as mutable, so updates will been seen by the caller.
 	// Especially useful if Kubenretes fills some things in for you, but just be
@@ -91,13 +91,23 @@ func (p *ResourceProvisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	log.Info("object created", "key", objectKey)
+
 	return nil
 }
 
 // Deprovision implements the Provision interface.
 func (p *ResourceProvisioner) Deprovision(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	objectKey := client.ObjectKeyFromObject(p.resource)
+
+	log.Info("deleting object", "key", objectKey)
+
 	if err := p.client.Delete(ctx, p.resource); err != nil {
 		if errors.IsNotFound(err) {
+			log.Info("object deleted", "key", objectKey)
+
 			return nil
 		}
 
@@ -107,6 +117,8 @@ func (p *ResourceProvisioner) Deprovision(ctx context.Context) error {
 	if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, p.resource)).Check(ctx); err != nil {
 		return err
 	}
+
+	log.Info("object deleted", "key", objectKey)
 
 	return nil
 }

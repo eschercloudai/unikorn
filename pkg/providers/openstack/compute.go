@@ -108,51 +108,12 @@ func (c *ComputeClient) FlavorExtraSpecs(flavor *flavors.Flavor) (map[string]str
 	return result.Extract()
 }
 
-// VGPUMeta describes a virtual GPU.
-type VGPUMeta struct {
-	// Slices are the number of shares of the GPU.
-	Slices int
-
-	// NumSlices are the total number of shares available.
-	NumSlices int
-}
-
 // GPUMeta describes GPUs.
 type GPUMeta struct {
 	// GPUs is the number of GPUs, this may be the total number
 	// or physical GPUs, or a single virtual GPU.  This value
 	// is what will be reported for Kubernetes scheduling.
 	GPUs int
-
-	// VGPU if set defines VGPU metadata.
-	VGPU *VGPUMeta
-}
-
-// getVGPUMeta returns the number of VGPU slices for a particular flavor.
-func getVGPUMeta(flavor *flavors.Flavor, extraSpecs map[string]string) (*VGPUMeta, error) {
-	// TODO: make this a config map.
-	vpguMetaMap := map[string]VGPUMeta{
-		"trait:CUSTOM_A100D_1_10C": {
-			Slices:    1,
-			NumSlices: 7,
-		},
-		"trait:CUSTOM_A100D_2_20C": {
-			Slices:    2,
-			NumSlices: 7,
-		},
-		"trait:CUSTOM_A100D_3_40C": {
-			Slices:    3,
-			NumSlices: 7,
-		},
-	}
-
-	for property := range extraSpecs {
-		if meta, ok := vpguMetaMap[property]; ok {
-			return &meta, nil
-		}
-	}
-
-	return nil, fmt.Errorf("%w: unable to lookup vGPU metadata for flavor %s", ErrParseError, flavor.Name)
 }
 
 // FlavorGPUs returns metadata about GPUs, whether it has any, the number of GPUs
@@ -165,17 +126,14 @@ func FlavorGPUs(flavor *flavors.Flavor, extraSpecs map[string]string) (*GPUMeta,
 	//
 	// MIG instances will have specs that look like:
 	//   "resources:VGPU": "1", "trait:CUSTOM_A100D_2_20C": "required"
-	// On our platform, VGPU doesn't reflect the number of VGPU slices,
-	// so we have to consult the trait to work out what things look like.
-	if _, ok := extraSpecs["resources:VGPU"]; ok {
-		vgpu, err := getVGPUMeta(flavor, extraSpecs)
+	if value, ok := extraSpecs["resources:VGPU"]; ok {
+		gpus, err := strconv.Atoi(value)
 		if err != nil {
 			return nil, false, err
 		}
 
 		meta := &GPUMeta{
-			GPUs: 1,
-			VGPU: vgpu,
+			GPUs: gpus,
 		}
 
 		return meta, true, nil

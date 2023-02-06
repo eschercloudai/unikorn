@@ -116,7 +116,7 @@ func convertFlavor(flavor *flavors.Flavor, extraSpecs map[string]string) (*gener
 	f := &generated.OpenstackFlavor{
 		Id:   flavor.ID,
 		Name: flavor.Name,
-		Cpu:  flavor.VCPUs,
+		Cpus: flavor.VCPUs,
 		// Convert MiB to GiB
 		// TODO: Should probably specify units too to disambiguate.
 		Memory: flavor.RAM >> 10,
@@ -129,13 +129,6 @@ func convertFlavor(flavor *flavors.Flavor, extraSpecs map[string]string) (*gener
 
 	if ok {
 		f.Gpus = &gpu.GPUs
-
-		if gpu.VGPU != nil {
-			f.Vgpu = &generated.Vgpu{
-				Slices:    gpu.VGPU.Slices,
-				NumSlices: gpu.VGPU.NumSlices,
-			}
-		}
 	}
 
 	return f, nil

@@ -91,6 +91,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 	// Provision the remote cluster, then once that's configured, install
 	// the CNI and cloud provider in parallel.
 	provisioner := &serial.Provisioner{
+		Name: "cluster add-ons",
 		Provisioners: []provisioners.Provisioner{
 			remotecluster.New(p.client, remote),
 			&concurrent.Provisioner{

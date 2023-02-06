@@ -17,6 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"strings"
 )
 
@@ -35,4 +40,49 @@ func SplitYAML(s string) []string {
 	}
 
 	return yamls
+}
+
+// natPrefix provides a cache/memoization for GetNATPrefix, be nice to our
+// internet brethren.
+//
+//nolint:gochecknoglobals
+var natPrefix string
+
+// GetNATPrefix returns the IP address of the SNAT that the control plane
+// and by extension we, sit behind.
+func GetNATPrefix(ctx context.Context) (string, error) {
+	if natPrefix != "" {
+		return natPrefix, nil
+	}
+
+	natAddress := struct {
+		IP string `json:"ip"`
+	}{}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.ipify.org?format=json", nil)
+	if err != nil {
+		return "", err
+	}
+
+	client := &http.Client{}
+
+	response, err := client.Do(request)
+	if err != nil {
+		return "", err
+	}
+
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if err := json.Unmarshal(body, &natAddress); err != nil {
+		return "", err
+	}
+
+	natPrefix = fmt.Sprintf("%s/32", natAddress.IP)
+
+	return natPrefix, nil
 }

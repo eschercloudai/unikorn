@@ -116,6 +116,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	// Remove the addons first, Argo will probably have a fit if the cluster vanishes
 	// before it has a chance to delete the contained add-on applications.
 	provisioner := &serial.Provisioner{
+		Name: "kubernetes cluster",
 		Provisioners: []provisioners.Provisioner{
 			clusterProvisioner,
 			addonsProvisioner,

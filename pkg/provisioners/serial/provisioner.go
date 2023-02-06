@@ -20,10 +20,12 @@ import (
 	"context"
 
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Provisioner struct {
-	// Name is the conditional name.
+	// Name is the group name.
 	Name string
 
 	// Provisioners are the provisioner to provision in order.
@@ -35,11 +37,17 @@ var _ provisioners.Provisioner = &Provisioner{}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	log.Info("provisioning serial group", "group", p.Name)
+
 	for _, provisioner := range p.Provisioners {
 		if err := provisioner.Provision(ctx); err != nil {
 			return err
 		}
 	}
+
+	log.Info("serial group provisioned", "group", p.Name)
 
 	return nil
 }
@@ -49,13 +57,19 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 // that the same code that generates the provisioner, generates the deprovisioner
 // and ordering constraints matter.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	log.Info("deprovisioning serial group", "group", p.Name)
+
 	for i := range p.Provisioners {
-		provisioner := p.Provisioners[len(p.Provisioners)-1-i]
+		provisioner := p.Provisioners[len(p.Provisioners)-(i+1)]
 
 		if err := provisioner.Deprovision(ctx); err != nil {
 			return err
 		}
 	}
+
+	log.Info("serial group deprovisioned", "group", p.Name)
 
 	return nil
 }
