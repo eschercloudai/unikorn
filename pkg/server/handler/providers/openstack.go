@@ -108,7 +108,14 @@ func (o *Openstack) ListExternalNetworks(r *http.Request) (interface{}, error) {
 		return nil, errors.OAuth2ServerError("failed list external networks").WithError(err)
 	}
 
-	return result, nil
+	externalNetworks := make(generated.OpenstackExternalNetworks, len(result))
+
+	for i, externalNetwork := range result {
+		externalNetworks[i].Id = externalNetwork.Network.ID
+		externalNetworks[i].Name = externalNetwork.Network.Name
+	}
+
+	return externalNetworks, nil
 }
 
 // convertFlavor traslates from Openstack's mess into our API types.
@@ -145,7 +152,7 @@ func (o *Openstack) ListFlavors(r *http.Request) (interface{}, error) {
 		return nil, errors.OAuth2ServerError("failed list flavors").WithError(err)
 	}
 
-	flavors := []generated.OpenstackFlavor{}
+	flavors := generated.OpenstackFlavors{}
 
 	for i := range result {
 		f := &result[i]
@@ -254,7 +261,7 @@ func (o *Openstack) ListKeyPairs(r *http.Request) (interface{}, error) {
 		return nil, errors.OAuth2ServerError("failed list key pairs").WithError(err)
 	}
 
-	keyPairs := []generated.OpenstackKeyPair{}
+	keyPairs := generated.OpenstackKeyPairs{}
 
 	for _, keyPair := range result {
 		// Undocumented (what a shocker), but absence means SSH as that's

@@ -38,6 +38,18 @@ type Oauth2Error struct {
 // Oauth2ErrorError A terse error string expaning on the HTTP error code.
 type Oauth2ErrorError string
 
+// OpenstackExternalNetwork An Openstack external network.
+type OpenstackExternalNetwork struct {
+	// Id Openstack external network ID.
+	Id string `json:"id"`
+
+	// Name Opestack external network name.
+	Name string `json:"name"`
+}
+
+// OpenstackExternalNetworks A list of Openstack external networks.
+type OpenstackExternalNetworks = []OpenstackExternalNetwork
+
 // OpenstackFlavor An Openstack flavor.
 type OpenstackFlavor struct {
 	Cpus int `json:"cpus"`
@@ -92,7 +104,7 @@ type OpenstackKeyPair struct {
 }
 
 // OpenstackKeyPairs A list of Openstack key pairs.
-type OpenstackKeyPairs = interface{}
+type OpenstackKeyPairs = []OpenstackKeyPair
 
 // OpenstackProject An Openstack project.
 type OpenstackProject struct {
@@ -144,6 +156,9 @@ type InternalServerErrorResponse = Oauth2Error
 
 // NullResponse defines model for nullResponse.
 type NullResponse = map[string]interface{}
+
+// OpenstackExternalNetworksResponse A list of Openstack external networks.
+type OpenstackExternalNetworksResponse = OpenstackExternalNetworks
 
 // OpenstackFlavorsResponse A list of Openstack flavors.
 type OpenstackFlavorsResponse = OpenstackFlavors
