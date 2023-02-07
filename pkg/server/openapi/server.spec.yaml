@@ -282,7 +282,7 @@ paths:
           $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/providers/openstack/availability-zones:
+  /api/v1/providers/openstack/availability-zones/compute:
     description: OpenStack compute availability zone services.
     get:
       description: |-
@@ -293,7 +293,27 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/openstackComputeAvailabilityZonesResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '415':
+          $ref: '#/components/responses/unsupportedMediaTypeResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/providers/openstack/availability-zones/block-storage:
+    description: OpenStack block storage availability zone services.
+    get:
+      description: |-
+        Lists all OpenStack volume availability zones the authenticated user has
+        access to within the scope of the OpenStack project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/openstackBlockStorageAvailabilityZonesResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -544,6 +564,20 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackKeyPair'
+    openstackAvailabilityZone:
+      description: An Openstack availability zone.
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          description: The availability zone name.
+          type: string
+    openstackAvailabilityZones:
+      description: A list of Openstack availability zones.
+      type: array
+      items:
+        $ref: '#/components/schemas/openstackAvailabilityZone'
   requestBodies:
     tokenScopeRequest:
       description: Openstack authentication scoping information.
@@ -622,6 +656,18 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackKeyPairs'
+    openstackComputeAvailabilityZonesResponse:
+      description: A list of Openstack availability zones.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/openstackAvailabilityZones'
+    openstackBlockStorageAvailabilityZonesResponse:
+      description: A list of Openstack availability zones.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/openstackAvailabilityZones'
   securitySchemes:
     httpBasicAuthentication:
       description: Operation requires HTTP basic authentication.

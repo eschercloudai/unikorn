@@ -69,6 +69,20 @@ func (o *Openstack) ComputeClient(r *http.Request) (*openstack.ComputeClient, er
 	return client, nil
 }
 
+func (o *Openstack) BlockStorageClient(r *http.Request) (*openstack.BlockStorageClient, error) {
+	token, err := context.TokenFromContext(r.Context())
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed get authorization token").WithError(err)
+	}
+
+	client, err := openstack.NewBlockStorageClient(openstack.NewTokenProvider(o.endpoint, token))
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed get block storage client").WithError(err)
+	}
+
+	return client, nil
+}
+
 func (o *Openstack) NetworkClient(r *http.Request) (*openstack.NetworkClient, error) {
 	token, err := context.TokenFromContext(r.Context())
 	if err != nil {
@@ -83,7 +97,7 @@ func (o *Openstack) NetworkClient(r *http.Request) (*openstack.NetworkClient, er
 	return client, nil
 }
 
-func (o *Openstack) ListAvailabilityZones(r *http.Request) (interface{}, error) {
+func (o *Openstack) ListAvailabilityZonesCompute(r *http.Request) (generated.OpenstackAvailabilityZones, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
@@ -94,7 +108,33 @@ func (o *Openstack) ListAvailabilityZones(r *http.Request) (interface{}, error) 
 		return nil, errors.OAuth2ServerError("failed list availability zones").WithError(err)
 	}
 
-	return result, nil
+	azs := make(generated.OpenstackAvailabilityZones, len(result))
+
+	for i, az := range result {
+		azs[i].Name = az.ZoneName
+	}
+
+	return azs, nil
+}
+
+func (o *Openstack) ListAvailabilityZonesBlockStorage(r *http.Request) (generated.OpenstackAvailabilityZones, error) {
+	client, err := o.BlockStorageClient(r)
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed get block storage client").WithError(err)
+	}
+
+	result, err := client.AvailabilityZones()
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed list availability zones").WithError(err)
+	}
+
+	azs := make(generated.OpenstackAvailabilityZones, len(result))
+
+	for i, az := range result {
+		azs[i].Name = az.ZoneName
+	}
+
+	return azs, nil
 }
 
 func (o *Openstack) ListExternalNetworks(r *http.Request) (interface{}, error) {
@@ -141,7 +181,7 @@ func convertFlavor(flavor *flavors.Flavor, extraSpecs map[string]string) (*gener
 	return f, nil
 }
 
-func (o *Openstack) ListFlavors(r *http.Request) (interface{}, error) {
+func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
@@ -250,7 +290,7 @@ func (o *Openstack) ListAvailableProjects(r *http.Request) (generated.OpenstackP
 	return projects, nil
 }
 
-func (o *Openstack) ListKeyPairs(r *http.Request) (interface{}, error) {
+func (o *Openstack) ListKeyPairs(r *http.Request) (generated.OpenstackKeyPairs, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)

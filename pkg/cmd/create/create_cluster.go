@@ -126,9 +126,13 @@ type createClusterOptions struct {
 	// diskSize defines the persistent volume size to provision with.
 	diskSize uflags.QuantityFlag
 
-	// availabilityZone defines in what Openstack failure domain the Kubernetes
+	// computeAvailabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.
-	availabilityZone string
+	computeAvailabilityZone string
+
+	// volumeAvailabilityZone defines in what Openstack failure domain volumes
+	// will be provisoned in.
+	volumeAvailabilityZone string
 
 	// sshKeyName defines the SSH key to inject onto the Kubernetes cluster.
 	sshKeyName string
@@ -174,7 +178,8 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 
 	// Openstack provisioning options.
 	flags.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Kubernetes Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
-	flags.RequiredStringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
+	flags.RequiredStringVarWithCompletion(cmd, &o.computeAvailabilityZone, "compute-availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list --compute'.)", completion.OpenstackComputeAvailabilityZoneCompletionFunc(&o.cloud))
+	flags.RequiredStringVarWithCompletion(cmd, &o.volumeAvailabilityZone, "volume-availability-zone", "", "Openstack availability zone to provision into.  Only one is supported currently (see: 'openstack availability zone list --volume'.)", completion.OpenstackVolumeAvailabilityZoneCompletionFunc(&o.cloud))
 	flags.StringVarWithCompletion(cmd, &o.sshKeyName, "ssh-key-name", "", "Openstack SSH key to inject onto the Kubernetes nodes (see: 'openstack keypair list'.)", completion.OpenstackSSHKeyCompletionFunc(&o.cloud))
 
 	// Feature enablement.
@@ -295,12 +300,13 @@ func (o *createClusterOptions) run() error {
 		},
 		Spec: unikornv1alpha1.KubernetesClusterSpec{
 			Openstack: &unikornv1alpha1.KubernetesClusterOpenstackSpec{
-				CACert:            &o.caCert,
-				CloudConfig:       &o.clouds,
-				Cloud:             &o.cloud,
-				FailureDomain:     &o.availabilityZone,
-				SSHKeyName:        &o.sshKeyName,
-				ExternalNetworkID: &o.externalNetworkID,
+				CACert:              &o.caCert,
+				CloudConfig:         &o.clouds,
+				Cloud:               &o.cloud,
+				FailureDomain:       &o.computeAvailabilityZone,
+				VolumeFailureDomain: &o.volumeAvailabilityZone,
+				SSHKeyName:          &o.sshKeyName,
+				ExternalNetworkID:   &o.externalNetworkID,
 			},
 			Network: &unikornv1alpha1.KubernetesClusterNetworkSpec{
 				NodeNetwork:    &unikornv1alpha1.IPv4Prefix{IPNet: o.nodeNetwork},

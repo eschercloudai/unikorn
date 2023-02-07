@@ -38,6 +38,15 @@ type Oauth2Error struct {
 // Oauth2ErrorError A terse error string expaning on the HTTP error code.
 type Oauth2ErrorError string
 
+// OpenstackAvailabilityZone An Openstack availability zone.
+type OpenstackAvailabilityZone struct {
+	// Name The availability zone name.
+	Name string `json:"name"`
+}
+
+// OpenstackAvailabilityZones A list of Openstack availability zones.
+type OpenstackAvailabilityZones = []OpenstackAvailabilityZone
+
 // OpenstackExternalNetwork An Openstack external network.
 type OpenstackExternalNetwork struct {
 	// Id Openstack external network ID.
@@ -156,6 +165,12 @@ type InternalServerErrorResponse = Oauth2Error
 
 // NullResponse defines model for nullResponse.
 type NullResponse = map[string]interface{}
+
+// OpenstackBlockStorageAvailabilityZonesResponse A list of Openstack availability zones.
+type OpenstackBlockStorageAvailabilityZonesResponse = OpenstackAvailabilityZones
+
+// OpenstackComputeAvailabilityZonesResponse A list of Openstack availability zones.
+type OpenstackComputeAvailabilityZonesResponse = OpenstackAvailabilityZones
 
 // OpenstackExternalNetworksResponse A list of Openstack external networks.
 type OpenstackExternalNetworksResponse = OpenstackExternalNetworks

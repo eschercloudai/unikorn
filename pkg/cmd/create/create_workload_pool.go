@@ -73,9 +73,13 @@ type createWorkloadPoolOptions struct {
 	// diskSize defines the persistent volume size to provision with.
 	diskSize uflags.QuantityFlag
 
-	// availabilityZone defines in what Openstack failure domain the Kubernetes
+	// computeAvailabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.
-	availabilityZone string
+	computeAvailabilityZone string
+
+	// volumeAvailabilityZone defines in what Openstack failure domain volumes
+	// will be provisoned in.
+	volumeAvailabilityZone string
 
 	// autoscaling allows the cluster to determine its own destiny, not the
 	// user.
@@ -106,7 +110,8 @@ func (o *createWorkloadPoolOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 	flags.RequiredStringVarWithCompletion(cmd, &o.flavor, "flavor", "", "Kubernetes workload Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
 	cmd.Flags().IntVar(&o.replicas, "replicas", defaultWorkloadReplicas, "Number of workload replicas.")
 	flags.RequiredStringVarWithCompletion(cmd, &o.image, "image", "", "Openstack image (see: 'openstack image list'.)", completion.OpenstackImageCompletionFunc(&o.cloud))
-	flags.StringVarWithCompletion(cmd, &o.availabilityZone, "availability-zone", "", "Openstack availability zone to provision into. Will default to that specified for the control plane. (see: 'openstack availability zone list'.)", completion.OpenstackAvailabilityZoneCompletionFunc(&o.cloud))
+	flags.StringVarWithCompletion(cmd, &o.computeAvailabilityZone, "compute-availability-zone", "", "Openstack availability zone to provision into. Will default to that specified for the control plane. (see: 'openstack availability zone list --compute'.)", completion.OpenstackComputeAvailabilityZoneCompletionFunc(&o.cloud))
+	flags.StringVarWithCompletion(cmd, &o.volumeAvailabilityZone, "volume-availability-zone", "", "Openstack availability zone to provision into.  Will default to that specified for the control plane. (see: 'openstack availability zone list --volume'.)", completion.OpenstackVolumeAvailabilityZoneCompletionFunc(&o.cloud))
 	cmd.Flags().Var(&o.diskSize, "disk-size", "Disk size, defaults to that of the machine flavor.")
 	cmd.Flags().Var(&o.labels, "label", "Label to add on node creation.  May be set multiple times.")
 
@@ -226,6 +231,14 @@ func (o *createWorkloadPoolOptions) run() error {
 				DiskSize: o.diskSize.Quantity,
 			},
 		},
+	}
+
+	if o.computeAvailabilityZone != "" {
+		workloadPool.Spec.FailureDomain = &o.computeAvailabilityZone
+	}
+
+	if o.volumeAvailabilityZone != "" {
+		workloadPool.Spec.VolumeFailureDomain = &o.volumeAvailabilityZone
 	}
 
 	if err := o.applyAutoscaling(workloadPool); err != nil {

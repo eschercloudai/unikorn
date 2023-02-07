@@ -117,8 +117,19 @@ func (h *Handler) GetApiV1ProjectsProjectControlplanesControlPlaneClustersCluste
 func (h *Handler) PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane, cluster generated.Cluster) {
 }
 
-func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZones(w http.ResponseWriter, r *http.Request) {
-	result, err := providers.NewOpenstack(h.authenticator).ListAvailabilityZones(r)
+func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request) {
+	result, err := providers.NewOpenstack(h.authenticator).ListAvailabilityZonesCompute(r)
+	if err != nil {
+		errors.HandleError(w, r, err)
+
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http.ResponseWriter, r *http.Request) {
+	result, err := providers.NewOpenstack(h.authenticator).ListAvailabilityZonesBlockStorage(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 

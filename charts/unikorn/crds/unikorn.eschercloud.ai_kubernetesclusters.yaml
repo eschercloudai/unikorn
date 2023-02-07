@@ -107,6 +107,10 @@ spec:
                       on the provided image.
                     pattern: ^v(?:[0-9]+\.){2}(?:[0-9]+)$
                     type: string
+                  volumeFailureDomain:
+                    description: VolumeFailureDomain allows the volume failure domain
+                      to be set on a per machine deployment basis.
+                    type: string
                 required:
                 - flavor
                 - image
@@ -182,6 +186,12 @@ spec:
                   sshKeyName:
                     description: SSHKeyName is the SSH key name to use to provide
                       access to the VMs.
+                    type: string
+                  volumeFailureDomain:
+                    description: VolumeFailureDomain is the default failure domain
+                      to use for volumes as these needn't match compute.  For legacy
+                      reasons, this will default to FailureDomain, but you shouldn't
+                      reply on this behaviour.
                     type: string
                 required:
                 - caCert

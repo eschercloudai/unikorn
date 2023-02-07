@@ -63,8 +63,11 @@ type ServerInterface interface {
 	// (PUT /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster})
 	PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane, cluster Cluster)
 
-	// (GET /api/v1/providers/openstack/availability-zones)
-	GetApiV1ProvidersOpenstackAvailabilityZones(w http.ResponseWriter, r *http.Request)
+	// (GET /api/v1/providers/openstack/availability-zones/block-storage)
+	GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/providers/openstack/availability-zones/compute)
+	GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/providers/openstack/external-networks)
 	GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWriter, r *http.Request)
@@ -594,14 +597,31 @@ func (siw *ServerInterfaceWrapper) PutApiV1ProjectsProjectControlplanesControlPl
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ProvidersOpenstackAvailabilityZones operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackAvailabilityZones(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ProvidersOpenstackAvailabilityZones(w, r)
+		siw.Handler.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetApiV1ProvidersOpenstackAvailabilityZonesCompute operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -858,7 +878,10 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/providers/openstack/availability-zones", wrapper.GetApiV1ProvidersOpenstackAvailabilityZones)
+		r.Get(options.BaseURL+"/api/v1/providers/openstack/availability-zones/block-storage", wrapper.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/providers/openstack/availability-zones/compute", wrapper.GetApiV1ProvidersOpenstackAvailabilityZonesCompute)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/providers/openstack/external-networks", wrapper.GetApiV1ProvidersOpenstackExternalNetworks)

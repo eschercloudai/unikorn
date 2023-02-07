@@ -376,6 +376,9 @@ type MachineGeneric struct {
 	// DiskSize is the persistent root disk size to deploy with.  This
 	// overrides the default ephemeral disk size defined in the flavor.
 	DiskSize *resource.Quantity `json:"diskSize,omitempty"`
+	// VolumeFailureDomain allows the volume failure domain to be set
+	// on a per machine deployment basis.
+	VolumeFailureDomain *string `json:"volumeFailureDomain,omitempty"`
 	// Replicas is the initial pool size to deploy.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=3
@@ -519,6 +522,10 @@ type KubernetesClusterOpenstackSpec struct {
 	// will always be deployed in this region.  Individual worload pools will
 	// default to this, but can override it.
 	FailureDomain *string `json:"failureDomain"`
+	// VolumeFailureDomain is the default failure domain to use for volumes
+	// as these needn't match compute.  For legacy reasons, this will default
+	// to FailureDomain, but you shouldn't reply on this behaviour.
+	VolumeFailureDomain *string `json:"volumeFailureDomain,omitempty"`
 	// ExternalNetworkID is the Openstack external network ID.
 	ExternalNetworkID *string `json:"externalNetworkId"`
 }

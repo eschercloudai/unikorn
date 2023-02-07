@@ -147,10 +147,35 @@ func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, 
 	}
 }
 
-// OpenstackAvailabilityZoneCompletionFunc lists any matching availability zones by name.
-func OpenstackAvailabilityZoneCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// OpenstackComputeAvailabilityZoneCompletionFunc lists any matching availability zones by name.
+func OpenstackComputeAvailabilityZoneCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		client, err := openstack.NewComputeClient(openstack.NewCloudsProvider(*cloud))
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		results, err := client.AvailabilityZones()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		var matches []string
+
+		for _, availabilityZone := range results {
+			if strings.HasPrefix(availabilityZone.ZoneName, toComplete) {
+				matches = append(matches, availabilityZone.ZoneName)
+			}
+		}
+
+		return matches, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// OpenstackVolumeAvailabilityZoneCompletionFunc lists any matching availability zones by name.
+func OpenstackVolumeAvailabilityZoneCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		client, err := openstack.NewBlockStorageClient(openstack.NewCloudsProvider(*cloud))
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

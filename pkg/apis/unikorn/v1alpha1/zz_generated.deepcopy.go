@@ -422,6 +422,11 @@ func (in *KubernetesClusterOpenstackSpec) DeepCopyInto(out *KubernetesClusterOpe
 		*out = new(string)
 		**out = **in
 	}
+	if in.VolumeFailureDomain != nil {
+		in, out := &in.VolumeFailureDomain, &out.VolumeFailureDomain
+		*out = new(string)
+		**out = **in
+	}
 	if in.ExternalNetworkID != nil {
 		in, out := &in.ExternalNetworkID, &out.ExternalNetworkID
 		*out = new(string)
@@ -680,6 +685,11 @@ func (in *MachineGeneric) DeepCopyInto(out *MachineGeneric) {
 		in, out := &in.DiskSize, &out.DiskSize
 		x := (*in).DeepCopy()
 		*out = &x
+	}
+	if in.VolumeFailureDomain != nil {
+		in, out := &in.VolumeFailureDomain, &out.VolumeFailureDomain
+		*out = new(string)
+		**out = **in
 	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
