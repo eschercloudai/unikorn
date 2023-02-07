@@ -45,8 +45,8 @@ func NewClient(client client.Client) *Client {
 	}
 }
 
-// nameFromContext translates an Openstack project ID to one we an use.
-func nameFromContext(ctx context.Context) (string, error) {
+// NameFromContext translates an Openstack project ID to one we an use.
+func NameFromContext(ctx context.Context) (string, error) {
 	claims, err := authorization.ClaimsFromContext(ctx)
 	if err != nil {
 		return "", err
@@ -55,21 +55,45 @@ func nameFromContext(ctx context.Context) (string, error) {
 	return fmt.Sprintf("unikorn-server-%s", claims.UnikornClaims.Project), nil
 }
 
-// Get returns the implicit project identified by the JWT claims.
-func (p *Client) Get(ctx context.Context) (*generated.Project, error) {
-	name, err := nameFromContext(ctx)
+// get returns the implicit project identified by the JWT claims.
+func (c *Client) get(ctx context.Context) (*unikornv1.Project, error) {
+	name, err := NameFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var result unikornv1.Project
+	result := &unikornv1.Project{}
 
-	if err := p.client.Get(ctx, client.ObjectKey{Name: name}, &result); err != nil {
+	if err := c.client.Get(ctx, client.ObjectKey{Name: name}, result); err != nil {
 		if kerrors.IsNotFound(err) {
 			return nil, errors.HTTPNotFound()
 		}
 
 		return nil, errors.OAuth2ServerError("failed to get project").WithError(err)
+	}
+
+	return result, err
+}
+
+// Namespace retrieves the project namespace.
+func (c *Client) Namespace(ctx context.Context) (string, error) {
+	result, err := c.get(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if result.Status.Namespace == "" {
+		return "", errors.OAuth2ServerError("project namespace not set")
+	}
+
+	return result.Status.Namespace, nil
+}
+
+// Get returns the implicit project identified by the JWT claims.
+func (c *Client) Get(ctx context.Context) (*generated.Project, error) {
+	result, err := c.get(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	project := &generated.Project{
@@ -90,8 +114,8 @@ func (p *Client) Get(ctx context.Context) (*generated.Project, error) {
 }
 
 // Create creates the implicit project indentified by the JTW claims.
-func (p *Client) Create(ctx context.Context) error {
-	name, err := nameFromContext(ctx)
+func (c *Client) Create(ctx context.Context) error {
+	name, err := NameFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -106,7 +130,7 @@ func (p *Client) Create(ctx context.Context) error {
 		},
 	}
 
-	if err := p.client.Create(ctx, project); err != nil {
+	if err := c.client.Create(ctx, project); err != nil {
 		// TODO: we can do a cached lookup to save the API traffic.
 		if kerrors.IsAlreadyExists(err) {
 			return errors.HTTPConflict()
@@ -119,8 +143,8 @@ func (p *Client) Create(ctx context.Context) error {
 }
 
 // Delete deletes the implicit project indentified by the JTW claims.
-func (p *Client) Delete(ctx context.Context) error {
-	name, err := nameFromContext(ctx)
+func (c *Client) Delete(ctx context.Context) error {
+	name, err := NameFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -132,7 +156,7 @@ func (p *Client) Delete(ctx context.Context) error {
 		},
 	}
 
-	if err := p.client.Delete(ctx, project); err != nil {
+	if err := c.client.Delete(ctx, project); err != nil {
 		if kerrors.IsNotFound(err) {
 			return errors.HTTPNotFound()
 		}
