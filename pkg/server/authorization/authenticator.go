@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
-	"github.com/eschercloudai/unikorn/pkg/server/context"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 )
@@ -92,7 +91,11 @@ func (a *Authenticator) Basic(r *http.Request) (string, error) {
 		return "", errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
 
-	jwToken, err := a.issuer.Issue(r, username, keystoneToken.ID, nil, keystoneToken.ExpiresAt)
+	claims := &UnikornClaims{
+		Token: keystoneToken.ID,
+	}
+
+	jwToken, err := a.issuer.Issue(r, username, claims, nil, keystoneToken.ExpiresAt)
 	if err != nil {
 		return "", errors.OAuth2ServerError("unable to create access token").WithError(err)
 	}
@@ -103,14 +106,9 @@ func (a *Authenticator) Basic(r *http.Request) (string, error) {
 // Token performs token based authentication against Keystone with a scope, and returns a new token.
 // Used to upgrade from unscoped, or to refresh a token.
 func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (string, error) {
-	subject, err := context.SubjectFromContext(r.Context())
+	tokenClaims, err := ClaimsFromContext(r.Context())
 	if err != nil {
-		return "", errors.OAuth2ServerError("failed get subject").WithError(err)
-	}
-
-	token, err := context.TokenFromContext(r.Context())
-	if err != nil {
-		return "", errors.OAuth2ServerError("failed get authorization token").WithError(err)
+		return "", errors.OAuth2ServerError("failed get claims").WithError(err)
 	}
 
 	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.endpoint))
@@ -118,9 +116,18 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (str
 		return "", errors.OAuth2ServerError("unable to initialize identity").WithError(err)
 	}
 
-	keystoneToken, err := identity.CreateToken(openstack.NewCreateTokenOptionsScopedToken(token, scope.Project.Id))
+	if tokenClaims.UnikornClaims == nil {
+		return "", errors.OAuth2ServerError("unable to get unikorn claims")
+	}
+
+	keystoneToken, err := identity.CreateToken(openstack.NewCreateTokenOptionsScopedToken(tokenClaims.UnikornClaims.Token, scope.Project.Id))
 	if err != nil {
 		return "", errors.OAuth2AccessDenied("authentication failed").WithError(err)
+	}
+
+	claims := &UnikornClaims{
+		Token:   keystoneToken.ID,
+		Project: scope.Project.Id,
 	}
 
 	// Add some scope to the claims to allow the token to do more.
@@ -130,7 +137,7 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (str
 		},
 	}
 
-	jwToken, err := a.issuer.Issue(r, subject, keystoneToken.ID, oAuth2Scope, keystoneToken.ExpiresAt)
+	jwToken, err := a.issuer.Issue(r, tokenClaims.Subject, claims, oAuth2Scope, keystoneToken.ExpiresAt)
 	if err != nil {
 		return "", errors.OAuth2ServerError("unable to create access token").WithError(err)
 	}

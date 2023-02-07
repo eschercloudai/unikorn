@@ -17,6 +17,7 @@ limitations under the License.
 package authorization
 
 import (
+	"context"
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
@@ -42,6 +43,10 @@ var (
 
 	// ErrTokenVerification is raised when token verification fails.
 	ErrTokenVerification = errors.New("failed to verify token")
+
+	// ErrContextError is raised when a required value cannot be retrieved
+	// from a context.
+	ErrContextError = errors.New("value missing from context")
 )
 
 // JWTIssuer is in charge of API token issue and verification.
@@ -171,6 +176,15 @@ func (l *ScopeList) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+// UnikornClaims are JWT claims we add to the underlying specification.
+type UnikornClaims struct {
+	// Token is the OpenStack Keystone token.
+	Token string `json:"unikorn:token:keystone,omitempty"`
+
+	// Project is the Openstack/Unikorn project ID the token is scoped to.
+	Project string `json:"unikorn:project:name,omitempty"`
+}
+
 // Claims is an application specific set of claims.
 // TODO: this technically isn't conformant to oauth2 in that we don't specify
 // the client_id claim, and there are probably others.
@@ -178,15 +192,43 @@ type Claims struct {
 	jwt.Claims `json:",inline"`
 
 	// Scope is the set of scopes for a JWT as defined by oauth2.
-	// These also corrrespond to security requirements in the OpenAPI schema.
+	// These also correspond to security requirements in the OpenAPI schema.
 	Scope *ScopeList `json:"scope,omitempty"`
 
-	// Token is the OpenStack Keystone token.
-	Token string `json:"unikorn:token:keystone,omitempty"`
+	// UnikornClaims are claims required by this application.
+	UnikornClaims *UnikornClaims `json:",inline"`
+}
+
+// contextKey defines a new context key type unique to this package.
+type contextKey int
+
+const (
+	// claimsKey is used to store claims in a context.
+	claimsKey contextKey = iota
+)
+
+// NewContextWithClaims injects the given claims into a new context.
+func NewContextWithClaims(ctx context.Context, claims *Claims) context.Context {
+	return context.WithValue(ctx, claimsKey, claims)
+}
+
+// ClaimsFromContext extracts the claims from a context.
+func ClaimsFromContext(ctx context.Context) (*Claims, error) {
+	value := ctx.Value(claimsKey)
+	if value == nil {
+		return nil, fmt.Errorf("%w: unable to find claims", ErrContextError)
+	}
+
+	claims, ok := value.(*Claims)
+	if !ok {
+		return nil, fmt.Errorf("%w: unable to assert claims", ErrContextError)
+	}
+
+	return claims, nil
 }
 
 // Issue issues a new JWT token.
-func (i *JWTIssuer) Issue(r *http.Request, subject string, keystoneToken string, scope *ScopeList, expiresAt time.Time) (string, error) {
+func (i *JWTIssuer) Issue(r *http.Request, subject string, uclaims *UnikornClaims, scope *ScopeList, expiresAt time.Time) (string, error) {
 	publicKey, privateKey, err := i.GetKeyPair()
 	if err != nil {
 		return "", fmt.Errorf("failed to get key pair: %w", err)
@@ -219,8 +261,8 @@ func (i *JWTIssuer) Issue(r *http.Request, subject string, keystoneToken string,
 			NotBefore: &nowRFC7519,
 			Expiry:    &expiresAtRFC7519,
 		},
-		Scope: scope,
-		Token: keystoneToken,
+		Scope:         scope,
+		UnikornClaims: uclaims,
 	}
 
 	signingKey := jose.SigningKey{

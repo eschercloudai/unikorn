@@ -88,8 +88,21 @@ func (e *HTTPError) Error() string {
 
 // Write returns the error code and description to the client.
 func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
+	// Emit the response to the client.
+	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Cache-Control", "no-cache")
+
+	w.WriteHeader(e.status)
+
+	// Short cut errors with no response.
+	switch e.status {
+	case http.StatusNotFound, http.StatusConflict:
+		return
+	}
+
 	// Log out any detail from the error that shouldn't be
-	// reported to the client.
+	// reported to the client.  Do it before things can error
+	// and return.
 	log := log.FromContext(r.Context())
 
 	details := []interface{}{
@@ -108,12 +121,7 @@ func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
 		log.Info("error detail", details...)
 	}
 
-	// Emit the response to the client.
-	w.Header().Add("Content-Type", "application/json")
-	w.Header().Add("Cache-Control", "no-cache")
-
-	w.WriteHeader(e.status)
-
+	// Emit the response body.
 	ge := &generated.Oauth2Error{
 		Error:            e.code,
 		ErrorDescription: e.description,
@@ -134,15 +142,15 @@ func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTPNotFound() *HTTPError {
-	return newHTTPError(http.StatusNotFound, generated.NotFound, "the requested path was not found")
+	return newHTTPError(http.StatusNotFound, "", "")
 }
 
 func HTTPMethodNotAllowed() *HTTPError {
 	return newHTTPError(http.StatusMethodNotAllowed, generated.MethodNotAllowed, "the requested method was not allowed")
 }
 
-func HTTPUnsupportedMediaType() *HTTPError {
-	return newHTTPError(http.StatusUnsupportedMediaType, generated.UnsupportedMediaType, "the requested content type was not allowed")
+func HTTPConflict() *HTTPError {
+	return newHTTPError(http.StatusConflict, "", "")
 }
 
 // OAuth2InvalidRequest indicates a client error.

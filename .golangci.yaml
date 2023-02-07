@@ -37,3 +37,5 @@ linters-settings:
     - prefix(k8s.io)
     - prefix(sigs.k8s.io)
     skip-generated: true
+  nlreturn:
+    block-size: 2

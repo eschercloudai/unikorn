@@ -33,11 +33,8 @@ type authorizationContext struct {
 	// the openapi validaiton is doing.
 	err error
 
-	// subject is the token subject.
-	subject string
-
-	// token is the Openstack token from password authentication.
-	token string
+	// claims contains all claims defined in the token.
+	claims *authorization.Claims
 }
 
 // Authorizer provides OpenAPI based authorization middleware.
@@ -93,10 +90,8 @@ func (a *Authorizer) authorizeOAuth2(ctx *authorizationContext, r *http.Request,
 		}
 	}
 
-	// Set the Keystone token in the context for use by the handlers.
-	// TODO: if this gets too crazy, just add the claims.
-	ctx.subject = claims.Subject
-	ctx.token = claims.Token
+	// Set the claims in the context for use by the handlers.
+	ctx.claims = claims
 
 	return nil
 }

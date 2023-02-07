@@ -24,7 +24,6 @@ import (
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
-	"github.com/eschercloudai/unikorn/pkg/server/context"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 )
@@ -41,10 +40,23 @@ func NewOpenstack(a *authorization.Authenticator) *Openstack {
 	}
 }
 
-func (o *Openstack) IdentityClient(r *http.Request) (*openstack.IdentityClient, error) {
-	token, err := context.TokenFromContext(r.Context())
+func getToken(r *http.Request) (string, error) {
+	claims, err := authorization.ClaimsFromContext(r.Context())
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed get authorization token").WithError(err)
+		return "", errors.OAuth2ServerError("failed get token claims").WithError(err)
+	}
+
+	if claims.UnikornClaims == nil {
+		return "", errors.OAuth2ServerError("failed get token claim")
+	}
+
+	return claims.UnikornClaims.Token, nil
+}
+
+func (o *Openstack) IdentityClient(r *http.Request) (*openstack.IdentityClient, error) {
+	token, err := getToken(r)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := openstack.NewIdentityClient(openstack.NewTokenProvider(o.endpoint, token))
@@ -56,9 +68,9 @@ func (o *Openstack) IdentityClient(r *http.Request) (*openstack.IdentityClient, 
 }
 
 func (o *Openstack) ComputeClient(r *http.Request) (*openstack.ComputeClient, error) {
-	token, err := context.TokenFromContext(r.Context())
+	token, err := getToken(r)
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed get authorization token").WithError(err)
+		return nil, err
 	}
 
 	client, err := openstack.NewComputeClient(openstack.NewTokenProvider(o.endpoint, token))
@@ -70,9 +82,9 @@ func (o *Openstack) ComputeClient(r *http.Request) (*openstack.ComputeClient, er
 }
 
 func (o *Openstack) BlockStorageClient(r *http.Request) (*openstack.BlockStorageClient, error) {
-	token, err := context.TokenFromContext(r.Context())
+	token, err := getToken(r)
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed get authorization token").WithError(err)
+		return nil, err
 	}
 
 	client, err := openstack.NewBlockStorageClient(openstack.NewTokenProvider(o.endpoint, token))
@@ -84,9 +96,9 @@ func (o *Openstack) BlockStorageClient(r *http.Request) (*openstack.BlockStorage
 }
 
 func (o *Openstack) NetworkClient(r *http.Request) (*openstack.NetworkClient, error) {
-	token, err := context.TokenFromContext(r.Context())
+	token, err := getToken(r)
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed get authorization token").WithError(err)
+		return nil, err
 	}
 
 	client, err := openstack.NewNetworkClient(openstack.NewTokenProvider(o.endpoint, token))
