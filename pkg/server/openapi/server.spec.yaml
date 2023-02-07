@@ -320,6 +320,60 @@ paths:
           $ref: '#/components/responses/unauthorizedResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/providers/openstack/application-credentials:
+    post:
+      description: |-
+        Creates a new Openstack application credential scoped to the project.
+      security:
+      - oauth2Authentication:
+        - project
+      requestBody:
+        $ref: '#/components/requestBodies/applicationCredentialRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/openstackApplicationCredentialResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/providers/openstack/application-credentials/{applicationCredential}:
+    description: Openstack application credential services.
+    parameters:
+    - $ref: '#/components/parameters/applicationCredentialParameter'
+    get:
+      description: |-
+        Get an Openstack application credential.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/openstackApplicationCredentialResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+    delete:
+      description: |-
+        Deletes an Openstack application credential scoped to the project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/okResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/flavors:
     description: OpenStack compute flavor services.
     get:
@@ -441,6 +495,13 @@ components:
       name: cluster
       in: path
       description: The Unikorn cluster name.
+      required: true
+      schema:
+        $ref: '#/components/schemas/stringParameter'
+    applicationCredentialParameter:
+      name: applicationCredential
+      in: path
+      description: Openstack application credential name.
       required: true
       schema:
         $ref: '#/components/schemas/stringParameter'
@@ -578,6 +639,31 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackProject'
+    applicationCredentialOptions:
+      description: Openstack application credential create options.
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          description: Application credential name.
+          type: string
+    openstackApplicationCredential:
+      description: An Openstack application credential.
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          description: Application credential ID.
+          type: string
+        name:
+          description: Application credential name.
+          type: string
+        secret:
+          description: Application credential secret, this is only present on creation.
+          type: string
     openstackImage:
       description: And Openstack image.
       type: object
@@ -703,6 +789,13 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/tokenScope'
+    applicationCredentialRequest:
+      description: Openstack application credential parameters.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/applicationCredentialOptions'
     createControlPlaneRequest:
       description: Unikorn control plane parameters.
       required: true
@@ -720,6 +813,8 @@ components:
         application/json:
           schema:
             type: object
+    okResponse:
+      description: Request is ok with no body.
     acceptedResponse:
       description: Creation request accepted.
     badRequestResponse:
@@ -774,6 +869,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackProjects'
+    openstackApplicationCredentialResponse:
+      description: An Openstack application credential.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/openstackApplicationCredential'
     openstackImagesResponse:
       description: A list of Openstack images that are compatible with this platform.
       content:

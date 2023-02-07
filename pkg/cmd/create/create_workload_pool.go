@@ -31,7 +31,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
-	uflags "github.com/eschercloudai/unikorn/pkg/util/flags"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,7 +58,7 @@ type createWorkloadPoolOptions struct {
 	name string
 
 	// version defines the Kubernetes version to install.
-	version uflags.SemverFlag
+	version flags.SemverFlag
 
 	// image defines the Openstack image for Kubernetes nodes.
 	image string
@@ -71,7 +70,7 @@ type createWorkloadPoolOptions struct {
 	replicas int
 
 	// diskSize defines the persistent volume size to provision with.
-	diskSize uflags.QuantityFlag
+	diskSize flags.QuantityFlag
 
 	// computeAvailabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.
@@ -92,7 +91,7 @@ type createWorkloadPoolOptions struct {
 	maximumReplicas int
 
 	// labels defines labels on node creation.
-	labels uflags.StringMapFlag
+	labels map[string]string
 
 	// client gives access to our custom resources.
 	client unikorn.Interface
@@ -113,7 +112,7 @@ func (o *createWorkloadPoolOptions) addFlags(f cmdutil.Factory, cmd *cobra.Comma
 	flags.StringVarWithCompletion(cmd, &o.computeAvailabilityZone, "compute-availability-zone", "", "Openstack availability zone to provision into. Will default to that specified for the control plane. (see: 'openstack availability zone list --compute'.)", completion.OpenstackComputeAvailabilityZoneCompletionFunc(&o.cloud))
 	flags.StringVarWithCompletion(cmd, &o.volumeAvailabilityZone, "volume-availability-zone", "", "Openstack availability zone to provision into.  Will default to that specified for the control plane. (see: 'openstack availability zone list --volume'.)", completion.OpenstackVolumeAvailabilityZoneCompletionFunc(&o.cloud))
 	cmd.Flags().Var(&o.diskSize, "disk-size", "Disk size, defaults to that of the machine flavor.")
-	cmd.Flags().Var(&o.labels, "label", "Label to add on node creation.  May be set multiple times.")
+	cmd.Flags().StringToStringVar(&o.labels, "labels", nil, "Labels to add on node creation. (format: key1=value1,key2=value2)")
 
 	// Feature enablement.
 	cmd.Flags().BoolVar(&o.autoscaling, "enable-autoscaling", false, "Enables workload pool auto-scaling. To function, you must enable autoscaling on the cluster.")
@@ -222,7 +221,7 @@ func (o *createWorkloadPoolOptions) run() error {
 		},
 		Spec: unikornv1alpha1.KubernetesWorkloadPoolSpec{
 			Name:   &o.name,
-			Labels: o.labels.Map,
+			Labels: o.labels,
 			MachineGeneric: unikornv1alpha1.MachineGeneric{
 				Version:  &version,
 				Image:    &o.image,

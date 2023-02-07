@@ -82,6 +82,10 @@ func (c *Client) Namespace(ctx context.Context) (string, error) {
 		return "", err
 	}
 
+	if result.DeletionTimestamp != nil {
+		return "", errors.OAuth2InvalidRequest("project is marked for deletion")
+	}
+
 	if result.Status.Namespace == "" {
 		return "", errors.OAuth2ServerError("project namespace not set")
 	}

@@ -60,6 +60,15 @@ type ServerInterface interface {
 	// (POST /api/v1/project)
 	PostApiV1Project(w http.ResponseWriter, r *http.Request)
 
+	// (POST /api/v1/providers/openstack/application-credentials)
+	PostApiV1ProvidersOpenstackApplicationCredentials(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /api/v1/providers/openstack/application-credentials/{applicationCredential})
+	DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential ApplicationCredentialParameter)
+
+	// (GET /api/v1/providers/openstack/application-credentials/{applicationCredential})
+	GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential ApplicationCredentialParameter)
+
 	// (GET /api/v1/providers/openstack/availability-zones/block-storage)
 	GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http.ResponseWriter, r *http.Request)
 
@@ -461,6 +470,79 @@ func (siw *ServerInterfaceWrapper) PostApiV1Project(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// PostApiV1ProvidersOpenstackApplicationCredentials operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1ProvidersOpenstackApplicationCredentials(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1ProvidersOpenstackApplicationCredentials(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "applicationCredential" -------------
+	var applicationCredential ApplicationCredentialParameter
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "applicationCredential", runtime.ParamLocationPath, chi.URLParam(r, "applicationCredential"), &applicationCredential)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationCredential", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w, r, applicationCredential)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "applicationCredential" -------------
+	var applicationCredential ApplicationCredentialParameter
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "applicationCredential", runtime.ParamLocationPath, chi.URLParam(r, "applicationCredential"), &applicationCredential)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationCredential", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w, r, applicationCredential)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage operation middleware
 func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -737,6 +819,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/project", wrapper.PostApiV1Project)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/providers/openstack/application-credentials", wrapper.PostApiV1ProvidersOpenstackApplicationCredentials)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/providers/openstack/application-credentials/{applicationCredential}", wrapper.DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/providers/openstack/application-credentials/{applicationCredential}", wrapper.GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/providers/openstack/availability-zones/block-storage", wrapper.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage)

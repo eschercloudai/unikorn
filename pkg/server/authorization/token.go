@@ -23,17 +23,15 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/pflag"
 	jose "gopkg.in/go-jose/go-jose.v2"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
-
-	"github.com/eschercloudai/unikorn/pkg/util/flags"
 )
 
 var (
@@ -66,23 +64,24 @@ type JWTIssuer struct {
 	tLSCertPath string
 
 	// duration allows the token lifetime to be capped.
-	duration flags.DurationFlag
+	duration time.Duration
 }
 
 // NewJWTIssuer returns a new JWT issuer and validator.
 func NewJWTIssuer() *JWTIssuer {
-	return &JWTIssuer{
-		duration: flags.DurationFlag{
-			Duration: time.Hour,
-		},
-	}
+	return &JWTIssuer{}
 }
 
+const (
+	tlsKeyPathDefault  = "/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.key"
+	tlsCertPathDefault = "/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.crt"
+)
+
 // AddFlags registers flags with the provided flag set.
-func (i *JWTIssuer) AddFlags(f *flag.FlagSet) {
-	f.StringVar(&i.tLSKeyPath, "jose-tls-key", "", "TLS key used to sign JWS and decrypt JWE.")
-	f.StringVar(&i.tLSCertPath, "jose-tls-cert", "", "TLS cert used to verify JWS and encrypt JWE.")
-	f.Var(&i.duration, "token-expiry-duration", "JWT expiry duration")
+func (i *JWTIssuer) AddFlags(f *pflag.FlagSet) {
+	f.StringVar(&i.tLSKeyPath, "jose-tls-key", tlsKeyPathDefault, "TLS key used to sign JWS and decrypt JWE.")
+	f.StringVar(&i.tLSCertPath, "jose-tls-cert", tlsCertPathDefault, "TLS cert used to verify JWS and encrypt JWE.")
+	f.DurationVar(&i.duration, "token-expiry-duration", time.Hour, "JWT expiry duration")
 }
 
 // GetKeyPair returns the public and private key from the configuration data.
@@ -182,7 +181,13 @@ type UnikornClaims struct {
 	Token string `json:"unikorn:token:keystone,omitempty"`
 
 	// Project is the Openstack/Unikorn project ID the token is scoped to.
-	Project string `json:"unikorn:project:name,omitempty"`
+	// This is a unique identifier for the region.
+	Project string `json:"unikorn:project:id,omitempty"`
+
+	// User is the Openstack user ID, the user name is stored in the "sub" claim.
+	// This effectively caches the unique user ID so we don't have to translate
+	// between names in the scope of the token, and what Openstack APIs expect.
+	User string `json:"unikorn:user:id,omitempty"`
 }
 
 // Claims is an application specific set of claims.
@@ -238,7 +243,7 @@ func (i *JWTIssuer) Issue(r *http.Request, subject string, uclaims *UnikornClaim
 
 	// Override the default token expiration time if it exceeds our
 	// security requirements.
-	maxExpiresAt := now.Add(i.duration.Duration)
+	maxExpiresAt := now.Add(i.duration)
 
 	if expiresAt.After(maxExpiresAt) {
 		expiresAt = maxExpiresAt

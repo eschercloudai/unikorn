@@ -37,12 +37,16 @@ type Handler struct {
 
 	// authenticator gives access to authentication and token handling functions.
 	authenticator *authorization.Authenticator
+
+	// options allows behaviour to be defined on the CLI.
+	options *Options
 }
 
-func New(client client.Client, authenticator *authorization.Authenticator) *Handler {
+func New(client client.Client, authenticator *authorization.Authenticator, options *Options) *Handler {
 	return &Handler{
 		client:        client,
 		authenticator: authenticator,
+		options:       options,
 	}
 }
 
@@ -170,6 +174,40 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneClustersCluster(w http.Respon
 }
 
 func (h *Handler) PutApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter, cluster generated.ClusterParameter) {
+}
+
+func (h *Handler) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
+	result, err := providers.NewOpenstack(h.authenticator).GetApplicationCredential(r, applicationCredential)
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) PostApiV1ProvidersOpenstackApplicationCredentials(w http.ResponseWriter, r *http.Request) {
+	options := &generated.ApplicationCredentialOptions{}
+
+	if err := util.ReadJSONBody(r, options); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	result, err := providers.NewOpenstack(h.authenticator).CreateApplicationCredential(r, options, h.options.applicationCredentialRoles)
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
+	if err := providers.NewOpenstack(h.authenticator).DeleteApplicationCredential(r, applicationCredential); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request) {

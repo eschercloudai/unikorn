@@ -23,6 +23,7 @@ import (
 	"time"
 
 	chi "github.com/go-chi/chi/v5"
+	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
 
 	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
@@ -31,7 +32,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler"
 	"github.com/eschercloudai/unikorn/pkg/server/middleware"
-	"github.com/eschercloudai/unikorn/pkg/util/flags"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
@@ -51,39 +51,24 @@ type serverOptions struct {
 
 	// readTimeout defines how long before we give up on the client,
 	// this should be fairly short.
-	readTimeout flags.DurationFlag
+	readTimeout time.Duration
 
 	// readHeaderTimeout defines how long before we give up on the client,
 	// this should be fairly short.
-	readHeaderTimeout flags.DurationFlag
+	readHeaderTimeout time.Duration
 
 	// writeTimeout defines how long we take to respond before we give up.
 	// Ideally we'd like this to be short, but Openstack in general sucks
 	// for performance.
-	writeTimeout flags.DurationFlag
-}
-
-// newServerOptions returns default server options.
-func newServerOptions() *serverOptions {
-	return &serverOptions{
-		readTimeout: flags.DurationFlag{
-			Duration: time.Second,
-		},
-		readHeaderTimeout: flags.DurationFlag{
-			Duration: time.Second,
-		},
-		writeTimeout: flags.DurationFlag{
-			Duration: 10 * time.Second,
-		},
-	}
+	writeTimeout time.Duration
 }
 
 // addFlags allows server options to be modified.
-func (o *serverOptions) addFlags(f *flag.FlagSet) {
+func (o *serverOptions) addFlags(f *pflag.FlagSet) {
 	f.StringVar(&o.listenAddress, "server-listen-address", ":6080", "API listener address.")
-	f.Var(&o.readTimeout, "server-read-timeout", "How long to wait for the client to send the request body.")
-	f.Var(&o.readHeaderTimeout, "server-read-header-timeout", "How long to wait for the client to send headers.")
-	f.Var(&o.writeTimeout, "server-write-timeout", "How long to wait for the API to respond to the client.")
+	f.DurationVar(&o.readTimeout, "server-read-timeout", time.Second, "How long to wait for the client to send the request body.")
+	f.DurationVar(&o.readHeaderTimeout, "server-read-header-timeout", time.Second, "How long to wait for the client to send headers.")
+	f.DurationVar(&o.writeTimeout, "server-write-timeout", 10*time.Second, "How long to wait for the API to respond to the client.")
 }
 
 // getClient grabs a client for the entire server instance so all handers
@@ -115,20 +100,25 @@ func getClient() (client.Client, error) {
 
 // main is the entry point to server.
 func main() {
-	// Initialize components with flags, then parse them.
-	serverOptions := newServerOptions()
-	serverOptions.addFlags(flag.CommandLine)
-
+	// Initialize components with legacy flags.
 	zapOptions := &zap.Options{}
 	zapOptions.BindFlags(flag.CommandLine)
 
+	// Initialize components with flags, then parse them.
+	serverOptions := &serverOptions{}
+	serverOptions.addFlags(pflag.CommandLine)
+
 	issuer := authorization.NewJWTIssuer()
-	issuer.AddFlags(flag.CommandLine)
+	issuer.AddFlags(pflag.CommandLine)
 
 	authenticator := authorization.NewAuthenticator(issuer)
-	authenticator.AddFlags(flag.CommandLine)
+	authenticator.AddFlags(pflag.CommandLine)
 
-	flag.Parse()
+	handlerOptions := &handler.Options{}
+	handlerOptions.AddFlags(pflag.CommandLine)
+
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 
 	// Get logging going first, log sinks will expect JSON formatted output for everything.
 	log.SetLogger(zap.New(zap.UseFlagOptions(zapOptions)))
@@ -163,14 +153,14 @@ func main() {
 		},
 	}
 
-	handlerInterface := handler.New(client, authenticator)
+	handlerInterface := handler.New(client, authenticator, handlerOptions)
 	chiServerhandler := generated.HandlerWithOptions(handlerInterface, chiServerOptions)
 
 	server := &http.Server{
 		Addr:              serverOptions.listenAddress,
-		ReadTimeout:       serverOptions.readTimeout.Duration,
-		ReadHeaderTimeout: serverOptions.readHeaderTimeout.Duration,
-		WriteTimeout:      serverOptions.writeTimeout.Duration,
+		ReadTimeout:       serverOptions.readTimeout,
+		ReadHeaderTimeout: serverOptions.readHeaderTimeout,
+		WriteTimeout:      serverOptions.writeTimeout,
 		Handler:           chiServerhandler,
 	}
 

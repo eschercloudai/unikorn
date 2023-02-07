@@ -18,9 +18,10 @@ package authorization
 
 import (
 	"encoding/base64"
-	"flag"
 	"net/http"
 	"strings"
+
+	"github.com/spf13/pflag"
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
@@ -48,7 +49,7 @@ func NewAuthenticator(issuer *JWTIssuer) *Authenticator {
 }
 
 // AddFlags to the specified flagset.
-func (a *Authenticator) AddFlags(f *flag.FlagSet) {
+func (a *Authenticator) AddFlags(f *pflag.FlagSet) {
 	f.StringVar(&a.endpoint, "keystone-endpoint", "https://nl1.eschercloud.com:5000", "Keystone endpoint to use for authn/authz.")
 	f.StringVar(&a.domain, "keystone-user-domain-name", "Default", "Keystone user domain name for password authentication.")
 }
@@ -86,13 +87,14 @@ func (a *Authenticator) Basic(r *http.Request) (string, error) {
 	// Do an unscoped authentication against Keystone.  The client is expected
 	// to list visible projects (or indeed cache them in local web-storage) then
 	// use that to do a scoped bearer token based upgrade.
-	keystoneToken, err := identity.CreateToken(openstack.NewCreateTokenOptionsUnscopedPassword(a.domain, username, password))
+	keystoneToken, user, err := identity.CreateToken(openstack.NewCreateTokenOptionsUnscopedPassword(a.domain, username, password))
 	if err != nil {
 		return "", errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
 
 	claims := &UnikornClaims{
 		Token: keystoneToken.ID,
+		User:  user.ID,
 	}
 
 	jwToken, err := a.issuer.Issue(r, username, claims, nil, keystoneToken.ExpiresAt)
@@ -120,13 +122,14 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (str
 		return "", errors.OAuth2ServerError("unable to get unikorn claims")
 	}
 
-	keystoneToken, err := identity.CreateToken(openstack.NewCreateTokenOptionsScopedToken(tokenClaims.UnikornClaims.Token, scope.Project.Id))
+	keystoneToken, user, err := identity.CreateToken(openstack.NewCreateTokenOptionsScopedToken(tokenClaims.UnikornClaims.Token, scope.Project.Id))
 	if err != nil {
 		return "", errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
 
 	claims := &UnikornClaims{
 		Token:   keystoneToken.ID,
+		User:    user.ID,
 		Project: scope.Project.Id,
 	}
 
