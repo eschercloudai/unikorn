@@ -26,6 +26,30 @@ const (
 	UnsupportedResponseType Oauth2ErrorError = "unsupported_response_type"
 )
 
+// ControlPlane A Unikorn control plane.
+type ControlPlane struct {
+	// CreationTime The time the resource was created.
+	CreationTime time.Time `json:"creation_time"`
+
+	// DeletionTime The time a control plane was deleted.
+	DeletionTime *time.Time `json:"deletion_time,omitempty"`
+
+	// Name The name of the resource.
+	Name string `json:"name"`
+
+	// Status The current status of the resource.
+	Status string `json:"status"`
+}
+
+// ControlPlanes A list of Unikorn control planes.
+type ControlPlanes = []ControlPlane
+
+// CreateControlPlane Unikorn control plane creation parameters.
+type CreateControlPlane struct {
+	// Name The name of the resource.
+	Name string `json:"name"`
+}
+
 // Oauth2Error Generic error message.
 type Oauth2Error struct {
 	// Error A terse error string expaning on the HTTP error code.
@@ -132,13 +156,13 @@ type OpenstackProjects = []OpenstackProject
 
 // Project A Unikorn project.
 type Project struct {
-	// CreationTime The time a project was created.
+	// CreationTime The time the resource was created.
 	CreationTime time.Time `json:"creation_time"`
 
-	// DeletionTime The time a project was deleted.
+	// DeletionTime The time the resource was deleted.
 	DeletionTime *time.Time `json:"deletion_time,omitempty"`
 
-	// Name The project name.
+	// Name The name of the resource.
 	Name string `json:"name"`
 
 	// Status The current status of the resource.
@@ -171,6 +195,12 @@ type ControlPlaneParameter = StringParameter
 
 // BadRequestResponse Generic error message.
 type BadRequestResponse = Oauth2Error
+
+// ControlPlaneResponse A Unikorn control plane.
+type ControlPlaneResponse = ControlPlane
+
+// ControlPlanesResponse A list of Unikorn control planes.
+type ControlPlanesResponse = ControlPlanes
 
 // InternalServerErrorResponse Generic error message.
 type InternalServerErrorResponse = Oauth2Error
@@ -208,8 +238,14 @@ type TokenResponse = Token
 // UnauthorizedResponse Generic error message.
 type UnauthorizedResponse = Oauth2Error
 
+// CreateControlPlaneRequest Unikorn control plane creation parameters.
+type CreateControlPlaneRequest = CreateControlPlane
+
 // TokenScopeRequest Password authentication scope.
 type TokenScopeRequest = TokenScope
 
 // PostApiV1AuthTokensTokenJSONRequestBody defines body for PostApiV1AuthTokensToken for application/json ContentType.
 type PostApiV1AuthTokensTokenJSONRequestBody = TokenScope
+
+// PostApiV1ControlplanesJSONRequestBody defines body for PostApiV1Controlplanes for application/json ContentType.
+type PostApiV1ControlplanesJSONRequestBody = CreateControlPlane

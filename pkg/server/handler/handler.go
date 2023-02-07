@@ -23,6 +23,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/providers"
 	"github.com/eschercloudai/unikorn/pkg/server/util"
@@ -52,11 +53,11 @@ func (h *Handler) PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	response := &generated.Token{
+	result := &generated.Token{
 		Token: token,
 	}
 
-	util.WriteJSONResponse(w, r, http.StatusOK, response)
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
 func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Request) {
@@ -73,21 +74,21 @@ func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	response := &generated.Token{
+	result := &generated.Token{
 		Token: token,
 	}
 
-	util.WriteJSONResponse(w, r, http.StatusOK, response)
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
 func (h *Handler) GetApiV1Project(w http.ResponseWriter, r *http.Request) {
-	project, err := project.NewClient(h.client).Get(r.Context())
+	result, err := project.NewClient(h.client).Get(r.Context())
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
 
-	util.WriteJSONResponse(w, r, http.StatusOK, project)
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
 func (h *Handler) PostApiV1Project(w http.ResponseWriter, r *http.Request) {
@@ -109,15 +110,48 @@ func (h *Handler) DeleteApiV1Project(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetApiV1Controlplanes(w http.ResponseWriter, r *http.Request) {
+	result, err := controlplane.NewClient(h.client).List(r.Context())
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
 func (h *Handler) PostApiV1Controlplanes(w http.ResponseWriter, r *http.Request) {
+	request := &generated.CreateControlPlane{}
+
+	if err := util.ReadJSONBody(r, request); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	if err := controlplane.NewClient(h.client).Create(r.Context(), request); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handler) DeleteApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
+	if err := controlplane.NewClient(h.client).Delete(r.Context(), controlPlane); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
+	result, err := controlplane.NewClient(h.client).Get(r.Context(), controlPlane)
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
 func (h *Handler) PutApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {

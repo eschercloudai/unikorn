@@ -114,7 +114,7 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/controlPlanesResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -130,7 +130,7 @@ paths:
       - oauth2Authentication:
         - project
       requestBody:
-        $ref: "#/components/requestBodies/nullRequest"
+        $ref: "#/components/requestBodies/createControlPlaneRequest"
       responses:
         '202':
           $ref: '#/components/responses/acceptedResponse'
@@ -154,7 +154,7 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/controlPlaneResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -508,19 +508,55 @@ components:
       - status
       properties:
         name:
-          description: The project name.
+          description: The name of the resource.
           type: string
         creation_time:
-          description: The time a project was created.
+          description: The time the resource was created.
           type: string
           format: date-time
         deletion_time:
-          description: The time a project was deleted.
+          description: The time the resource was deleted.
           type: string
           format: date-time
         status:
           description: The current status of the resource.
           type: string
+    createControlPlane:
+      description: Unikorn control plane creation parameters.
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          description: The name of the resource.
+          type: string
+    controlPlane:
+      description: A Unikorn control plane.
+      type: object
+      required:
+      - name
+      - creation_time
+      - status
+      properties:
+        name:
+          description: The name of the resource.
+          type: string
+        creation_time:
+          description: The time the resource was created.
+          type: string
+          format: date-time
+        deletion_time:
+          description: The time a control plane was deleted.
+          type: string
+          format: date-time
+        status:
+          description: The current status of the resource.
+          type: string
+    controlPlanes:
+      description: A list of Unikorn control planes.
+      type: array
+      items:
+        $ref: '#/components/schemas/controlPlane'
     openstackProject:
       description: An Openstack project.
       type: object
@@ -667,6 +703,13 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/tokenScope'
+    createControlPlaneRequest:
+      description: Unikorn control plane parameters.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/createControlPlane'
     nullRequest:
       description: Delete me
       content: {}
@@ -713,6 +756,18 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/project'
+    controlPlaneResponse:
+      description: A Unikorn control plane.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/controlPlane'
+    controlPlanesResponse:
+      description: A list of Unikorn control planes.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/controlPlanes'
     openstackProjectsResponse:
       description: A list of Openstack projects.
       content:
