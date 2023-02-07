@@ -130,6 +130,21 @@ type OpenstackProject struct {
 // OpenstackProjects A list of Openstack projects.
 type OpenstackProjects = []OpenstackProject
 
+// Project A Unikorn project.
+type Project struct {
+	// CreationTime The time a project was created.
+	CreationTime time.Time `json:"creation_time"`
+
+	// DeletionTime The time a project was deleted.
+	DeletionTime *time.Time `json:"deletion_time,omitempty"`
+
+	// Name The project name.
+	Name string `json:"name"`
+
+	// Status The current status of the resource.
+	Status string `json:"status"`
+}
+
 // StringParameter A basic string parameter.
 type StringParameter = string
 
@@ -148,14 +163,11 @@ type TokenScope struct {
 	} `json:"project"`
 }
 
-// Cluster A basic string parameter.
-type Cluster = StringParameter
+// ClusterParameter A basic string parameter.
+type ClusterParameter = StringParameter
 
-// ControlPlane A basic string parameter.
-type ControlPlane = StringParameter
-
-// Project A basic string parameter.
-type Project = StringParameter
+// ControlPlaneParameter A basic string parameter.
+type ControlPlaneParameter = StringParameter
 
 // BadRequestResponse Generic error message.
 type BadRequestResponse = Oauth2Error
@@ -187,14 +199,14 @@ type OpenstackKeyPairsResponse = OpenstackKeyPairs
 // OpenstackProjectsResponse A list of Openstack projects.
 type OpenstackProjectsResponse = OpenstackProjects
 
+// ProjectResponse A Unikorn project.
+type ProjectResponse = Project
+
 // TokenResponse defines model for tokenResponse.
 type TokenResponse = Token
 
 // UnauthorizedResponse Generic error message.
 type UnauthorizedResponse = Oauth2Error
-
-// UnsupportedMediaTypeResponse Generic error message.
-type UnsupportedMediaTypeResponse = Oauth2Error
 
 // TokenScopeRequest Password authentication scope.
 type TokenScopeRequest = TokenScope

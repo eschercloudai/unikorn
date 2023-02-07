@@ -21,47 +21,44 @@ type ServerInterface interface {
 	// (POST /api/v1/auth/tokens/token)
 	PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Request)
 
-	// (GET /api/v1/projects)
-	GetApiV1Projects(w http.ResponseWriter, r *http.Request)
+	// (GET /api/v1/controlplanes)
+	GetApiV1Controlplanes(w http.ResponseWriter, r *http.Request)
 
-	// (POST /api/v1/projects)
-	PostApiV1Projects(w http.ResponseWriter, r *http.Request)
+	// (POST /api/v1/controlplanes)
+	PostApiV1Controlplanes(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v1/projects/{project})
-	DeleteApiV1ProjectsProject(w http.ResponseWriter, r *http.Request, project Project)
+	// (DELETE /api/v1/controlplanes/{controlPlane})
+	DeleteApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
 
-	// (GET /api/v1/projects/{project})
-	GetApiV1ProjectsProject(w http.ResponseWriter, r *http.Request, project Project)
+	// (GET /api/v1/controlplanes/{controlPlane})
+	GetApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
 
-	// (GET /api/v1/projects/{project}/controlplanes)
-	GetApiV1ProjectsProjectControlplanes(w http.ResponseWriter, r *http.Request, project Project)
+	// (PUT /api/v1/controlplanes/{controlPlane})
+	PutApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
 
-	// (POST /api/v1/projects/{project}/controlplanes)
-	PostApiV1ProjectsProjectControlplanes(w http.ResponseWriter, r *http.Request, project Project)
+	// (GET /api/v1/controlplanes/{controlPlane}/clusters)
+	GetApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
 
-	// (DELETE /api/v1/projects/{project}/controlplanes/{controlPlane})
-	DeleteApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane)
+	// (POST /api/v1/controlplanes/{controlPlane}/clusters)
+	PostApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
 
-	// (GET /api/v1/projects/{project}/controlplanes/{controlPlane})
-	GetApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane)
+	// (DELETE /api/v1/controlplanes/{controlPlane}/clusters/{cluster})
+	DeleteApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter, cluster ClusterParameter)
 
-	// (PUT /api/v1/projects/{project}/controlplanes/{controlPlane})
-	PutApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane)
+	// (GET /api/v1/controlplanes/{controlPlane}/clusters/{cluster})
+	GetApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter, cluster ClusterParameter)
 
-	// (GET /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters)
-	GetApiV1ProjectsProjectControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane)
+	// (PUT /api/v1/controlplanes/{controlPlane}/clusters/{cluster})
+	PutApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter, cluster ClusterParameter)
 
-	// (POST /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters)
-	PostApiV1ProjectsProjectControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane)
+	// (DELETE /api/v1/project)
+	DeleteApiV1Project(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster})
-	DeleteApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane, cluster Cluster)
+	// (GET /api/v1/project)
+	GetApiV1Project(w http.ResponseWriter, r *http.Request)
 
-	// (GET /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster})
-	GetApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane, cluster Cluster)
-
-	// (PUT /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster})
-	PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, project Project, controlPlane ControlPlane, cluster Cluster)
+	// (POST /api/v1/project)
+	PostApiV1Project(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/providers/openstack/availability-zones/block-storage)
 	GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http.ResponseWriter, r *http.Request)
@@ -128,14 +125,14 @@ func (siw *ServerInterfaceWrapper) PostApiV1AuthTokensToken(w http.ResponseWrite
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1Projects operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1Projects(w http.ResponseWriter, r *http.Request) {
+// GetApiV1Controlplanes operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1Controlplanes(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1Projects(w, r)
+		siw.Handler.GetApiV1Controlplanes(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -145,14 +142,14 @@ func (siw *ServerInterfaceWrapper) GetApiV1Projects(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// PostApiV1Projects operation middleware
-func (siw *ServerInterfaceWrapper) PostApiV1Projects(w http.ResponseWriter, r *http.Request) {
+// PostApiV1Controlplanes operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1Controlplanes(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiV1Projects(w, r)
+		siw.Handler.PostApiV1Controlplanes(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -162,135 +159,14 @@ func (siw *ServerInterfaceWrapper) PostApiV1Projects(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// DeleteApiV1ProjectsProject operation middleware
-func (siw *ServerInterfaceWrapper) DeleteApiV1ProjectsProject(w http.ResponseWriter, r *http.Request) {
+// DeleteApiV1ControlplanesControlPlane operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
-
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
-	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
-
-	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteApiV1ProjectsProject(w, r, project)
-	})
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
-// GetApiV1ProjectsProject operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProject(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
-	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
-
-	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ProjectsProject(w, r, project)
-	})
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
-// GetApiV1ProjectsProjectControlplanes operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanes(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
-	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
-
-	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ProjectsProjectControlplanes(w, r, project)
-	})
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
-// PostApiV1ProjectsProjectControlplanes operation middleware
-func (siw *ServerInterfaceWrapper) PostApiV1ProjectsProjectControlplanes(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
-	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
-
-	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiV1ProjectsProjectControlplanes(w, r, project)
-	})
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
-// DeleteApiV1ProjectsProjectControlplanesControlPlane operation middleware
-func (siw *ServerInterfaceWrapper) DeleteApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
 
 	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlane
+	var controlPlane ControlPlaneParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
 	if err != nil {
@@ -301,7 +177,7 @@ func (siw *ServerInterfaceWrapper) DeleteApiV1ProjectsProjectControlplanesContro
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteApiV1ProjectsProjectControlplanesControlPlane(w, r, project, controlPlane)
+		siw.Handler.DeleteApiV1ControlplanesControlPlane(w, r, controlPlane)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -311,23 +187,14 @@ func (siw *ServerInterfaceWrapper) DeleteApiV1ProjectsProjectControlplanesContro
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ProjectsProjectControlplanesControlPlane operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ControlplanesControlPlane operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
 	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlane
+	var controlPlane ControlPlaneParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
 	if err != nil {
@@ -338,7 +205,7 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPl
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ProjectsProjectControlplanesControlPlane(w, r, project, controlPlane)
+		siw.Handler.GetApiV1ControlplanesControlPlane(w, r, controlPlane)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -348,23 +215,14 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPl
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// PutApiV1ProjectsProjectControlplanesControlPlane operation middleware
-func (siw *ServerInterfaceWrapper) PutApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
+// PutApiV1ControlplanesControlPlane operation middleware
+func (siw *ServerInterfaceWrapper) PutApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
 	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlane
+	var controlPlane ControlPlaneParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
 	if err != nil {
@@ -375,7 +233,7 @@ func (siw *ServerInterfaceWrapper) PutApiV1ProjectsProjectControlplanesControlPl
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutApiV1ProjectsProjectControlplanesControlPlane(w, r, project, controlPlane)
+		siw.Handler.PutApiV1ControlplanesControlPlane(w, r, controlPlane)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -385,23 +243,14 @@ func (siw *ServerInterfaceWrapper) PutApiV1ProjectsProjectControlplanesControlPl
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ProjectsProjectControlplanesControlPlaneClusters operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ControlplanesControlPlaneClusters operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
 	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlane
+	var controlPlane ControlPlaneParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
 	if err != nil {
@@ -412,7 +261,7 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPl
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ProjectsProjectControlplanesControlPlaneClusters(w, r, project, controlPlane)
+		siw.Handler.GetApiV1ControlplanesControlPlaneClusters(w, r, controlPlane)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -422,23 +271,14 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPl
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// PostApiV1ProjectsProjectControlplanesControlPlaneClusters operation middleware
-func (siw *ServerInterfaceWrapper) PostApiV1ProjectsProjectControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request) {
+// PostApiV1ControlplanesControlPlaneClusters operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
 	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlane
+	var controlPlane ControlPlaneParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
 	if err != nil {
@@ -449,7 +289,7 @@ func (siw *ServerInterfaceWrapper) PostApiV1ProjectsProjectControlplanesControlP
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiV1ProjectsProjectControlplanesControlPlaneClusters(w, r, project, controlPlane)
+		siw.Handler.PostApiV1ControlplanesControlPlaneClusters(w, r, controlPlane)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -459,23 +299,14 @@ func (siw *ServerInterfaceWrapper) PostApiV1ProjectsProjectControlplanesControlP
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// DeleteApiV1ProjectsProjectControlplanesControlPlaneClustersCluster operation middleware
-func (siw *ServerInterfaceWrapper) DeleteApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
+// DeleteApiV1ControlplanesControlPlaneClustersCluster operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
 	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlane
+	var controlPlane ControlPlaneParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
 	if err != nil {
@@ -484,7 +315,7 @@ func (siw *ServerInterfaceWrapper) DeleteApiV1ProjectsProjectControlplanesContro
 	}
 
 	// ------------- Path parameter "cluster" -------------
-	var cluster Cluster
+	var cluster ClusterParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "cluster", runtime.ParamLocationPath, chi.URLParam(r, "cluster"), &cluster)
 	if err != nil {
@@ -495,7 +326,7 @@ func (siw *ServerInterfaceWrapper) DeleteApiV1ProjectsProjectControlplanesContro
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w, r, project, controlPlane, cluster)
+		siw.Handler.DeleteApiV1ControlplanesControlPlaneClustersCluster(w, r, controlPlane, cluster)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -505,23 +336,14 @@ func (siw *ServerInterfaceWrapper) DeleteApiV1ProjectsProjectControlplanesContro
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ProjectsProjectControlplanesControlPlaneClustersCluster operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ControlplanesControlPlaneClustersCluster operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
 	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlane
+	var controlPlane ControlPlaneParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
 	if err != nil {
@@ -530,7 +352,7 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPl
 	}
 
 	// ------------- Path parameter "cluster" -------------
-	var cluster Cluster
+	var cluster ClusterParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "cluster", runtime.ParamLocationPath, chi.URLParam(r, "cluster"), &cluster)
 	if err != nil {
@@ -541,7 +363,7 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPl
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w, r, project, controlPlane, cluster)
+		siw.Handler.GetApiV1ControlplanesControlPlaneClustersCluster(w, r, controlPlane, cluster)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -551,23 +373,14 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProjectsProjectControlplanesControlPl
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster operation middleware
-func (siw *ServerInterfaceWrapper) PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
+// PutApiV1ControlplanesControlPlaneClustersCluster operation middleware
+func (siw *ServerInterfaceWrapper) PutApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "project" -------------
-	var project Project
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "project", runtime.ParamLocationPath, chi.URLParam(r, "project"), &project)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
-		return
-	}
-
 	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlane
+	var controlPlane ControlPlaneParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
 	if err != nil {
@@ -576,7 +389,7 @@ func (siw *ServerInterfaceWrapper) PutApiV1ProjectsProjectControlplanesControlPl
 	}
 
 	// ------------- Path parameter "cluster" -------------
-	var cluster Cluster
+	var cluster ClusterParameter
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "cluster", runtime.ParamLocationPath, chi.URLParam(r, "cluster"), &cluster)
 	if err != nil {
@@ -587,7 +400,58 @@ func (siw *ServerInterfaceWrapper) PutApiV1ProjectsProjectControlplanesControlPl
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w, r, project, controlPlane, cluster)
+		siw.Handler.PutApiV1ControlplanesControlPlaneClustersCluster(w, r, controlPlane, cluster)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// DeleteApiV1Project operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1Project(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiV1Project(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetApiV1Project operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1Project(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1Project(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// PostApiV1Project operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1Project(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1Project(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -836,46 +700,43 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/auth/tokens/token", wrapper.PostApiV1AuthTokensToken)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/projects", wrapper.GetApiV1Projects)
+		r.Get(options.BaseURL+"/api/v1/controlplanes", wrapper.GetApiV1Controlplanes)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/projects", wrapper.PostApiV1Projects)
+		r.Post(options.BaseURL+"/api/v1/controlplanes", wrapper.PostApiV1Controlplanes)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/api/v1/projects/{project}", wrapper.DeleteApiV1ProjectsProject)
+		r.Delete(options.BaseURL+"/api/v1/controlplanes/{controlPlane}", wrapper.DeleteApiV1ControlplanesControlPlane)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/projects/{project}", wrapper.GetApiV1ProjectsProject)
+		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlane}", wrapper.GetApiV1ControlplanesControlPlane)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/projects/{project}/controlplanes", wrapper.GetApiV1ProjectsProjectControlplanes)
+		r.Put(options.BaseURL+"/api/v1/controlplanes/{controlPlane}", wrapper.PutApiV1ControlplanesControlPlane)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/projects/{project}/controlplanes", wrapper.PostApiV1ProjectsProjectControlplanes)
+		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters", wrapper.GetApiV1ControlplanesControlPlaneClusters)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}", wrapper.DeleteApiV1ProjectsProjectControlplanesControlPlane)
+		r.Post(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters", wrapper.PostApiV1ControlplanesControlPlaneClusters)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}", wrapper.GetApiV1ProjectsProjectControlplanesControlPlane)
+		r.Delete(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.DeleteApiV1ControlplanesControlPlaneClustersCluster)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}", wrapper.PutApiV1ProjectsProjectControlplanesControlPlane)
+		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.GetApiV1ControlplanesControlPlaneClustersCluster)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}/clusters", wrapper.GetApiV1ProjectsProjectControlplanesControlPlaneClusters)
+		r.Put(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.PutApiV1ControlplanesControlPlaneClustersCluster)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}/clusters", wrapper.PostApiV1ProjectsProjectControlplanesControlPlaneClusters)
+		r.Delete(options.BaseURL+"/api/v1/project", wrapper.DeleteApiV1Project)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.DeleteApiV1ProjectsProjectControlplanesControlPlaneClustersCluster)
+		r.Get(options.BaseURL+"/api/v1/project", wrapper.GetApiV1Project)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.GetApiV1ProjectsProjectControlplanesControlPlaneClustersCluster)
-	})
-	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster)
+		r.Post(options.BaseURL+"/api/v1/project", wrapper.PostApiV1Project)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/providers/openstack/availability-zones/block-storage", wrapper.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage)

@@ -24,7 +24,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3filter"
 
-	servercontext "github.com/eschercloudai/unikorn/pkg/server/context"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -153,11 +153,7 @@ func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add any contextual information to bubble up to the handler.
-	c := r.Context()
-
-	c = servercontext.NewContextWithSubject(c, authContext.subject)
-	c = servercontext.NewContextWithToken(c, authContext.token)
-
+	c := authorization.NewContextWithClaims(r.Context(), authContext.claims)
 	r = r.WithContext(c)
 
 	// Override the writer so we can inspect the contents and status.

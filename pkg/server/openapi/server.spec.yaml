@@ -22,8 +22,6 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/auth/tokens/token:
@@ -45,51 +43,50 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/projects:
+  /api/v1/project:
     description: Unikorn project services.
     get:
       description: |-
-        Lists all Unikorn projects associated with the authenticated user's
+        Gets the Unikorn project associated with the authenticated user's
         OpenStack project.
       security:
       - oauth2Authentication:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/projectResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     post:
+      x-no-body: true
       description: |-
         Creates a new Unikorn project associated with the authenticated user's
         OpenStack project.
       security:
       - oauth2Authentication:
         - project
-      requestBody:
-        $ref: "#/components/requestBodies/nullRequest"
       responses:
-        '200':
-          $ref: '#/components/responses/nullResponse'
-  /api/v1/projects/{project}:
-    description: Unikorn project services.
-    parameters:
-    - $ref: '#/components/parameters/project'
-    get:
-      description: |-
-        Gets a Unikorn project associated with the authenticated user's
-        OpenStack project.
-      security:
-      - oauth2Authentication:
-        - project
-      responses:
-        '200':
-          $ref: '#/components/responses/nullResponse'
+        '202':
+          $ref: '#/components/responses/acceptedResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '409':
+          $ref: '#/components/responses/conflictResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     delete:
       description: |-
-        Deletes a Unikorn project associated with the authenticated user's
+        Deletes the Unikorn project associated with the authenticated user's
         OpenStack project.  This is a cascading operation and will delete all
         contained control planes and clusters.
       security:
@@ -98,10 +95,16 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
-  /api/v1/projects/{project}/controlplanes:
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/controlplanes:
     description: Unikorn control plane services.
-    parameters:
-    - $ref: '#/components/parameters/project'
     get:
       description: |-
         Lists all Unikorn control planes contained within the selected Unikorn
@@ -112,6 +115,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     post:
       description: |-
         Creates a new Unikorn control plane within the selected Unikorn project.
@@ -121,13 +132,20 @@ paths:
       requestBody:
         $ref: "#/components/requestBodies/nullRequest"
       responses:
-        '200':
-          $ref: '#/components/responses/nullResponse'
-  /api/v1/projects/{project}/controlplanes/{controlPlane}:
+        '202':
+          $ref: '#/components/responses/acceptedResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '409':
+          $ref: '#/components/responses/conflictResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/controlplanes/{controlPlane}:
     description: Unikorn control plane services.
     parameters:
-    - $ref: '#/components/parameters/project'
-    - $ref: '#/components/parameters/controlPlane'
+    - $ref: '#/components/parameters/controlPlaneParameter'
     get:
       description: |-
         Gets a Unikorn control plane from within the selected Unikorn project.
@@ -137,6 +155,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     put:
       description: |-
         Updates a Unikorn control plane within the selected Unikorn project.
@@ -150,6 +176,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     delete:
       description: |-
         Deletes a Unikorn control plane from within the selected Unikorn project.
@@ -160,11 +194,18 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
-  /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters:
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/controlplanes/{controlPlane}/clusters:
     description: Unikorn cluster services.
     parameters:
-    - $ref: '#/components/parameters/project'
-    - $ref: '#/components/parameters/controlPlane'
+    - $ref: '#/components/parameters/controlPlaneParameter'
     get:
       description: |-
         List all Unikorn clusters within the selected Unikorn control plane.
@@ -174,6 +215,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     post:
       description: |-
         Create a new Unikorn cluster within the selected Unikorn control plane.
@@ -183,14 +232,21 @@ paths:
       requestBody:
         $ref: "#/components/requestBodies/nullRequest"
       responses:
-        '200':
-          $ref: '#/components/responses/nullResponse'
-  /api/v1/projects/{project}/controlplanes/{controlPlane}/clusters/{cluster}:
+        '202':
+          $ref: '#/components/responses/acceptedResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '409':
+          $ref: '#/components/responses/conflictResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/controlplanes/{controlPlane}/clusters/{cluster}:
     description: Unikorn cluster services.
     parameters:
-    - $ref: '#/components/parameters/project'
-    - $ref: '#/components/parameters/controlPlane'
-    - $ref: '#/components/parameters/cluster'
+    - $ref: '#/components/parameters/controlPlaneParameter'
+    - $ref: '#/components/parameters/clusterParameter'
     get:
       description: |-
         Get a Unikorn cluster from within the selected Unikorn control plane.
@@ -200,6 +256,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     put:
       description: |-
         Update a Unikorn cluster within the selected Unikorn control plane.
@@ -215,6 +279,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     delete:
       description: |-
         Delete a Unikorn cluster from within a Unikorn control plane.
@@ -224,6 +296,14 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/nullResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/projects:
     description: OpenStack identity project services.
     get:
@@ -238,8 +318,6 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/flavors:
@@ -258,8 +336,6 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/images:
@@ -278,8 +354,6 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/availability-zones/compute:
@@ -298,8 +372,6 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/availability-zones/block-storage:
@@ -318,8 +390,6 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/external-networks:
@@ -338,8 +408,6 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/key-pairs:
@@ -358,27 +426,18 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
-        '415':
-          $ref: '#/components/responses/unsupportedMediaTypeResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
 components:
   parameters:
-    project:
-      name: project
-      in: path
-      description: The Unikorn project name.
-      required: true
-      schema:
-        $ref: '#/components/schemas/stringParameter'
-    controlPlane:
+    controlPlaneParameter:
       name: controlPlane
       in: path
       description: The Unikorn control plane name.
       required: true
       schema:
         $ref: '#/components/schemas/stringParameter'
-    cluster:
+    clusterParameter:
       name: cluster
       in: path
       description: The Unikorn cluster name.
@@ -439,6 +498,28 @@ components:
       properties:
         token:
           description: Authentication token.
+          type: string
+    project:
+      description: A Unikorn project.
+      type: object
+      required:
+      - name
+      - creation_time
+      - status
+      properties:
+        name:
+          description: The project name.
+          type: string
+        creation_time:
+          description: The time a project was created.
+          type: string
+          format: date-time
+        deletion_time:
+          description: The time a project was deleted.
+          type: string
+          format: date-time
+        status:
+          description: The current status of the resource.
           type: string
     openstackProject:
       description: An Openstack project.
@@ -596,6 +677,8 @@ components:
         application/json:
           schema:
             type: object
+    acceptedResponse:
+      description: Creation request accepted.
     badRequestResponse:
       description: Request body failed schema validation.
       content:
@@ -608,12 +691,10 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/oauth2Error'
-    unsupportedMediaTypeResponse:
-      description: Requested media type unspecified or unsupported.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/oauth2Error'
+    notFoundResponse:
+      description: Unable to find a resource.
+    conflictResponse:
+      description: Resource conlicts with another.
     internalServerErrorResponse:
       description: An unexpected error occurred, please report.
       content:
@@ -626,6 +707,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/token'
+    projectResponse:
+      description: A Unikorn project.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/project'
     openstackProjectsResponse:
       description: A list of Openstack projects.
       content:

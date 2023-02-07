@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 )
@@ -59,27 +60,32 @@ func main() {
 				os.Exit(1)
 			}
 
+			//nolint:nestif
 			if method == http.MethodGet {
 				// GET calls will have a response.
 				if len(operation.Responses) == 0 {
 					report("no response set for", method, pathName)
 				}
-			}
 
-			// Where there are responses, they must have a schema.
-			for code, responseRef := range operation.Responses {
-				response := responseRef.Value
-				if response == nil {
-					response = spec.Components.Responses[responseRef.Ref].Value
-				}
+				// Where there are responses, they must have a schema.
+				for code, responseRef := range operation.Responses {
+					if code != strconv.Itoa(http.StatusOK) {
+						continue
+					}
 
-				if response.Content == nil {
-					report("no content type set for", code, method, pathName, "response")
-				}
+					response := responseRef.Value
+					if response == nil {
+						response = spec.Components.Responses[responseRef.Ref].Value
+					}
 
-				for mimeType, mediaType := range response.Content {
-					if mediaType.Schema == nil {
-						report("no schema set for", mimeType, code, method, pathName, "response")
+					if response.Content == nil {
+						report("no content type set for", code, method, pathName, "response")
+					}
+
+					for mimeType, mediaType := range response.Content {
+						if mediaType.Schema == nil {
+							report("no schema set for", mimeType, code, method, pathName, "response")
+						}
 					}
 				}
 			}

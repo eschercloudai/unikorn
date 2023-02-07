@@ -19,11 +19,13 @@ package main
 import (
 	"flag"
 	"net/http"
+	"os"
 	"time"
 
 	chi "github.com/go-chi/chi/v5"
 	"go.opentelemetry.io/otel"
 
+	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
@@ -31,6 +33,11 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/middleware"
 	"github.com/eschercloudai/unikorn/pkg/util/flags"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -79,6 +86,33 @@ func (o *serverOptions) addFlags(f *flag.FlagSet) {
 	f.Var(&o.writeTimeout, "server-write-timeout", "How long to wait for the API to respond to the client.")
 }
 
+// getClient grabs a client for the entire server instance so all handers
+// share caches.
+func getClient() (client.Client, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a scheme and ensure it knows about Kubernetes and Unikorn
+	// resource types.
+	scheme := runtime.NewScheme()
+
+	if err := kubernetesscheme.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+
+	if err := unikornscheme.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+
+	clientOptions := client.Options{
+		Scheme: scheme,
+	}
+
+	return client.New(config, clientOptions)
+}
+
 // main is the entry point to server.
 func main() {
 	// Initialize components with flags, then parse them.
@@ -105,6 +139,12 @@ func main() {
 	// Hello World!
 	logger.Info("service starting", "application", constants.Application, "version", constants.Version, "revision", constants.Revision)
 
+	client, err := getClient()
+	if err != nil {
+		logger.Error(err, "failed to create client")
+		os.Exit(1)
+	}
+
 	// Middleware specified here is applied to all requests pre-routing.
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
@@ -123,7 +163,7 @@ func main() {
 		},
 	}
 
-	handlerInterface := handler.New(authenticator)
+	handlerInterface := handler.New(client, authenticator)
 	chiServerhandler := generated.HandlerWithOptions(handlerInterface, chiServerOptions)
 
 	server := &http.Server{

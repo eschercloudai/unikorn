@@ -23,16 +23,24 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/providers"
 	"github.com/eschercloudai/unikorn/pkg/server/util"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Handler struct {
+	// client gives cached access to Kubernetes.
+	client client.Client
+
+	// authenticator gives access to authentication and token handling functions.
 	authenticator *authorization.Authenticator
 }
 
-func New(authenticator *authorization.Authenticator) *Handler {
+func New(client client.Client, authenticator *authorization.Authenticator) *Handler {
 	return &Handler{
+		client:        client,
 		authenticator: authenticator,
 	}
 }
@@ -41,7 +49,6 @@ func (h *Handler) PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Req
 	token, err := h.authenticator.Basic(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
@@ -57,14 +64,12 @@ func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Reques
 
 	if err := util.ReadJSONBody(r, scope); err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
 	token, err := h.authenticator.Token(r, scope)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
@@ -75,53 +80,68 @@ func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Reques
 	util.WriteJSONResponse(w, r, http.StatusOK, response)
 }
 
-func (h *Handler) GetApiV1Projects(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetApiV1Project(w http.ResponseWriter, r *http.Request) {
+	project, err := project.NewClient(h.client).Get(r.Context())
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, project)
 }
 
-func (h *Handler) PostApiV1Projects(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PostApiV1Project(w http.ResponseWriter, r *http.Request) {
+	if err := project.NewClient(h.client).Create(r.Context()); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h *Handler) DeleteApiV1ProjectsProject(w http.ResponseWriter, r *http.Request, project generated.Project) {
+func (h *Handler) DeleteApiV1Project(w http.ResponseWriter, r *http.Request) {
+	if err := project.NewClient(h.client).Delete(r.Context()); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h *Handler) GetApiV1ProjectsProject(w http.ResponseWriter, r *http.Request, project generated.Project) {
+func (h *Handler) GetApiV1Controlplanes(w http.ResponseWriter, r *http.Request) {
 }
 
-func (h *Handler) GetApiV1ProjectsProjectControlplanes(w http.ResponseWriter, r *http.Request, project generated.Project) {
+func (h *Handler) PostApiV1Controlplanes(w http.ResponseWriter, r *http.Request) {
 }
 
-func (h *Handler) PostApiV1ProjectsProjectControlplanes(w http.ResponseWriter, r *http.Request, project generated.Project) {
+func (h *Handler) DeleteApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
 }
 
-func (h *Handler) DeleteApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane) {
+func (h *Handler) GetApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
 }
 
-func (h *Handler) GetApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane) {
+func (h *Handler) PutApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
 }
 
-func (h *Handler) PutApiV1ProjectsProjectControlplanesControlPlane(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane) {
+func (h *Handler) GetApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
 }
 
-func (h *Handler) GetApiV1ProjectsProjectControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane) {
+func (h *Handler) PostApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
 }
 
-func (h *Handler) PostApiV1ProjectsProjectControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane) {
+func (h *Handler) DeleteApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter, cluster generated.ClusterParameter) {
 }
 
-func (h *Handler) DeleteApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane, cluster generated.Cluster) {
+func (h *Handler) GetApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter, cluster generated.ClusterParameter) {
 }
 
-func (h *Handler) GetApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane, cluster generated.Cluster) {
-}
-
-func (h *Handler) PutApiV1ProjectsProjectControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, project generated.Project, controlPlane generated.ControlPlane, cluster generated.Cluster) {
+func (h *Handler) PutApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter, cluster generated.ClusterParameter) {
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request) {
 	result, err := providers.NewOpenstack(h.authenticator).ListAvailabilityZonesCompute(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
@@ -132,7 +152,6 @@ func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http
 	result, err := providers.NewOpenstack(h.authenticator).ListAvailabilityZonesBlockStorage(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
@@ -143,7 +162,6 @@ func (h *Handler) GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWrit
 	result, err := providers.NewOpenstack(h.authenticator).ListExternalNetworks(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
@@ -154,7 +172,6 @@ func (h *Handler) GetApiV1ProvidersOpenstackFlavors(w http.ResponseWriter, r *ht
 	result, err := providers.NewOpenstack(h.authenticator).ListFlavors(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
@@ -165,7 +182,6 @@ func (h *Handler) GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *htt
 	result, err := providers.NewOpenstack(h.authenticator).ListImages(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
@@ -176,7 +192,6 @@ func (h *Handler) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *h
 	result, err := providers.NewOpenstack(h.authenticator).ListKeyPairs(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
@@ -187,7 +202,6 @@ func (h *Handler) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *h
 	result, err := providers.NewOpenstack(h.authenticator).ListAvailableProjects(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
-
 		return
 	}
 
