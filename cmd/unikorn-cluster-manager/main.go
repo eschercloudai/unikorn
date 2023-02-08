@@ -20,6 +20,8 @@ import (
 	"flag"
 	"os"
 
+	"github.com/spf13/pflag"
+
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/managers/cluster"
 
@@ -31,7 +33,8 @@ func main() {
 	options := &zap.Options{}
 	options.BindFlags(flag.CommandLine)
 
-	flag.Parse()
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 
 	log.SetLogger(zap.New(zap.UseFlagOptions(options)))
 

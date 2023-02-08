@@ -19,6 +19,7 @@ package openstack
 import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/applicationcredentials"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 )
@@ -125,8 +126,20 @@ func (o *CreateTokenOptionsScopedToken) Options() *tokens.AuthOptions {
 }
 
 // CreateToken issues a new token.
-func (c *IdentityClient) CreateToken(options CreateTokenOptions) (*tokens.Token, error) {
-	return tokens.Create(c.client, options.Options()).ExtractToken()
+func (c *IdentityClient) CreateToken(options CreateTokenOptions) (*tokens.Token, *tokens.User, error) {
+	result := tokens.Create(c.client, options.Options())
+
+	token, err := result.ExtractToken()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, err := result.ExtractUser()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return token, user, nil
 }
 
 // ListAvailableProjects lists projects that an authenticated (but unscoped) user can
@@ -143,4 +156,46 @@ func (c *IdentityClient) ListAvailableProjects() ([]projects.Project, error) {
 	}
 
 	return items, nil
+}
+
+// ListApplicationCredentials lists application credentials for the scoped user.
+func (c *IdentityClient) ListApplicationCredentials(userID string) ([]applicationcredentials.ApplicationCredential, error) {
+	page, err := applicationcredentials.List(c.client, userID, nil).AllPages()
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := applicationcredentials.ExtractApplicationCredentials(page)
+	if err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
+// CreateApplicationCredential creates an application credential for the user.
+func (c *IdentityClient) CreateApplicationCredential(userID, name, description string, roles []string) (*applicationcredentials.ApplicationCredential, error) {
+	applicationRoles := make([]applicationcredentials.Role, len(roles))
+
+	for i, role := range roles {
+		applicationRoles[i].Name = role
+	}
+
+	opts := &applicationcredentials.CreateOpts{
+		Name:        name,
+		Description: description,
+		Roles:       applicationRoles,
+	}
+
+	result, err := applicationcredentials.Create(c.client, userID, opts).Extract()
+	if err != nil {
+		return nil, err
+	}
+
+	return result, err
+}
+
+// DeleteApplicationCredential deletes an application credential for the user.
+func (c *IdentityClient) DeleteApplicationCredential(userID, id string) error {
+	return applicationcredentials.Delete(c.client, userID, id).ExtractErr()
 }

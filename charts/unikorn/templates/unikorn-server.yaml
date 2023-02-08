@@ -93,8 +93,11 @@ spec:
       - name: unikorn-server
         image: {{ include "unikorn.serverImage" . }}
         args:
-        - -jose-tls-key=/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.key
-        - -jose-tls-cert=/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.crt
+        {{- with $credentials := .Values.server.applicationCredentials -}}
+          {{- with $roles := $credentials.roles -}}
+            {{ printf "- --application-credential-roles=%s" (join "," $roles) | nindent 8 }}
+          {{- end }}
+        {{- end }}
         volumeMounts:
         - name: unikorn-server-jose-tls
           mountPath: /var/lib/secrets/unikorn.eschercloud.ai/jose

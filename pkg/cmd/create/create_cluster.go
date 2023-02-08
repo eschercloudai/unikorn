@@ -35,7 +35,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	uflags "github.com/eschercloudai/unikorn/pkg/util/flags"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -94,7 +93,7 @@ type createClusterOptions struct {
 	caCert []byte
 
 	// version defines the Kubernetes version to install.
-	version uflags.SemverFlag
+	version flags.SemverFlag
 
 	// externalNetworkID is an internet facing Openstack network to provision
 	// VIPs on for load balancers and stuff.
@@ -124,7 +123,7 @@ type createClusterOptions struct {
 	replicas int
 
 	// diskSize defines the persistent volume size to provision with.
-	diskSize uflags.QuantityFlag
+	diskSize flags.QuantityFlag
 
 	// computeAvailabilityZone defines in what Openstack failure domain the Kubernetes
 	// cluster will be provisioned in.
@@ -146,7 +145,7 @@ type createClusterOptions struct {
 	SANs []string
 
 	// allowedPrefixes allows the Kubernetes API firewall.
-	allowedPrefixes uflags.IPNetSliceFlag
+	allowedPrefixes flags.IPNetSliceFlag
 
 	// client gives access to our custom resources.
 	client unikorn.Interface
@@ -167,9 +166,9 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	cmd.Flags().IPNetVar(&o.nodeNetwork, "node-network", defaultNodeNetwork, "Node network prefix.")
 	cmd.Flags().IPNetVar(&o.podNetwork, "pod-network", defaultPodNetwork, "Pod network prefix.")
 	cmd.Flags().IPNetVar(&o.serviceNetwork, "service-network", defaultServiceNetwork, "Service network prefix.")
-	cmd.Flags().IPSliceVar(&o.dnsNameservers, "dns-nameservers", defaultDNSNameservers, "DNS nameservers for pods.")
-	cmd.Flags().StringSliceVar(&o.SANs, "api-san", nil, "Specifies an X.509 subject alternative name to generate in the API certificate. May be specified multiple times.")
-	cmd.Flags().Var(&o.allowedPrefixes, "api-allowed-prefix", "Specifies a network prefix allowed to use the Kubernetes API. May be specified multiple times.")
+	cmd.Flags().IPSliceVar(&o.dnsNameservers, "dns-nameservers", defaultDNSNameservers, "DNS nameservers for pods. (format: 1.1.1.1,8.8.8.8)")
+	cmd.Flags().StringSliceVar(&o.SANs, "api-sans", nil, "Specifies X.509 subject alternative names to generate in the API certificate. (format: foo.acme.com,bar.acme.com)")
+	cmd.Flags().Var(&o.allowedPrefixes, "api-allowed-prefixes", "Specifies network prefixs allowed to use the Kubernetes API. (format: 1.1.1.1/32,2.2.2.2/32)")
 
 	// Kubernetes control plane options.
 	flags.RequiredStringVarWithCompletion(cmd, &o.flavor, "flavor", "", "Kubernetes control plane Openstack flavor (see: 'openstack flavor list'.)", completion.OpenstackFlavorCompletionFunc(&o.cloud))
@@ -368,7 +367,7 @@ var (
 	//nolint:gochecknoglobals
 	createClusterExamples = util.TemplatedExample(`
         # Create a Kubernetes cluster
-        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --external-network c9d130bc-301d-45c0-9328-a6964af65579 --flavor c.small --version v1.24.7 --image ubuntu-2004-kube-v1.24.7 --availability-zone nova baz`)
+        {{.Application}} create cluster --project foo --control-plane bar --cloud nl1-simon --external-network c9d130bc-301d-45c0-9328-a6964af65579 --flavor c.small --version v1.24.7 --image ubuntu-2004-kube-v1.24.7 --compute-availability-zone nova --volume-availability-zone cinder baz`)
 )
 
 // newCreateClusterCommand creates a command that is able to provison a new Kubernetes

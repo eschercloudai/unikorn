@@ -38,12 +38,24 @@ clusterManager:
 server:
   # Temporarily block deployment until it's complete.
   enabled: false
+
   # Allows override of the global default image.
   image:
+
   # Sets the ingress class to use.
   ingressClass: nginx
+
   # Sets the DNS hosts/X.509 Certs.
   host: kubernetes.eschercloud.com
+
+  # Allow configuration of application credentials.
+  applicationCredentials:
+    # Sets the roles to grant to credentials.  It is up to the Openstack administrator
+    # to ensure users have these roles so they can grant them to the credential.
+    roles:
+    - _member_
+    - member
+    - load-balancer_member
 
 # Defines Prometheus monitoring integration.
 monitoring:
