@@ -96,5 +96,15 @@ func (c *NetworkClient) ExternalNetworks() ([]Network, error) {
 		return nil, err
 	}
 
-	return results, nil
+	filtered := []Network{}
+
+	for _, result := range results {
+		if !result.External {
+			continue
+		}
+
+		filtered = append(filtered, result)
+	}
+
+	return filtered, nil
 }

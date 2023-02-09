@@ -551,7 +551,6 @@ type KubernetesClusterNetworkSpec struct {
 	// only one DNS server.
 	// +listType=set
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=1
 	DNSNameservers []IPv4Address `json:"dnsNameservers"`
 }
 
@@ -565,11 +564,23 @@ type KubernetesClusterControlPlaneSpec struct {
 	MachineGeneric `json:",inline"`
 }
 
+type KubernetesClusterWorkloadPoolsPoolSpec struct {
+	KubernetesWorkloadPoolSpec `json:",inline"`
+
+	// Name is the name of the pool.
+	Name string `json:"name"`
+}
+
 type KubernetesClusterWorkloadPoolsSpec struct {
 	// Selector is a label selector to collect KubernetesClusterWorkloadPool
-	// resources.  If not specified all KubernetesClusterWorkloadPool resources
-	// will be considered a member of this cluster.
-	Selector *metav1.LabelSelector `json:"selector"`
+	// resources.  If not specified Pools will be used exclusively.
+	// Label selectors are expected to be used for CLI generated clusters.
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
+	// Pools contains an inline set of pools.  This field will be ignored
+	// when Selector is set.  Inline pools are expected to be used for UI
+	// generated clusters.
+	Pools []KubernetesClusterWorkloadPoolsPoolSpec `json:"pools,omitempty"`
 }
 
 // KubernetesClusterStatus defines the observed state of the Kubernetes cluster.

@@ -18,11 +18,8 @@ package create
 
 import (
 	"context"
-	"crypto/tls"
-	"encoding/pem"
 	"fmt"
 	"net"
-	"net/url"
 
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/spf13/cobra"
@@ -35,6 +32,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	uutil "github.com/eschercloudai/unikorn/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -238,29 +236,12 @@ func (o *createClusterOptions) completeOpenstackConfig() error {
 	o.clouds = filteredCloudsYaml
 
 	// Work out the correct CA to use.
-	// Screw private clouds, public is the future!
-	authURL, err := url.Parse(cloud.AuthInfo.AuthURL)
+	ca, err := uutil.GetURLCACertificate(cloud.AuthInfo.AuthURL)
 	if err != nil {
 		return err
 	}
 
-	conn, err := tls.Dial("tcp", authURL.Host, nil)
-	if err != nil {
-		return err
-	}
-
-	defer conn.Close()
-
-	chains := conn.ConnectionState().VerifiedChains
-	chain := chains[0]
-	ca := chain[len(chain)-1]
-
-	pemBlock := &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: ca.Raw,
-	}
-
-	o.caCert = pem.EncodeToMemory(pemBlock)
+	o.caCert = ca
 
 	return nil
 }

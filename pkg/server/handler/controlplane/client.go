@@ -25,6 +25,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -42,6 +43,70 @@ func NewClient(client client.Client) *Client {
 	return &Client{
 		client: client,
 	}
+}
+
+// Meta describes the control plane.
+type Meta struct {
+	// Project is the owning project's metadata.
+	Project *project.Meta
+
+	// Name is the project's Kubernetes name, so a higher level resource
+	// can reference it.
+	Name string
+
+	// Active defines whether the control plane is ready to be used: it's not
+	// marked for deletion, and it's active according to the controller.
+	// TODO: should we inherit the project's inactive status too?
+	Active bool
+
+	// Namespace is the namespace that is provisioned by the control plane.
+	// Should be usable and set when the project is active.
+	Namespace string
+}
+
+// active returns true if the project is usable.
+func active(c *unikornv1.ControlPlane) bool {
+	// Being deleted, don't use.
+	// Takes precedence over condition as there's a delay between the resource
+	// being deleted, and the controller acknoledging it.
+	if c.DeletionTimestamp != nil {
+		return false
+	}
+
+	// Unknown condition, don't use.
+	condition, err := c.LookupCondition(unikornv1.ControlPlaneConditionAvailable)
+	if err != nil {
+		return false
+	}
+
+	// Condition not provisioned, don't use.
+	if condition.Status != corev1.ConditionTrue {
+		return false
+	}
+
+	return true
+}
+
+// Metadata retrieves the control plane metadata.
+func (c *Client) Metadata(ctx context.Context, name string) (*Meta, error) {
+	project, err := project.NewClient(c.client).Metadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := c.get(ctx, project.Namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := &Meta{
+		Project:   project,
+		Name:      name,
+		Active:    active(result),
+		Namespace: result.Status.Namespace,
+	}
+
+	return metadata, nil
 }
 
 // convert converts from Kubernetes into OpenAPI types.
@@ -76,27 +141,22 @@ func convertList(in *unikornv1.ControlPlaneList) []*generated.ControlPlane {
 
 // List returns all control planes owned by the implicit control plane.
 func (c *Client) List(ctx context.Context) ([]*generated.ControlPlane, error) {
-	namespace, err := project.NewClient(c.client).Namespace(ctx)
+	project, err := project.NewClient(c.client).Metadata(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	result := &unikornv1.ControlPlaneList{}
 
-	if err := c.client.List(ctx, result, &client.ListOptions{Namespace: namespace}); err != nil {
+	if err := c.client.List(ctx, result, &client.ListOptions{Namespace: project.Namespace}); err != nil {
 		return nil, errors.OAuth2ServerError("failed to list control planes").WithError(err)
 	}
 
 	return convertList(result), nil
 }
 
-// Get returns the implicit control plane identified by the JWT claims.
-func (c *Client) Get(ctx context.Context, name generated.ControlPlaneParameter) (*generated.ControlPlane, error) {
-	namespace, err := project.NewClient(c.client).Namespace(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+// get returns the implicit control plane identified by the JWT claims.
+func (c *Client) get(ctx context.Context, namespace, name string) (*unikornv1.ControlPlane, error) {
 	result := &unikornv1.ControlPlane{}
 
 	if err := c.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, result); err != nil {
@@ -107,29 +167,43 @@ func (c *Client) Get(ctx context.Context, name generated.ControlPlaneParameter) 
 		return nil, errors.OAuth2ServerError("failed to get control plane").WithError(err)
 	}
 
+	return result, nil
+}
+
+// Get returns the implicit control plane identified by the JWT claims.
+func (c *Client) Get(ctx context.Context, name generated.ControlPlaneNameParameter) (*generated.ControlPlane, error) {
+	project, err := project.NewClient(c.client).Metadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := c.get(ctx, project.Namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
 	return convert(result), nil
 }
 
 // Create creates the implicit control plane indentified by the JTW claims.
 func (c *Client) Create(ctx context.Context, request *generated.CreateControlPlane) error {
-	namespace, err := project.NewClient(c.client).Namespace(ctx)
+	project, err := project.NewClient(c.client).Metadata(ctx)
 	if err != nil {
 		return err
 	}
 
-	projectName, err := project.NameFromContext(ctx)
-	if err != nil {
-		return err
+	if !project.Active {
+		return errors.OAuth2InvalidRequest("project is not active")
 	}
 
 	// TODO: common with CLI tools.
 	controlPlane := &unikornv1.ControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      request.Name,
-			Namespace: namespace,
+			Namespace: project.Namespace,
 			Labels: map[string]string{
 				constants.VersionLabel: constants.Version,
-				constants.ProjectLabel: projectName,
+				constants.ProjectLabel: project.Name,
 			},
 		},
 	}
@@ -147,17 +221,20 @@ func (c *Client) Create(ctx context.Context, request *generated.CreateControlPla
 }
 
 // Delete deletes the implicit control plane indentified by the JTW claims.
-func (c *Client) Delete(ctx context.Context, name generated.ControlPlaneParameter) error {
-	namespace, err := project.NewClient(c.client).Namespace(ctx)
+func (c *Client) Delete(ctx context.Context, name generated.ControlPlaneNameParameter) error {
+	project, err := project.NewClient(c.client).Metadata(ctx)
 	if err != nil {
 		return err
 	}
 
-	// TODO: common with CLI tools.
+	if !project.Active {
+		return errors.OAuth2InvalidRequest("project is not active")
+	}
+
 	controlPlane := &unikornv1.ControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: namespace,
+			Namespace: project.Namespace,
 		},
 	}
 

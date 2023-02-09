@@ -76,7 +76,7 @@ func (p *Provisioner) Generate() (client.Object, error) {
 				"project": "default",
 				"source": map[string]interface{}{
 					//TODO:  programmable
-					"repoURL":        "https://helm.cilium.io/",
+					"repoURL":        "https://helm.cilium.io",
 					"chart":          "cilium",
 					"targetRevision": "1.12.4",
 				},

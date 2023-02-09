@@ -26,6 +26,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -55,13 +56,69 @@ func NameFromContext(ctx context.Context) (string, error) {
 	return fmt.Sprintf("unikorn-server-%s", claims.UnikornClaims.Project), nil
 }
 
-// get returns the implicit project identified by the JWT claims.
-func (c *Client) get(ctx context.Context) (*unikornv1.Project, error) {
+// Meta describes the project.
+type Meta struct {
+	// Name is the project's Kubernetes name, so a higher level resource
+	// can reference it.
+	Name string
+
+	// Active defines whether the project is ready to be used: it's not
+	// marked for deletion, and it's active according to the controller.
+	Active bool
+
+	// Namespace is the namespace that is provisioned by the project.
+	// Should be usable set when the project is active.
+	Namespace string
+}
+
+// active returns true if the project is usable.
+func active(p *unikornv1.Project) bool {
+	// Being deleted, don't use.
+	// Takes precedence over condition as there's a delay between the resource
+	// being deleted, and the controller acknoledging it.
+	if p.DeletionTimestamp != nil {
+		return false
+	}
+
+	// Unknown condition, don't use.
+	condition, err := p.LookupCondition(unikornv1.ProjectConditionAvailable)
+	if err != nil {
+		return false
+	}
+
+	// Condition not provisioned, don't use.
+	if condition.Status != corev1.ConditionTrue {
+		return false
+	}
+
+	return true
+}
+
+// Metadata retrieves the project metadata.
+// Clients should consult at least the Active status before doing anything
+// with the project.
+func (c *Client) Metadata(ctx context.Context) (*Meta, error) {
 	name, err := NameFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	result, err := c.get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := &Meta{
+		Name:      name,
+		Active:    active(result),
+		Namespace: result.Status.Namespace,
+	}
+
+	return metadata, nil
+}
+
+// get returns the implicit project identified by the JWT claims.
+func (c *Client) get(ctx context.Context, name string) (*unikornv1.Project, error) {
 	result := &unikornv1.Project{}
 
 	if err := c.client.Get(ctx, client.ObjectKey{Name: name}, result); err != nil {
@@ -72,30 +129,17 @@ func (c *Client) get(ctx context.Context) (*unikornv1.Project, error) {
 		return nil, errors.OAuth2ServerError("failed to get project").WithError(err)
 	}
 
-	return result, err
-}
-
-// Namespace retrieves the project namespace.
-func (c *Client) Namespace(ctx context.Context) (string, error) {
-	result, err := c.get(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if result.DeletionTimestamp != nil {
-		return "", errors.OAuth2InvalidRequest("project is marked for deletion")
-	}
-
-	if result.Status.Namespace == "" {
-		return "", errors.OAuth2ServerError("project namespace not set")
-	}
-
-	return result.Status.Namespace, nil
+	return result, nil
 }
 
 // Get returns the implicit project identified by the JWT claims.
 func (c *Client) Get(ctx context.Context) (*generated.Project, error) {
-	result, err := c.get(ctx)
+	name, err := NameFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := c.get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +197,6 @@ func (c *Client) Delete(ctx context.Context) error {
 		return err
 	}
 
-	// TODO: common with CLI tools.
 	project := &unikornv1.Project{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

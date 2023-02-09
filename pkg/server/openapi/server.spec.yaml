@@ -93,7 +93,7 @@ paths:
       - oauth2Authentication:
         - project
       responses:
-        '200':
+        '202':
           $ref: '#/components/responses/nullResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
@@ -142,10 +142,10 @@ paths:
           $ref: '#/components/responses/conflictResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/controlplanes/{controlPlane}:
+  /api/v1/controlplanes/{controlPlaneName}:
     description: Unikorn control plane services.
     parameters:
-    - $ref: '#/components/parameters/controlPlaneParameter'
+    - $ref: '#/components/parameters/controlPlaneNameParameter'
     get:
       description: |-
         Gets a Unikorn control plane from within the selected Unikorn project.
@@ -202,10 +202,10 @@ paths:
           $ref: '#/components/responses/notFoundResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/controlplanes/{controlPlane}/clusters:
+  /api/v1/controlplanes/{controlPlaneName}/clusters:
     description: Unikorn cluster services.
     parameters:
-    - $ref: '#/components/parameters/controlPlaneParameter'
+    - $ref: '#/components/parameters/controlPlaneNameParameter'
     get:
       description: |-
         List all Unikorn clusters within the selected Unikorn control plane.
@@ -214,7 +214,7 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/kubernetesClustersResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -230,7 +230,7 @@ paths:
       - oauth2Authentication:
         - project
       requestBody:
-        $ref: "#/components/requestBodies/nullRequest"
+        $ref: "#/components/requestBodies/createKubernetesClusterRequest"
       responses:
         '202':
           $ref: '#/components/responses/acceptedResponse'
@@ -242,11 +242,11 @@ paths:
           $ref: '#/components/responses/conflictResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/controlplanes/{controlPlane}/clusters/{cluster}:
+  /api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName}:
     description: Unikorn cluster services.
     parameters:
-    - $ref: '#/components/parameters/controlPlaneParameter'
-    - $ref: '#/components/parameters/clusterParameter'
+    - $ref: '#/components/parameters/controlPlaneNameParameter'
+    - $ref: '#/components/parameters/clusterNameParameter'
     get:
       description: |-
         Get a Unikorn cluster from within the selected Unikorn control plane.
@@ -255,7 +255,7 @@ paths:
         - project
       responses:
         '200':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/kubernetesClusterResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -484,15 +484,15 @@ paths:
           $ref: '#/components/responses/internalServerErrorResponse'
 components:
   parameters:
-    controlPlaneParameter:
-      name: controlPlane
+    controlPlaneNameParameter:
+      name: controlPlaneName
       in: path
       description: The Unikorn control plane name.
       required: true
       schema:
         $ref: '#/components/schemas/stringParameter'
-    clusterParameter:
-      name: cluster
+    clusterNameParameter:
+      name: clusterName
       in: path
       description: The Unikorn cluster name.
       required: true
@@ -565,17 +565,17 @@ components:
       type: object
       required:
       - name
-      - creation_time
+      - creation-time
       - status
       properties:
         name:
           description: The name of the resource.
           type: string
-        creation_time:
+        creation-time:
           description: The time the resource was created.
           type: string
           format: date-time
-        deletion_time:
+        deletion-time:
           description: The time the resource was deleted.
           type: string
           format: date-time
@@ -596,17 +596,17 @@ components:
       type: object
       required:
       - name
-      - creation_time
+      - creation-time
       - status
       properties:
         name:
           description: The name of the resource.
           type: string
-        creation_time:
+        creation-time:
           description: The time the resource was created.
           type: string
           format: date-time
-        deletion_time:
+        deletion-time:
           description: The time a control plane was deleted.
           type: string
           format: date-time
@@ -618,6 +618,243 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/controlPlane'
+    kubernetesClusterOpenstack:
+      description: Unikorn Kubernetes cluster creation Openstack parameters.
+      type: object
+      required:
+      - application-credential-id
+      - application-credential-secret
+      - compute-availability-zone
+      - volume-availability-zone
+      - external-network-id
+      properties:
+        application-credential-id:
+          description: Application credential ID.
+          type: string
+          writeOnly: true
+        application-credential-secret:
+          description: Application credential secret.
+          type: string
+          writeOnly: true
+        compute-availability-zone:
+          description: Compute availability zone for control plane, and workload pool default.
+          type: string
+        volume-availability-zone:
+          description: Volume availability zone for control plane, and workload pool default.
+          type: string
+        external-network-id:
+          description: Openstack external network ID.
+          type: string
+        ssh-key-name:
+          description: Openstack SSH Key to install on all machines.
+          type: string
+    kubernetesClusterNetwork:
+      description: A kubernetes cluster network settings.
+      required:
+      - node-prefix
+      - service-prefix
+      - pod-prefix
+      - dns-nameservers
+      properties:
+        node-prefix:
+          description: Network prefix to provision nodes in.
+          type: string
+        service-prefix:
+          description: Network prefix to provision services in.
+          type: string
+        pod-prefix:
+          description: Network prefix to provision pods in.
+          type: string
+        dns-nameservers:
+          description: A list of DNS name server to use.
+          type: array
+          items:
+            description: A DNS nameserver address.
+            type: string
+    kubernetesClusterAPI:
+      description: Kubernetes API settings.
+      properties:
+        subject-alternative-names:
+          description: Set of non-standard X.509 SANs to add to the API certificate.
+          type: array
+          minItems: 1
+          items:
+            description: An X.509 SAN.
+            type: string
+        allowed-prefixes:
+          description: Set of address prefixes to allow access to the Kubernetes API.
+          type: array
+          minItems: 1
+          items:
+            description: An IPv4 CIDR address prefix.
+            type: string
+    openstackVolume:
+      description: An Openstack volume.
+      type: object
+      required:
+      - size
+      properties:
+        size:
+          description: Disk size in GiB.
+          type: integer
+        availability-zone:
+          description: Volume availability zone.
+          type: string
+    openstackMachinePool:
+      description: A Kubernetes cluster machine.
+      type: object
+      required:
+      - replicas
+      - version
+      - image-name
+      - flavor-name
+      properties:
+        replicas:
+          description: Number of machines.
+          type: integer
+        version:
+          description: Kubernetes version.
+          type: string
+        image-name:
+          description: Openstack image name.
+          type: string
+        flavor-name:
+          description: Openstack flavor name.
+          type: string
+        disk:
+          $ref: '#/components/schemas/openstackVolume'
+    gpu:
+      description: GPU related autoscaling configuration.
+      type: object
+      required:
+      - type
+      - count
+      properties:
+        type:
+          description: The GPU type.
+          type: string
+        count:
+          description: The number of GPUs.
+          type: integer
+    kubernetesClusterAutoscalingScheduler:
+      description: Scheduling hints for scale-from-zero.
+      type: object
+      required:
+      - cpus
+      - memory
+      properties:
+        cpus:
+          description: The number of CPUs defined for the workload pool flavor.
+          type: integer
+        memory:
+          description: The amount of memory defind for the workload pool flavor in GiB.
+          type: integer
+        gpu:
+          $ref: '#/components/schemas/gpu'
+    kubernetesClusterAutoscaling:
+      description: A Kubernetes cluster workload pool autoscaling configuration.
+      type: object
+      required:
+      - minimum-replicas
+      - maximum-replicas
+      properties:
+        minimum-replicas:
+          description: The minimum number of replicas to allow.
+          type: integer
+        maximum-replicas:
+          description: The maximum number of replicas to allow.
+          type: integer
+        scheduler:
+          $ref: '#/components/schemas/kubernetesClusterAutoscalingScheduler'
+    kubernetesClusterWorkloadPool:
+      description: A Kuberntes cluster workload pool.
+      type: object
+      required:
+      - name
+      - machine
+      properties:
+        name:
+          description: Workload pool name.
+          type: string
+        machine:
+          $ref: '#/components/schemas/openstackMachinePool'
+        availability-zone:
+          description: Workload pool availability zone.
+          type: string
+        labels:
+          description: Workload pool labels to apply on node creation.
+          type: object
+          additionalProperties:
+            description: A string value.
+            type: string
+        auto-scaling:
+          $ref: '#/components/schemas/kubernetesClusterAutoscaling'
+    kubernetesClusterWorkloadPools:
+      description: A non-empty list of Kubernetes cluster workload pools.
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/components/schemas/kubernetesClusterWorkloadPool'
+    kubernetesClusterFeatures:
+      description: A set of optional add on features for the cluster.
+      properties:
+        auto-scaling:
+          description: Enable auto-scaling
+          type: boolean
+    kubernetesClusterStatus:
+      description: A Unikorn Kubernetes cluster status.
+      type: object
+      required:
+      - name
+      - creation-time
+      - status
+      properties:
+        name:
+          description: The name of the resource.
+          type: string
+        creation-time:
+          description: The time the resource was created.
+          type: string
+          format: date-time
+        deletion-time:
+          description: The time a control plane was deleted.
+          type: string
+          format: date-time
+        status:
+          description: The current status of the resource.
+          type: string
+    kubernetesCluster:
+      description: Unikorn Kubernetes cluster creation parameters.
+      type: object
+      required:
+      - name
+      - openstack
+      - network
+      - control-plane
+      - workload-pools
+      properties:
+        name:
+          description: Cluster name.
+          type: string
+        openstack:
+          $ref: '#/components/schemas/kubernetesClusterOpenstack'
+        network:
+          $ref: '#/components/schemas/kubernetesClusterNetwork'
+        api:
+          $ref: '#/components/schemas/kubernetesClusterAPI'
+        control-plane:
+          $ref: '#/components/schemas/openstackMachinePool'
+        workload-pools:
+          $ref: '#/components/schemas/kubernetesClusterWorkloadPools'
+        features:
+          $ref: '#/components/schemas/kubernetesClusterFeatures'
+        status:
+          $ref: '#/components/schemas/kubernetesClusterStatus'
+    kubernetesClusters:
+      description: A list of Unikorn Kubernetes clusters.
+      type: array
+      items:
+        $ref: '#/components/schemas/kubernetesCluster'
     openstackProject:
       description: An Openstack project.
       type: object
@@ -693,12 +930,12 @@ components:
           type: object
           required:
           - kubernetes
-          - nvidia_driver
+          - nvidia-driver
           properties:
             kubernetes:
               description: The kubernetes semantic version.
               type: string
-            nvidia_driver:
+            nvidia-driver:
               description: The nvidia driver version.
               type: string
     openstackImages:
@@ -803,6 +1040,13 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/createControlPlane'
+    createKubernetesClusterRequest:
+      description: Unikorn Kubernetes cluster parameters.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/kubernetesCluster'
     nullRequest:
       description: Delete me
       content: {}
@@ -863,6 +1107,18 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/controlPlanes'
+    kubernetesClusterResponse:
+      description: A Unikorn Kubernetes cluster.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/kubernetesCluster'
+    kubernetesClustersResponse:
+      description: A list of Unikorn Kubernetes clusters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/kubernetesClusters'
     openstackProjectsResponse:
       description: A list of Openstack projects.
       content:

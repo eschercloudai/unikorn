@@ -81,7 +81,12 @@ const (
 func (i *JWTIssuer) AddFlags(f *pflag.FlagSet) {
 	f.StringVar(&i.tLSKeyPath, "jose-tls-key", tlsKeyPathDefault, "TLS key used to sign JWS and decrypt JWE.")
 	f.StringVar(&i.tLSCertPath, "jose-tls-cert", tlsCertPathDefault, "TLS cert used to verify JWS and encrypt JWE.")
-	f.DurationVar(&i.duration, "token-expiry-duration", time.Hour, "JWT expiry duration")
+	// TODO: this was 1h, because access tokens should be short-lived so their
+	// window of opportunity--if stolen--is short.  However it's annoying.  In
+	// future we should issue a long-lived single-use refresh token.  This is
+	// deemed more secure as it's exposed to the network nowhere near as much,
+	// i.e, twice.
+	f.DurationVar(&i.duration, "token-expiry-duration", 24*time.Hour, "JWT expiry duration")
 }
 
 // GetKeyPair returns the public and private key from the configuration data.
@@ -176,6 +181,9 @@ func (l *ScopeList) UnmarshalJSON(value []byte) error {
 }
 
 // UnikornClaims are JWT claims we add to the underlying specification.
+// TODO: we should bind the access token to a specific client IP (and
+// validate), or something to that effect in order to mitigate impersonation
+// from another source.
 type UnikornClaims struct {
 	// Token is the OpenStack Keystone token.
 	Token string `json:"unikorn:token:keystone,omitempty"`

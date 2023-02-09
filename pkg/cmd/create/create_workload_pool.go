@@ -40,8 +40,6 @@ import (
 
 const (
 	defaultWorkloadReplicas = 3
-
-	nvidiaGPUType = "nvidia.com/gpu"
 )
 
 // createWorkloadPoolOptions defines a set of options that are required to create
@@ -187,7 +185,7 @@ func (o *createWorkloadPoolOptions) applyAutoscaling(workloadPool *unikornv1alph
 	}
 
 	if ok {
-		gpuType := nvidiaGPUType
+		gpuType := constants.NvidiaGPUType
 
 		workloadPool.Spec.Autoscaling.Scheduler.GPU = &unikornv1alpha1.MachineGenericAutoscalingSchedulerGPU{
 			Type:  &gpuType,
