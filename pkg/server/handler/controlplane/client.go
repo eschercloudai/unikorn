@@ -112,17 +112,19 @@ func (c *Client) Metadata(ctx context.Context, name string) (*Meta, error) {
 // convert converts from Kubernetes into OpenAPI types.
 func convert(in *unikornv1.ControlPlane) *generated.ControlPlane {
 	out := &generated.ControlPlane{
-		Name:         in.Name,
-		CreationTime: in.CreationTimestamp.Time,
-		Status:       "Unknown",
+		Status: &generated.KubernetesResourceStatus{
+			Name:         in.Name,
+			CreationTime: in.CreationTimestamp.Time,
+			Status:       "Unknown",
+		},
 	}
 
 	if in.DeletionTimestamp != nil {
-		out.DeletionTime = &in.DeletionTimestamp.Time
+		out.Status.DeletionTime = &in.DeletionTimestamp.Time
 	}
 
 	if condition, err := in.LookupCondition(unikornv1.ControlPlaneConditionAvailable); err == nil {
-		out.Status = string(condition.Reason)
+		out.Status.Status = string(condition.Reason)
 	}
 
 	return out

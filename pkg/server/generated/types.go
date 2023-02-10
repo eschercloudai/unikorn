@@ -34,17 +34,8 @@ type ApplicationCredentialOptions struct {
 
 // ControlPlane A Unikorn control plane.
 type ControlPlane struct {
-	// CreationTime The time the resource was created.
-	CreationTime time.Time `json:"creation-time"`
-
-	// DeletionTime The time a control plane was deleted.
-	DeletionTime *time.Time `json:"deletion-time,omitempty"`
-
-	// Name The name of the resource.
-	Name string `json:"name"`
-
-	// Status The current status of the resource.
-	Status string `json:"status"`
+	// Status A Kubernetes resource status.
+	Status *KubernetesResourceStatus `json:"status,omitempty"`
 }
 
 // ControlPlanes A list of Unikorn control planes.
@@ -71,7 +62,7 @@ type KubernetesCluster struct {
 	Api *KubernetesClusterAPI `json:"api,omitempty"`
 
 	// ControlPlane A Kubernetes cluster machine.
-	ControlPlane OpenstackMachinePool `json:"control-plane"`
+	ControlPlane OpenstackMachinePool `json:"controlPlane"`
 
 	// Features A set of optional add on features for the cluster.
 	Features *KubernetesClusterFeatures `json:"features,omitempty"`
@@ -85,29 +76,29 @@ type KubernetesCluster struct {
 	// Openstack Unikorn Kubernetes cluster creation Openstack parameters.
 	Openstack KubernetesClusterOpenstack `json:"openstack"`
 
-	// Status A Unikorn Kubernetes cluster status.
-	Status *KubernetesClusterStatus `json:"status,omitempty"`
+	// Status A Kubernetes resource status.
+	Status *KubernetesResourceStatus `json:"status,omitempty"`
 
 	// WorkloadPools A non-empty list of Kubernetes cluster workload pools.
-	WorkloadPools KubernetesClusterWorkloadPools `json:"workload-pools"`
+	WorkloadPools KubernetesClusterWorkloadPools `json:"workloadPools"`
 }
 
 // KubernetesClusterAPI Kubernetes API settings.
 type KubernetesClusterAPI struct {
 	// AllowedPrefixes Set of address prefixes to allow access to the Kubernetes API.
-	AllowedPrefixes *[]string `json:"allowed-prefixes,omitempty"`
+	AllowedPrefixes *[]string `json:"allowedPrefixes,omitempty"`
 
 	// SubjectAlternativeNames Set of non-standard X.509 SANs to add to the API certificate.
-	SubjectAlternativeNames *[]string `json:"subject-alternative-names,omitempty"`
+	SubjectAlternativeNames *[]string `json:"subjectAlternativeNames,omitempty"`
 }
 
 // KubernetesClusterAutoscaling A Kubernetes cluster workload pool autoscaling configuration.
 type KubernetesClusterAutoscaling struct {
 	// MaximumReplicas The maximum number of replicas to allow.
-	MaximumReplicas int `json:"maximum-replicas"`
+	MaximumReplicas int `json:"maximumReplicas"`
 
 	// MinimumReplicas The minimum number of replicas to allow.
-	MinimumReplicas int `json:"minimum-replicas"`
+	MinimumReplicas int `json:"minimumReplicas"`
 
 	// Scheduler Scheduling hints for scale-from-zero.
 	Scheduler *KubernetesClusterAutoscalingScheduler `json:"scheduler,omitempty"`
@@ -127,68 +118,53 @@ type KubernetesClusterAutoscalingScheduler struct {
 
 // KubernetesClusterFeatures A set of optional add on features for the cluster.
 type KubernetesClusterFeatures struct {
-	// AutoScaling Enable auto-scaling
-	AutoScaling *bool `json:"auto-scaling,omitempty"`
+	// Autoscaling Enable auto-scaling
+	Autoscaling *bool `json:"autoscaling,omitempty"`
 }
 
 // KubernetesClusterNetwork A kubernetes cluster network settings.
 type KubernetesClusterNetwork struct {
 	// DnsNameservers A list of DNS name server to use.
-	DnsNameservers []string `json:"dns-nameservers"`
+	DnsNameservers []string `json:"dnsNameservers"`
 
 	// NodePrefix Network prefix to provision nodes in.
-	NodePrefix string `json:"node-prefix"`
+	NodePrefix string `json:"nodePrefix"`
 
 	// PodPrefix Network prefix to provision pods in.
-	PodPrefix string `json:"pod-prefix"`
+	PodPrefix string `json:"podPrefix"`
 
 	// ServicePrefix Network prefix to provision services in.
-	ServicePrefix string `json:"service-prefix"`
+	ServicePrefix string `json:"servicePrefix"`
 }
 
 // KubernetesClusterOpenstack Unikorn Kubernetes cluster creation Openstack parameters.
 type KubernetesClusterOpenstack struct {
-	// ApplicationCredentialId Application credential ID.
-	ApplicationCredentialId *string `json:"application-credential-id,omitempty"`
+	// ApplicationCredentialID Application credential ID.
+	ApplicationCredentialID *string `json:"applicationCredentialID,omitempty"`
 
 	// ApplicationCredentialSecret Application credential secret.
-	ApplicationCredentialSecret *string `json:"application-credential-secret,omitempty"`
+	ApplicationCredentialSecret *string `json:"applicationCredentialSecret,omitempty"`
 
 	// ComputeAvailabilityZone Compute availability zone for control plane, and workload pool default.
-	ComputeAvailabilityZone string `json:"compute-availability-zone"`
+	ComputeAvailabilityZone string `json:"computeAvailabilityZone"`
 
-	// ExternalNetworkId Openstack external network ID.
-	ExternalNetworkId string `json:"external-network-id"`
+	// ExternalNetworkID Openstack external network ID.
+	ExternalNetworkID string `json:"externalNetworkID"`
 
 	// SshKeyName Openstack SSH Key to install on all machines.
-	SshKeyName *string `json:"ssh-key-name,omitempty"`
+	SshKeyName *string `json:"sshKeyName,omitempty"`
 
 	// VolumeAvailabilityZone Volume availability zone for control plane, and workload pool default.
-	VolumeAvailabilityZone string `json:"volume-availability-zone"`
-}
-
-// KubernetesClusterStatus A Unikorn Kubernetes cluster status.
-type KubernetesClusterStatus struct {
-	// CreationTime The time the resource was created.
-	CreationTime time.Time `json:"creation-time"`
-
-	// DeletionTime The time a control plane was deleted.
-	DeletionTime *time.Time `json:"deletion-time,omitempty"`
-
-	// Name The name of the resource.
-	Name string `json:"name"`
-
-	// Status The current status of the resource.
-	Status string `json:"status"`
+	VolumeAvailabilityZone string `json:"volumeAvailabilityZone"`
 }
 
 // KubernetesClusterWorkloadPool A Kuberntes cluster workload pool.
 type KubernetesClusterWorkloadPool struct {
-	// AutoScaling A Kubernetes cluster workload pool autoscaling configuration.
-	AutoScaling *KubernetesClusterAutoscaling `json:"auto-scaling,omitempty"`
+	// Autoscaling A Kubernetes cluster workload pool autoscaling configuration.
+	Autoscaling *KubernetesClusterAutoscaling `json:"autoscaling,omitempty"`
 
 	// AvailabilityZone Workload pool availability zone.
-	AvailabilityZone *string `json:"availability-zone,omitempty"`
+	AvailabilityZone *string `json:"availabilityZone,omitempty"`
 
 	// Labels Workload pool labels to apply on node creation.
 	Labels *map[string]string `json:"labels,omitempty"`
@@ -205,6 +181,21 @@ type KubernetesClusterWorkloadPools = []KubernetesClusterWorkloadPool
 
 // KubernetesClusters A list of Unikorn Kubernetes clusters.
 type KubernetesClusters = []KubernetesCluster
+
+// KubernetesResourceStatus A Kubernetes resource status.
+type KubernetesResourceStatus struct {
+	// CreationTime The time the resource was created.
+	CreationTime time.Time `json:"creationTime"`
+
+	// DeletionTime The time a control plane was deleted.
+	DeletionTime *time.Time `json:"deletionTime,omitempty"`
+
+	// Name The name of the resource.
+	Name string `json:"name"`
+
+	// Status The current status of the resource.
+	Status string `json:"status"`
+}
 
 // Oauth2Error Generic error message.
 type Oauth2Error struct {
@@ -291,7 +282,7 @@ type OpenstackImage struct {
 		Kubernetes string `json:"kubernetes"`
 
 		// NvidiaDriver The nvidia driver version.
-		NvidiaDriver string `json:"nvidia-driver"`
+		NvidiaDriver string `json:"nvidiaDriver"`
 	} `json:"versions"`
 }
 
@@ -313,10 +304,10 @@ type OpenstackMachinePool struct {
 	Disk *OpenstackVolume `json:"disk,omitempty"`
 
 	// FlavorName Openstack flavor name.
-	FlavorName string `json:"flavor-name"`
+	FlavorName string `json:"flavorName"`
 
 	// ImageName Openstack image name.
-	ImageName string `json:"image-name"`
+	ImageName string `json:"imageName"`
 
 	// Replicas Number of machines.
 	Replicas int `json:"replicas"`
@@ -343,7 +334,7 @@ type OpenstackProjects = []OpenstackProject
 // OpenstackVolume An Openstack volume.
 type OpenstackVolume struct {
 	// AvailabilityZone Volume availability zone.
-	AvailabilityZone *string `json:"availability-zone,omitempty"`
+	AvailabilityZone *string `json:"availabilityZone,omitempty"`
 
 	// Size Disk size in GiB.
 	Size int `json:"size"`
@@ -351,17 +342,8 @@ type OpenstackVolume struct {
 
 // Project A Unikorn project.
 type Project struct {
-	// CreationTime The time the resource was created.
-	CreationTime time.Time `json:"creation-time"`
-
-	// DeletionTime The time the resource was deleted.
-	DeletionTime *time.Time `json:"deletion-time,omitempty"`
-
-	// Name The name of the resource.
-	Name string `json:"name"`
-
-	// Status The current status of the resource.
-	Status string `json:"status"`
+	// Status A Kubernetes resource status.
+	Status *KubernetesResourceStatus `json:"status,omitempty"`
 }
 
 // StringParameter A basic string parameter.
