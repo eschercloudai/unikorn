@@ -27,29 +27,29 @@ type ServerInterface interface {
 	// (POST /api/v1/controlplanes)
 	PostApiV1Controlplanes(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v1/controlplanes/{controlPlane})
-	DeleteApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
+	// (DELETE /api/v1/controlplanes/{controlPlaneName})
+	DeleteApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request, controlPlaneName ControlPlaneNameParameter)
 
-	// (GET /api/v1/controlplanes/{controlPlane})
-	GetApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
+	// (GET /api/v1/controlplanes/{controlPlaneName})
+	GetApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request, controlPlaneName ControlPlaneNameParameter)
 
-	// (PUT /api/v1/controlplanes/{controlPlane})
-	PutApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
+	// (PUT /api/v1/controlplanes/{controlPlaneName})
+	PutApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request, controlPlaneName ControlPlaneNameParameter)
 
-	// (GET /api/v1/controlplanes/{controlPlane}/clusters)
-	GetApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
+	// (GET /api/v1/controlplanes/{controlPlaneName}/clusters)
+	GetApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request, controlPlaneName ControlPlaneNameParameter)
 
-	// (POST /api/v1/controlplanes/{controlPlane}/clusters)
-	PostApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter)
+	// (POST /api/v1/controlplanes/{controlPlaneName}/clusters)
+	PostApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request, controlPlaneName ControlPlaneNameParameter)
 
-	// (DELETE /api/v1/controlplanes/{controlPlane}/clusters/{cluster})
-	DeleteApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter, cluster ClusterParameter)
+	// (DELETE /api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName})
+	DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName ControlPlaneNameParameter, clusterName ClusterNameParameter)
 
-	// (GET /api/v1/controlplanes/{controlPlane}/clusters/{cluster})
-	GetApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter, cluster ClusterParameter)
+	// (GET /api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName})
+	GetApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName ControlPlaneNameParameter, clusterName ClusterNameParameter)
 
-	// (PUT /api/v1/controlplanes/{controlPlane}/clusters/{cluster})
-	PutApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane ControlPlaneParameter, cluster ClusterParameter)
+	// (PUT /api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName})
+	PutApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName ControlPlaneNameParameter, clusterName ClusterNameParameter)
 
 	// (DELETE /api/v1/project)
 	DeleteApiV1Project(w http.ResponseWriter, r *http.Request)
@@ -168,25 +168,25 @@ func (siw *ServerInterfaceWrapper) PostApiV1Controlplanes(w http.ResponseWriter,
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// DeleteApiV1ControlplanesControlPlane operation middleware
-func (siw *ServerInterfaceWrapper) DeleteApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
+// DeleteApiV1ControlplanesControlPlaneName operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlaneParameter
+	// ------------- Path parameter "controlPlaneName" -------------
+	var controlPlaneName ControlPlaneNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlaneName", runtime.ParamLocationPath, chi.URLParam(r, "controlPlaneName"), &controlPlaneName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlane", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlaneName", Err: err})
 		return
 	}
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteApiV1ControlplanesControlPlane(w, r, controlPlane)
+		siw.Handler.DeleteApiV1ControlplanesControlPlaneName(w, r, controlPlaneName)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -196,25 +196,25 @@ func (siw *ServerInterfaceWrapper) DeleteApiV1ControlplanesControlPlane(w http.R
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ControlplanesControlPlane operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ControlplanesControlPlaneName operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlaneParameter
+	// ------------- Path parameter "controlPlaneName" -------------
+	var controlPlaneName ControlPlaneNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlaneName", runtime.ParamLocationPath, chi.URLParam(r, "controlPlaneName"), &controlPlaneName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlane", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlaneName", Err: err})
 		return
 	}
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ControlplanesControlPlane(w, r, controlPlane)
+		siw.Handler.GetApiV1ControlplanesControlPlaneName(w, r, controlPlaneName)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -224,25 +224,25 @@ func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlane(w http.Resp
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// PutApiV1ControlplanesControlPlane operation middleware
-func (siw *ServerInterfaceWrapper) PutApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request) {
+// PutApiV1ControlplanesControlPlaneName operation middleware
+func (siw *ServerInterfaceWrapper) PutApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlaneParameter
+	// ------------- Path parameter "controlPlaneName" -------------
+	var controlPlaneName ControlPlaneNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlaneName", runtime.ParamLocationPath, chi.URLParam(r, "controlPlaneName"), &controlPlaneName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlane", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlaneName", Err: err})
 		return
 	}
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutApiV1ControlplanesControlPlane(w, r, controlPlane)
+		siw.Handler.PutApiV1ControlplanesControlPlaneName(w, r, controlPlaneName)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -252,25 +252,25 @@ func (siw *ServerInterfaceWrapper) PutApiV1ControlplanesControlPlane(w http.Resp
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ControlplanesControlPlaneClusters operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ControlplanesControlPlaneNameClusters operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlaneParameter
+	// ------------- Path parameter "controlPlaneName" -------------
+	var controlPlaneName ControlPlaneNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlaneName", runtime.ParamLocationPath, chi.URLParam(r, "controlPlaneName"), &controlPlaneName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlane", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlaneName", Err: err})
 		return
 	}
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ControlplanesControlPlaneClusters(w, r, controlPlane)
+		siw.Handler.GetApiV1ControlplanesControlPlaneNameClusters(w, r, controlPlaneName)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -280,25 +280,25 @@ func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneClusters(w h
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// PostApiV1ControlplanesControlPlaneClusters operation middleware
-func (siw *ServerInterfaceWrapper) PostApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request) {
+// PostApiV1ControlplanesControlPlaneNameClusters operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlaneParameter
+	// ------------- Path parameter "controlPlaneName" -------------
+	var controlPlaneName ControlPlaneNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlaneName", runtime.ParamLocationPath, chi.URLParam(r, "controlPlaneName"), &controlPlaneName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlane", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlaneName", Err: err})
 		return
 	}
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiV1ControlplanesControlPlaneClusters(w, r, controlPlane)
+		siw.Handler.PostApiV1ControlplanesControlPlaneNameClusters(w, r, controlPlaneName)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -308,34 +308,34 @@ func (siw *ServerInterfaceWrapper) PostApiV1ControlplanesControlPlaneClusters(w 
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// DeleteApiV1ControlplanesControlPlaneClustersCluster operation middleware
-func (siw *ServerInterfaceWrapper) DeleteApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
+// DeleteApiV1ControlplanesControlPlaneNameClustersClusterName operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlaneParameter
+	// ------------- Path parameter "controlPlaneName" -------------
+	var controlPlaneName ControlPlaneNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlaneName", runtime.ParamLocationPath, chi.URLParam(r, "controlPlaneName"), &controlPlaneName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlane", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlaneName", Err: err})
 		return
 	}
 
-	// ------------- Path parameter "cluster" -------------
-	var cluster ClusterParameter
+	// ------------- Path parameter "clusterName" -------------
+	var clusterName ClusterNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "cluster", runtime.ParamLocationPath, chi.URLParam(r, "cluster"), &cluster)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "clusterName", runtime.ParamLocationPath, chi.URLParam(r, "clusterName"), &clusterName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clusterName", Err: err})
 		return
 	}
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteApiV1ControlplanesControlPlaneClustersCluster(w, r, controlPlane, cluster)
+		siw.Handler.DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w, r, controlPlaneName, clusterName)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -345,34 +345,34 @@ func (siw *ServerInterfaceWrapper) DeleteApiV1ControlplanesControlPlaneClustersC
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ControlplanesControlPlaneClustersCluster operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ControlplanesControlPlaneNameClustersClusterName operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlaneParameter
+	// ------------- Path parameter "controlPlaneName" -------------
+	var controlPlaneName ControlPlaneNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlaneName", runtime.ParamLocationPath, chi.URLParam(r, "controlPlaneName"), &controlPlaneName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlane", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlaneName", Err: err})
 		return
 	}
 
-	// ------------- Path parameter "cluster" -------------
-	var cluster ClusterParameter
+	// ------------- Path parameter "clusterName" -------------
+	var clusterName ClusterNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "cluster", runtime.ParamLocationPath, chi.URLParam(r, "cluster"), &cluster)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "clusterName", runtime.ParamLocationPath, chi.URLParam(r, "clusterName"), &clusterName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clusterName", Err: err})
 		return
 	}
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ControlplanesControlPlaneClustersCluster(w, r, controlPlane, cluster)
+		siw.Handler.GetApiV1ControlplanesControlPlaneNameClustersClusterName(w, r, controlPlaneName, clusterName)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -382,34 +382,34 @@ func (siw *ServerInterfaceWrapper) GetApiV1ControlplanesControlPlaneClustersClus
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// PutApiV1ControlplanesControlPlaneClustersCluster operation middleware
-func (siw *ServerInterfaceWrapper) PutApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request) {
+// PutApiV1ControlplanesControlPlaneNameClustersClusterName operation middleware
+func (siw *ServerInterfaceWrapper) PutApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
-	// ------------- Path parameter "controlPlane" -------------
-	var controlPlane ControlPlaneParameter
+	// ------------- Path parameter "controlPlaneName" -------------
+	var controlPlaneName ControlPlaneNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlane", runtime.ParamLocationPath, chi.URLParam(r, "controlPlane"), &controlPlane)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "controlPlaneName", runtime.ParamLocationPath, chi.URLParam(r, "controlPlaneName"), &controlPlaneName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlane", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controlPlaneName", Err: err})
 		return
 	}
 
-	// ------------- Path parameter "cluster" -------------
-	var cluster ClusterParameter
+	// ------------- Path parameter "clusterName" -------------
+	var clusterName ClusterNameParameter
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "cluster", runtime.ParamLocationPath, chi.URLParam(r, "cluster"), &cluster)
+	err = runtime.BindStyledParameterWithLocation("simple", false, "clusterName", runtime.ParamLocationPath, chi.URLParam(r, "clusterName"), &clusterName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cluster", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clusterName", Err: err})
 		return
 	}
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutApiV1ControlplanesControlPlaneClustersCluster(w, r, controlPlane, cluster)
+		siw.Handler.PutApiV1ControlplanesControlPlaneNameClustersClusterName(w, r, controlPlaneName, clusterName)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -788,28 +788,28 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/controlplanes", wrapper.PostApiV1Controlplanes)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/api/v1/controlplanes/{controlPlane}", wrapper.DeleteApiV1ControlplanesControlPlane)
+		r.Delete(options.BaseURL+"/api/v1/controlplanes/{controlPlaneName}", wrapper.DeleteApiV1ControlplanesControlPlaneName)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlane}", wrapper.GetApiV1ControlplanesControlPlane)
+		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlaneName}", wrapper.GetApiV1ControlplanesControlPlaneName)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/api/v1/controlplanes/{controlPlane}", wrapper.PutApiV1ControlplanesControlPlane)
+		r.Put(options.BaseURL+"/api/v1/controlplanes/{controlPlaneName}", wrapper.PutApiV1ControlplanesControlPlaneName)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters", wrapper.GetApiV1ControlplanesControlPlaneClusters)
+		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlaneName}/clusters", wrapper.GetApiV1ControlplanesControlPlaneNameClusters)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters", wrapper.PostApiV1ControlplanesControlPlaneClusters)
+		r.Post(options.BaseURL+"/api/v1/controlplanes/{controlPlaneName}/clusters", wrapper.PostApiV1ControlplanesControlPlaneNameClusters)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.DeleteApiV1ControlplanesControlPlaneClustersCluster)
+		r.Delete(options.BaseURL+"/api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName}", wrapper.DeleteApiV1ControlplanesControlPlaneNameClustersClusterName)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.GetApiV1ControlplanesControlPlaneClustersCluster)
+		r.Get(options.BaseURL+"/api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName}", wrapper.GetApiV1ControlplanesControlPlaneNameClustersClusterName)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/api/v1/controlplanes/{controlPlane}/clusters/{cluster}", wrapper.PutApiV1ControlplanesControlPlaneClustersCluster)
+		r.Put(options.BaseURL+"/api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName}", wrapper.PutApiV1ControlplanesControlPlaneNameClustersClusterName)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/project", wrapper.DeleteApiV1Project)

@@ -29,7 +29,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -120,34 +119,53 @@ func (p *Provisioner) generateMachineHelmValues(machine *unikornv1alpha1.Machine
 // By default that's all the things, in reality most sane people will add label
 // selectors.
 func getWorkloadPools(ctx context.Context, c client.Client, cluster *unikornv1alpha1.KubernetesCluster) (*unikornv1alpha1.KubernetesWorkloadPoolList, error) {
-	selector := labels.Everything()
+	// No workload pools at all.
+	if cluster.Spec.WorkloadPools == nil {
+		//nolint:nilnil
+		return nil, nil
+	}
 
-	if cluster.Spec.WorkloadPools != nil && cluster.Spec.WorkloadPools.Selector != nil {
-		s, err := metav1.LabelSelectorAsSelector(cluster.Spec.WorkloadPools.Selector)
+	// When using selector based pools, just list them.
+	if cluster.Spec.WorkloadPools.Selector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(cluster.Spec.WorkloadPools.Selector)
 		if err != nil {
 			return nil, err
 		}
 
-		selector = s
+		workloadPools := &unikornv1alpha1.KubernetesWorkloadPoolList{}
+
+		if err := c.List(ctx, workloadPools, &client.ListOptions{LabelSelector: selector}); err != nil {
+			return nil, err
+		}
+
+		// The inherent problem here is a race condition, with us picking something up
+		// even though it's marked for deletion, so it stays around.
+		filtered := &unikornv1alpha1.KubernetesWorkloadPoolList{}
+
+		for _, pool := range workloadPools.Items {
+			if pool.DeletionTimestamp == nil {
+				filtered.Items = append(filtered.Items, pool)
+			}
+		}
+
+		return filtered, nil
 	}
 
+	// Otherwise we are using inline pools.
 	workloadPools := &unikornv1alpha1.KubernetesWorkloadPoolList{}
 
-	if err := c.List(ctx, workloadPools, &client.ListOptions{LabelSelector: selector}); err != nil {
-		return nil, err
-	}
-
-	// The inherent problem here is a race condition, with us picking something up
-	// even though it's marked for deletion, so it stays around.
-	filtered := &unikornv1alpha1.KubernetesWorkloadPoolList{}
-
-	for _, pool := range workloadPools.Items {
-		if pool.DeletionTimestamp == nil {
-			filtered.Items = append(filtered.Items, pool)
+	for _, pool := range cluster.Spec.WorkloadPools.Pools {
+		workloadPool := unikornv1alpha1.KubernetesWorkloadPool{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: pool.Name,
+			},
+			Spec: pool.KubernetesWorkloadPoolSpec,
 		}
+
+		workloadPools.Items = append(workloadPools.Items, workloadPool)
 	}
 
-	return filtered, nil
+	return workloadPools, nil
 }
 
 // generateWorkloadPoolHelmValues translates the API's idea of a workload pool into

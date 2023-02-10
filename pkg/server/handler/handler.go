@@ -23,6 +23,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/cluster"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/providers"
@@ -139,8 +140,8 @@ func (h *Handler) PostApiV1Controlplanes(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h *Handler) DeleteApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
-	if err := controlplane.NewClient(h.client).Delete(r.Context(), controlPlane); err != nil {
+func (h *Handler) DeleteApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
+	if err := controlplane.NewClient(h.client).Delete(r.Context(), controlPlaneName); err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
@@ -148,8 +149,8 @@ func (h *Handler) DeleteApiV1ControlplanesControlPlane(w http.ResponseWriter, r 
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h *Handler) GetApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
-	result, err := controlplane.NewClient(h.client).Get(r.Context(), controlPlane)
+func (h *Handler) GetApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
+	result, err := controlplane.NewClient(h.client).Get(r.Context(), controlPlaneName)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -158,22 +159,55 @@ func (h *Handler) GetApiV1ControlplanesControlPlane(w http.ResponseWriter, r *ht
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
-func (h *Handler) PutApiV1ControlplanesControlPlane(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
+func (h *Handler) PutApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
 }
 
-func (h *Handler) GetApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
+func (h *Handler) GetApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
+	result, err := cluster.NewClient(h.client, h.authenticator.Endpoint()).List(r.Context(), controlPlaneName)
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
-func (h *Handler) PostApiV1ControlplanesControlPlaneClusters(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter) {
+func (h *Handler) PostApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
+	request := &generated.KubernetesCluster{}
+
+	if err := util.ReadJSONBody(r, request); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	if err := cluster.NewClient(h.client, h.authenticator.Endpoint()).Create(r.Context(), controlPlaneName, request); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h *Handler) DeleteApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter, cluster generated.ClusterParameter) {
+func (h *Handler) DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
+	if err := cluster.NewClient(h.client, h.authenticator.Endpoint()).Delete(r.Context(), controlPlaneName, clusterName); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h *Handler) GetApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter, cluster generated.ClusterParameter) {
+func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
+	result, err := cluster.NewClient(h.client, h.authenticator.Endpoint()).Get(r.Context(), controlPlaneName, clusterName)
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
-func (h *Handler) PutApiV1ControlplanesControlPlaneClustersCluster(w http.ResponseWriter, r *http.Request, controlPlane generated.ControlPlaneParameter, cluster generated.ClusterParameter) {
+func (h *Handler) PutApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {

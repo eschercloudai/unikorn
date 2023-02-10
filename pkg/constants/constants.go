@@ -68,4 +68,7 @@ const (
 	// Finalizer is applied to resources that need to be deleted manually
 	// and do other complex logic.
 	Finalizer = "unikorn"
+
+	// NvidiaGPUType is used to indicate the GPU type for cluster-autoscaler.
+	NvidiaGPUType = "nvidia.com/gpu"
 )

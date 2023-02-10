@@ -35,10 +35,10 @@ type ApplicationCredentialOptions struct {
 // ControlPlane A Unikorn control plane.
 type ControlPlane struct {
 	// CreationTime The time the resource was created.
-	CreationTime time.Time `json:"creation_time"`
+	CreationTime time.Time `json:"creation-time"`
 
 	// DeletionTime The time a control plane was deleted.
-	DeletionTime *time.Time `json:"deletion_time,omitempty"`
+	DeletionTime *time.Time `json:"deletion-time,omitempty"`
 
 	// Name The name of the resource.
 	Name string `json:"name"`
@@ -55,6 +55,156 @@ type CreateControlPlane struct {
 	// Name The name of the resource.
 	Name string `json:"name"`
 }
+
+// Gpu GPU related autoscaling configuration.
+type Gpu struct {
+	// Count The number of GPUs.
+	Count int `json:"count"`
+
+	// Type The GPU type.
+	Type string `json:"type"`
+}
+
+// KubernetesCluster Unikorn Kubernetes cluster creation parameters.
+type KubernetesCluster struct {
+	// Api Kubernetes API settings.
+	Api *KubernetesClusterAPI `json:"api,omitempty"`
+
+	// ControlPlane A Kubernetes cluster machine.
+	ControlPlane OpenstackMachinePool `json:"control-plane"`
+
+	// Features A set of optional add on features for the cluster.
+	Features *KubernetesClusterFeatures `json:"features,omitempty"`
+
+	// Name Cluster name.
+	Name string `json:"name"`
+
+	// Network A kubernetes cluster network settings.
+	Network KubernetesClusterNetwork `json:"network"`
+
+	// Openstack Unikorn Kubernetes cluster creation Openstack parameters.
+	Openstack KubernetesClusterOpenstack `json:"openstack"`
+
+	// Status A Unikorn Kubernetes cluster status.
+	Status *KubernetesClusterStatus `json:"status,omitempty"`
+
+	// WorkloadPools A non-empty list of Kubernetes cluster workload pools.
+	WorkloadPools KubernetesClusterWorkloadPools `json:"workload-pools"`
+}
+
+// KubernetesClusterAPI Kubernetes API settings.
+type KubernetesClusterAPI struct {
+	// AllowedPrefixes Set of address prefixes to allow access to the Kubernetes API.
+	AllowedPrefixes *[]string `json:"allowed-prefixes,omitempty"`
+
+	// SubjectAlternativeNames Set of non-standard X.509 SANs to add to the API certificate.
+	SubjectAlternativeNames *[]string `json:"subject-alternative-names,omitempty"`
+}
+
+// KubernetesClusterAutoscaling A Kubernetes cluster workload pool autoscaling configuration.
+type KubernetesClusterAutoscaling struct {
+	// MaximumReplicas The maximum number of replicas to allow.
+	MaximumReplicas int `json:"maximum-replicas"`
+
+	// MinimumReplicas The minimum number of replicas to allow.
+	MinimumReplicas int `json:"minimum-replicas"`
+
+	// Scheduler Scheduling hints for scale-from-zero.
+	Scheduler *KubernetesClusterAutoscalingScheduler `json:"scheduler,omitempty"`
+}
+
+// KubernetesClusterAutoscalingScheduler Scheduling hints for scale-from-zero.
+type KubernetesClusterAutoscalingScheduler struct {
+	// Cpus The number of CPUs defined for the workload pool flavor.
+	Cpus int `json:"cpus"`
+
+	// Gpu GPU related autoscaling configuration.
+	Gpu *Gpu `json:"gpu,omitempty"`
+
+	// Memory The amount of memory defind for the workload pool flavor in GiB.
+	Memory int `json:"memory"`
+}
+
+// KubernetesClusterFeatures A set of optional add on features for the cluster.
+type KubernetesClusterFeatures struct {
+	// AutoScaling Enable auto-scaling
+	AutoScaling *bool `json:"auto-scaling,omitempty"`
+}
+
+// KubernetesClusterNetwork A kubernetes cluster network settings.
+type KubernetesClusterNetwork struct {
+	// DnsNameservers A list of DNS name server to use.
+	DnsNameservers []string `json:"dns-nameservers"`
+
+	// NodePrefix Network prefix to provision nodes in.
+	NodePrefix string `json:"node-prefix"`
+
+	// PodPrefix Network prefix to provision pods in.
+	PodPrefix string `json:"pod-prefix"`
+
+	// ServicePrefix Network prefix to provision services in.
+	ServicePrefix string `json:"service-prefix"`
+}
+
+// KubernetesClusterOpenstack Unikorn Kubernetes cluster creation Openstack parameters.
+type KubernetesClusterOpenstack struct {
+	// ApplicationCredentialId Application credential ID.
+	ApplicationCredentialId *string `json:"application-credential-id,omitempty"`
+
+	// ApplicationCredentialSecret Application credential secret.
+	ApplicationCredentialSecret *string `json:"application-credential-secret,omitempty"`
+
+	// ComputeAvailabilityZone Compute availability zone for control plane, and workload pool default.
+	ComputeAvailabilityZone string `json:"compute-availability-zone"`
+
+	// ExternalNetworkId Openstack external network ID.
+	ExternalNetworkId string `json:"external-network-id"`
+
+	// SshKeyName Openstack SSH Key to install on all machines.
+	SshKeyName *string `json:"ssh-key-name,omitempty"`
+
+	// VolumeAvailabilityZone Volume availability zone for control plane, and workload pool default.
+	VolumeAvailabilityZone string `json:"volume-availability-zone"`
+}
+
+// KubernetesClusterStatus A Unikorn Kubernetes cluster status.
+type KubernetesClusterStatus struct {
+	// CreationTime The time the resource was created.
+	CreationTime time.Time `json:"creation-time"`
+
+	// DeletionTime The time a control plane was deleted.
+	DeletionTime *time.Time `json:"deletion-time,omitempty"`
+
+	// Name The name of the resource.
+	Name string `json:"name"`
+
+	// Status The current status of the resource.
+	Status string `json:"status"`
+}
+
+// KubernetesClusterWorkloadPool A Kuberntes cluster workload pool.
+type KubernetesClusterWorkloadPool struct {
+	// AutoScaling A Kubernetes cluster workload pool autoscaling configuration.
+	AutoScaling *KubernetesClusterAutoscaling `json:"auto-scaling,omitempty"`
+
+	// AvailabilityZone Workload pool availability zone.
+	AvailabilityZone *string `json:"availability-zone,omitempty"`
+
+	// Labels Workload pool labels to apply on node creation.
+	Labels *map[string]string `json:"labels,omitempty"`
+
+	// Machine A Kubernetes cluster machine.
+	Machine OpenstackMachinePool `json:"machine"`
+
+	// Name Workload pool name.
+	Name string `json:"name"`
+}
+
+// KubernetesClusterWorkloadPools A non-empty list of Kubernetes cluster workload pools.
+type KubernetesClusterWorkloadPools = []KubernetesClusterWorkloadPool
+
+// KubernetesClusters A list of Unikorn Kubernetes clusters.
+type KubernetesClusters = []KubernetesCluster
 
 // Oauth2Error Generic error message.
 type Oauth2Error struct {
@@ -141,7 +291,7 @@ type OpenstackImage struct {
 		Kubernetes string `json:"kubernetes"`
 
 		// NvidiaDriver The nvidia driver version.
-		NvidiaDriver string `json:"nvidia_driver"`
+		NvidiaDriver string `json:"nvidia-driver"`
 	} `json:"versions"`
 }
 
@@ -156,6 +306,24 @@ type OpenstackKeyPair struct {
 
 // OpenstackKeyPairs A list of Openstack key pairs.
 type OpenstackKeyPairs = []OpenstackKeyPair
+
+// OpenstackMachinePool A Kubernetes cluster machine.
+type OpenstackMachinePool struct {
+	// Disk An Openstack volume.
+	Disk *OpenstackVolume `json:"disk,omitempty"`
+
+	// FlavorName Openstack flavor name.
+	FlavorName string `json:"flavor-name"`
+
+	// ImageName Openstack image name.
+	ImageName string `json:"image-name"`
+
+	// Replicas Number of machines.
+	Replicas int `json:"replicas"`
+
+	// Version Kubernetes version.
+	Version string `json:"version"`
+}
 
 // OpenstackProject An Openstack project.
 type OpenstackProject struct {
@@ -172,13 +340,22 @@ type OpenstackProject struct {
 // OpenstackProjects A list of Openstack projects.
 type OpenstackProjects = []OpenstackProject
 
+// OpenstackVolume An Openstack volume.
+type OpenstackVolume struct {
+	// AvailabilityZone Volume availability zone.
+	AvailabilityZone *string `json:"availability-zone,omitempty"`
+
+	// Size Disk size in GiB.
+	Size int `json:"size"`
+}
+
 // Project A Unikorn project.
 type Project struct {
 	// CreationTime The time the resource was created.
-	CreationTime time.Time `json:"creation_time"`
+	CreationTime time.Time `json:"creation-time"`
 
 	// DeletionTime The time the resource was deleted.
-	DeletionTime *time.Time `json:"deletion_time,omitempty"`
+	DeletionTime *time.Time `json:"deletion-time,omitempty"`
 
 	// Name The name of the resource.
 	Name string `json:"name"`
@@ -208,11 +385,11 @@ type TokenScope struct {
 // ApplicationCredentialParameter A basic string parameter.
 type ApplicationCredentialParameter = StringParameter
 
-// ClusterParameter A basic string parameter.
-type ClusterParameter = StringParameter
+// ClusterNameParameter A basic string parameter.
+type ClusterNameParameter = StringParameter
 
-// ControlPlaneParameter A basic string parameter.
-type ControlPlaneParameter = StringParameter
+// ControlPlaneNameParameter A basic string parameter.
+type ControlPlaneNameParameter = StringParameter
 
 // BadRequestResponse Generic error message.
 type BadRequestResponse = Oauth2Error
@@ -225,6 +402,12 @@ type ControlPlanesResponse = ControlPlanes
 
 // InternalServerErrorResponse Generic error message.
 type InternalServerErrorResponse = Oauth2Error
+
+// KubernetesClusterResponse Unikorn Kubernetes cluster creation parameters.
+type KubernetesClusterResponse = KubernetesCluster
+
+// KubernetesClustersResponse A list of Unikorn Kubernetes clusters.
+type KubernetesClustersResponse = KubernetesClusters
 
 // NullResponse defines model for nullResponse.
 type NullResponse = map[string]interface{}
@@ -268,6 +451,9 @@ type ApplicationCredentialRequest = ApplicationCredentialOptions
 // CreateControlPlaneRequest Unikorn control plane creation parameters.
 type CreateControlPlaneRequest = CreateControlPlane
 
+// CreateKubernetesClusterRequest Unikorn Kubernetes cluster creation parameters.
+type CreateKubernetesClusterRequest = KubernetesCluster
+
 // TokenScopeRequest Password authentication scope.
 type TokenScopeRequest = TokenScope
 
@@ -276,6 +462,9 @@ type PostApiV1AuthTokensTokenJSONRequestBody = TokenScope
 
 // PostApiV1ControlplanesJSONRequestBody defines body for PostApiV1Controlplanes for application/json ContentType.
 type PostApiV1ControlplanesJSONRequestBody = CreateControlPlane
+
+// PostApiV1ControlplanesControlPlaneNameClustersJSONRequestBody defines body for PostApiV1ControlplanesControlPlaneNameClusters for application/json ContentType.
+type PostApiV1ControlplanesControlPlaneNameClustersJSONRequestBody = KubernetesCluster
 
 // PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody defines body for PostApiV1ProvidersOpenstackApplicationCredentials for application/json ContentType.
 type PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody = ApplicationCredentialOptions
