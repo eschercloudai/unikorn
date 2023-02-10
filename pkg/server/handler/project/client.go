@@ -145,17 +145,19 @@ func (c *Client) Get(ctx context.Context) (*generated.Project, error) {
 	}
 
 	project := &generated.Project{
-		Name:         result.Name,
-		CreationTime: result.CreationTimestamp.Time,
-		Status:       "Unknown",
+		Status: &generated.KubernetesResourceStatus{
+			Name:         result.Name,
+			CreationTime: result.CreationTimestamp.Time,
+			Status:       "Unknown",
+		},
 	}
 
 	if result.DeletionTimestamp != nil {
-		project.DeletionTime = &result.DeletionTimestamp.Time
+		project.Status.DeletionTime = &result.DeletionTimestamp.Time
 	}
 
 	if condition, err := result.LookupCondition(unikornv1.ProjectConditionAvailable); err == nil {
-		project.Status = string(condition.Reason)
+		project.Status.Status = string(condition.Reason)
 	}
 
 	return project, nil

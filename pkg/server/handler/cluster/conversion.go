@@ -40,7 +40,7 @@ func convertOpenstack(in *unikornv1.KubernetesCluster) generated.KubernetesClust
 	openstack := generated.KubernetesClusterOpenstack{
 		ComputeAvailabilityZone: *in.Spec.Openstack.FailureDomain,
 		VolumeAvailabilityZone:  *in.Spec.Openstack.VolumeFailureDomain,
-		ExternalNetworkId:       *in.Spec.Openstack.ExternalNetworkID,
+		ExternalNetworkID:       *in.Spec.Openstack.ExternalNetworkID,
 		SshKeyName:              in.Spec.Openstack.SSHKeyName,
 	}
 
@@ -121,19 +121,19 @@ func convertWorkloadPool(in *unikornv1.KubernetesClusterWorkloadPoolsPoolSpec) g
 	}
 
 	if in.KubernetesWorkloadPoolSpec.Autoscaling != nil {
-		workloadPool.AutoScaling = &generated.KubernetesClusterAutoscaling{
+		workloadPool.Autoscaling = &generated.KubernetesClusterAutoscaling{
 			MinimumReplicas: *in.KubernetesWorkloadPoolSpec.Autoscaling.MinimumReplicas,
 			MaximumReplicas: *in.KubernetesWorkloadPoolSpec.Autoscaling.MaximumReplicas,
 		}
 
 		if in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler != nil {
-			workloadPool.AutoScaling.Scheduler = &generated.KubernetesClusterAutoscalingScheduler{
+			workloadPool.Autoscaling.Scheduler = &generated.KubernetesClusterAutoscalingScheduler{
 				Cpus:   *in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.CPU,
 				Memory: int(in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.Memory.Value()) >> 30,
 			}
 
 			if in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.GPU != nil {
-				workloadPool.AutoScaling.Scheduler.Gpu = &generated.Gpu{
+				workloadPool.Autoscaling.Scheduler.Gpu = &generated.Gpu{
 					Type:  *in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.GPU.Type,
 					Count: *in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.GPU.Count,
 				}
@@ -162,15 +162,15 @@ func convertFeatures(in *unikornv1.KubernetesCluster) *generated.KubernetesClust
 	}
 
 	features := &generated.KubernetesClusterFeatures{
-		AutoScaling: in.Spec.Features.Autoscaling,
+		Autoscaling: in.Spec.Features.Autoscaling,
 	}
 
 	return features
 }
 
 // convertStatus converts from a custom resource into the API definition.
-func convertStatus(in *unikornv1.KubernetesCluster) *generated.KubernetesClusterStatus {
-	out := &generated.KubernetesClusterStatus{
+func convertStatus(in *unikornv1.KubernetesCluster) *generated.KubernetesResourceStatus {
+	out := &generated.KubernetesResourceStatus{
 		Name:         in.Name,
 		CreationTime: in.CreationTimestamp.Time,
 		Status:       "Unknown",
@@ -224,7 +224,7 @@ func (c *Client) createClientConfig(options *generated.KubernetesCluster) ([]byt
 				AuthType: clientconfig.AuthV3ApplicationCredential,
 				AuthInfo: &clientconfig.AuthInfo{
 					AuthURL:                     c.endpoint,
-					ApplicationCredentialID:     *options.Openstack.ApplicationCredentialId,
+					ApplicationCredentialID:     *options.Openstack.ApplicationCredentialID,
 					ApplicationCredentialSecret: *options.Openstack.ApplicationCredentialSecret,
 				},
 			},
@@ -257,7 +257,7 @@ func (c *Client) createOpenstack(options *generated.KubernetesCluster) (*unikorn
 		Cloud:               &cloud,
 		FailureDomain:       &options.Openstack.ComputeAvailabilityZone,
 		VolumeFailureDomain: &options.Openstack.VolumeAvailabilityZone,
-		ExternalNetworkID:   &options.Openstack.ExternalNetworkId,
+		ExternalNetworkID:   &options.Openstack.ExternalNetworkID,
 	}
 
 	if options.Openstack.SshKeyName != nil {
@@ -402,29 +402,29 @@ func createWorkloadPools(options *generated.KubernetesCluster) (*unikornv1.Kuber
 		}
 
 		//nolint:nestif
-		if pool.AutoScaling != nil {
+		if pool.Autoscaling != nil {
 			autoscaling := &unikornv1.MachineGenericAutoscaling{
-				MinimumReplicas: &pool.AutoScaling.MinimumReplicas,
-				MaximumReplicas: &pool.AutoScaling.MaximumReplicas,
+				MinimumReplicas: &pool.Autoscaling.MinimumReplicas,
+				MaximumReplicas: &pool.Autoscaling.MaximumReplicas,
 			}
 
-			if pool.AutoScaling.Scheduler != nil {
-				memory, err := resource.ParseQuantity(fmt.Sprintf("%dGi", pool.AutoScaling.Scheduler.Memory))
+			if pool.Autoscaling.Scheduler != nil {
+				memory, err := resource.ParseQuantity(fmt.Sprintf("%dGi", pool.Autoscaling.Scheduler.Memory))
 				if err != nil {
 					return nil, errors.OAuth2InvalidRequest("failed to parse workload pool memory hint").WithError(err)
 				}
 
 				autoscaling.Scheduler = &unikornv1.MachineGenericAutoscalingScheduler{
-					CPU:    &pool.AutoScaling.Scheduler.Cpus,
+					CPU:    &pool.Autoscaling.Scheduler.Cpus,
 					Memory: &memory,
 				}
 
-				if pool.AutoScaling.Scheduler.Gpu != nil {
+				if pool.Autoscaling.Scheduler.Gpu != nil {
 					t := constants.NvidiaGPUType
 
 					autoscaling.Scheduler.GPU = &unikornv1.MachineGenericAutoscalingSchedulerGPU{
 						Type:  &t,
-						Count: &pool.AutoScaling.Scheduler.Gpu.Count,
+						Count: &pool.Autoscaling.Scheduler.Gpu.Count,
 					}
 				}
 			}
@@ -443,7 +443,7 @@ func createFeatures(options *generated.KubernetesCluster) *unikornv1.KubernetesC
 	}
 
 	features := &unikornv1.KubernetesClusterFeaturesSpec{
-		Autoscaling: options.Features.AutoScaling,
+		Autoscaling: options.Features.Autoscaling,
 	}
 
 	return features
