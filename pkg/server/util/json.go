@@ -38,7 +38,6 @@ func WriteJSONResponse(w http.ResponseWriter, r *http.Request, code int, respons
 	}
 
 	w.Header().Add("Content-Type", "application/json")
-	w.Header().Add("Cache-Control", "no-cache")
 
 	w.WriteHeader(code)
 

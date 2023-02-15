@@ -351,6 +351,9 @@ type StringParameter = string
 
 // Token defines model for token.
 type Token struct {
+	// Email The user's email address.
+	Email string `json:"email"`
+
 	// Token Authentication token.
 	Token string `json:"token"`
 }

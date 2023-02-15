@@ -18,7 +18,9 @@ limitations under the License.
 package handler
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
@@ -51,8 +53,17 @@ func New(client client.Client, authenticator *authorization.Authenticator, optio
 	}
 }
 
+func (h *Handler) setCacheable(w http.ResponseWriter) {
+	w.Header().Add("Cache-Control", fmt.Sprintf("max-age=%d", h.options.cacheMaxAge/time.Second))
+	w.Header().Add("Cache-Control", "private")
+}
+
+func (h *Handler) setUncacheable(w http.ResponseWriter) {
+	w.Header().Add("Cache-Control", "no-cache")
+}
+
 func (h *Handler) PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Request) {
-	token, err := h.authenticator.Basic(r)
+	token, claims, err := h.authenticator.Basic(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -60,8 +71,10 @@ func (h *Handler) PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Req
 
 	result := &generated.Token{
 		Token: token,
+		Email: claims.Subject,
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -73,7 +86,7 @@ func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	token, err := h.authenticator.Token(r, scope)
+	token, claims, err := h.authenticator.Token(r, scope)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -81,8 +94,10 @@ func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Reques
 
 	result := &generated.Token{
 		Token: token,
+		Email: claims.Subject,
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -93,6 +108,7 @@ func (h *Handler) GetApiV1Project(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -102,6 +118,7 @@ func (h *Handler) PostApiV1Project(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.setUncacheable(w)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -111,6 +128,7 @@ func (h *Handler) DeleteApiV1Project(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.setUncacheable(w)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -121,6 +139,7 @@ func (h *Handler) GetApiV1Controlplanes(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -137,6 +156,7 @@ func (h *Handler) PostApiV1Controlplanes(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	h.setUncacheable(w)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -146,6 +166,7 @@ func (h *Handler) DeleteApiV1ControlplanesControlPlaneName(w http.ResponseWriter
 		return
 	}
 
+	h.setUncacheable(w)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -156,6 +177,7 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r
 		return
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -169,6 +191,7 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneNameClusters(w http.ResponseW
 		return
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -185,6 +208,7 @@ func (h *Handler) PostApiV1ControlplanesControlPlaneNameClusters(w http.Response
 		return
 	}
 
+	h.setUncacheable(w)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -194,6 +218,7 @@ func (h *Handler) DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w 
 		return
 	}
 
+	h.setUncacheable(w)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -204,6 +229,7 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterName(w htt
 		return
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -217,6 +243,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCre
 		return
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -234,6 +261,7 @@ func (h *Handler) PostApiV1ProvidersOpenstackApplicationCredentials(w http.Respo
 		return
 	}
 
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -242,6 +270,8 @@ func (h *Handler) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplication
 		errors.HandleError(w, r, err)
 		return
 	}
+
+	h.setUncacheable(w)
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request) {
@@ -251,6 +281,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.Resp
 		return
 	}
 
+	h.setCacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -261,6 +292,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http
 		return
 	}
 
+	h.setCacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -271,6 +303,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWrit
 		return
 	}
 
+	h.setCacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -281,6 +314,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackFlavors(w http.ResponseWriter, r *ht
 		return
 	}
 
+	h.setCacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -291,6 +325,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *htt
 		return
 	}
 
+	h.setCacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -301,6 +336,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *h
 		return
 	}
 
+	h.setCacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -311,5 +347,6 @@ func (h *Handler) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *h
 		return
 	}
 
+	h.setCacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }

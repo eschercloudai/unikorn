@@ -60,20 +60,20 @@ func (a *Authenticator) Endpoint() string {
 }
 
 // Basic performs basic authentication against Keystone and returns a token.
-func (a *Authenticator) Basic(r *http.Request) (string, error) {
+func (a *Authenticator) Basic(r *http.Request) (string, *Claims, error) {
 	_, token, err := GetHTTPAuthenticationScheme(r)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	tuple, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return "", errors.OAuth2InvalidRequest("basic authorization not base64 encoded").WithError(err)
+		return "", nil, errors.OAuth2InvalidRequest("basic authorization not base64 encoded").WithError(err)
 	}
 
 	parts := strings.Split(string(tuple), ":")
 	if len(parts) != 2 {
-		return "", errors.OAuth2InvalidRequest("basic authorization malformed")
+		return "", nil, errors.OAuth2InvalidRequest("basic authorization malformed")
 	}
 
 	username := parts[0]
@@ -81,7 +81,7 @@ func (a *Authenticator) Basic(r *http.Request) (string, error) {
 
 	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.endpoint))
 	if err != nil {
-		return "", errors.OAuth2ServerError("unable to initialize identity").WithError(err)
+		return "", nil, errors.OAuth2ServerError("unable to initialize identity").WithError(err)
 	}
 
 	// Do an unscoped authentication against Keystone.  The client is expected
@@ -89,45 +89,45 @@ func (a *Authenticator) Basic(r *http.Request) (string, error) {
 	// use that to do a scoped bearer token based upgrade.
 	keystoneToken, user, err := identity.CreateToken(openstack.NewCreateTokenOptionsUnscopedPassword(a.domain, username, password))
 	if err != nil {
-		return "", errors.OAuth2AccessDenied("authentication failed").WithError(err)
+		return "", nil, errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
 
-	claims := &UnikornClaims{
+	uClaims := &UnikornClaims{
 		Token: keystoneToken.ID,
 		User:  user.ID,
 	}
 
-	jwToken, err := a.issuer.Issue(r, username, claims, nil, keystoneToken.ExpiresAt)
+	jwToken, claims, err := a.issuer.Issue(r, username, uClaims, nil, keystoneToken.ExpiresAt)
 	if err != nil {
-		return "", errors.OAuth2ServerError("unable to create access token").WithError(err)
+		return "", nil, errors.OAuth2ServerError("unable to create access token").WithError(err)
 	}
 
-	return jwToken, nil
+	return jwToken, claims, nil
 }
 
 // Token performs token based authentication against Keystone with a scope, and returns a new token.
 // Used to upgrade from unscoped, or to refresh a token.
-func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (string, error) {
+func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (string, *Claims, error) {
 	tokenClaims, err := ClaimsFromContext(r.Context())
 	if err != nil {
-		return "", errors.OAuth2ServerError("failed get claims").WithError(err)
+		return "", nil, errors.OAuth2ServerError("failed get claims").WithError(err)
 	}
 
 	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.endpoint))
 	if err != nil {
-		return "", errors.OAuth2ServerError("unable to initialize identity").WithError(err)
+		return "", nil, errors.OAuth2ServerError("unable to initialize identity").WithError(err)
 	}
 
 	if tokenClaims.UnikornClaims == nil {
-		return "", errors.OAuth2ServerError("unable to get unikorn claims")
+		return "", nil, errors.OAuth2ServerError("unable to get unikorn claims")
 	}
 
 	keystoneToken, user, err := identity.CreateToken(openstack.NewCreateTokenOptionsScopedToken(tokenClaims.UnikornClaims.Token, scope.Project.Id))
 	if err != nil {
-		return "", errors.OAuth2AccessDenied("authentication failed").WithError(err)
+		return "", nil, errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
 
-	claims := &UnikornClaims{
+	uClaims := &UnikornClaims{
 		Token:   keystoneToken.ID,
 		User:    user.ID,
 		Project: scope.Project.Id,
@@ -140,10 +140,10 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (str
 		},
 	}
 
-	jwToken, err := a.issuer.Issue(r, tokenClaims.Subject, claims, oAuth2Scope, keystoneToken.ExpiresAt)
+	jwToken, claims, err := a.issuer.Issue(r, tokenClaims.Subject, uClaims, oAuth2Scope, keystoneToken.ExpiresAt)
 	if err != nil {
-		return "", errors.OAuth2ServerError("unable to create access token").WithError(err)
+		return "", nil, errors.OAuth2ServerError("unable to create access token").WithError(err)
 	}
 
-	return jwToken, nil
+	return jwToken, claims, nil
 }
