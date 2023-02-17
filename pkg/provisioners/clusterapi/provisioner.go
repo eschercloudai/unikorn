@@ -79,7 +79,15 @@ func (p *Provisioner) Generate() (client.Object, error) {
 					//TODO:  programmable
 					"repoURL":        "https://eschercloudai.github.io/helm-cluster-api",
 					"chart":          "cluster-api",
-					"targetRevision": "v0.1.4",
+					"targetRevision": "v0.1.5",
+					"helm": map[string]interface{}{
+						"parameters": []interface{}{
+							map[string]interface{}{
+								"name":  "cluster-api-provider-openstack.image",
+								"value": "spjmurray/capi-openstack-controller:v0.7.0-simon1",
+							},
+						},
+					},
 				},
 				"ignoreDifferences": []map[string]interface{}{
 					{
