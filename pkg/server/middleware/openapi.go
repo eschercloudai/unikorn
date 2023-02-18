@@ -45,9 +45,10 @@ type OpenAPIValidator struct {
 var _ http.Handler = &OpenAPIValidator{}
 
 // NewOpenAPIValidator returns an initialized validator middleware.
-func NewOpenAPIValidator(authorizer *Authorizer) *OpenAPIValidator {
+func NewOpenAPIValidator(authorizer *Authorizer, next http.Handler) *OpenAPIValidator {
 	return &OpenAPIValidator{
 		authorizer: authorizer,
+		next:       next,
 	}
 }
 
@@ -176,9 +177,10 @@ func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Middleware performs any authorization handling middleware.
-func (v *OpenAPIValidator) Middleware(next http.Handler) http.Handler {
-	v.next = next
-
-	return v
+// OpenAPIValidatorMiddlewareFactory returns a function that generates per-request
+// middleware functions.
+func OpenAPIValidatorMiddlewareFactory(authorizer *Authorizer) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return NewOpenAPIValidator(authorizer, next)
+	}
 }

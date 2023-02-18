@@ -149,7 +149,7 @@ func main() {
 		BaseRouter:       router,
 		ErrorHandlerFunc: handler.HandleError,
 		Middlewares: []generated.MiddlewareFunc{
-			middleware.NewOpenAPIValidator(authorizer).Middleware,
+			middleware.OpenAPIValidatorMiddlewareFactory(authorizer),
 		},
 	}
 
