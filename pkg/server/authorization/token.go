@@ -186,16 +186,16 @@ func (l *ScopeList) UnmarshalJSON(value []byte) error {
 // from another source.
 type UnikornClaims struct {
 	// Token is the OpenStack Keystone token.
-	Token string `json:"unikorn:token:keystone,omitempty"`
+	Token string `json:"token,omitempty"`
 
 	// Project is the Openstack/Unikorn project ID the token is scoped to.
 	// This is a unique identifier for the region.
-	Project string `json:"unikorn:project:id,omitempty"`
+	Project string `json:"projectId,omitempty"`
 
 	// User is the Openstack user ID, the user name is stored in the "sub" claim.
 	// This effectively caches the unique user ID so we don't have to translate
 	// between names in the scope of the token, and what Openstack APIs expect.
-	User string `json:"unikorn:user:id,omitempty"`
+	User string `json:"userId,omitempty"`
 }
 
 // Claims is an application specific set of claims.
@@ -209,7 +209,7 @@ type Claims struct {
 	Scope *ScopeList `json:"scope,omitempty"`
 
 	// UnikornClaims are claims required by this application.
-	UnikornClaims *UnikornClaims `json:",inline"`
+	UnikornClaims *UnikornClaims `json:"unikorn,omitempty"`
 }
 
 // contextKey defines a new context key type unique to this package.
@@ -241,10 +241,10 @@ func ClaimsFromContext(ctx context.Context) (*Claims, error) {
 }
 
 // Issue issues a new JWT token.
-func (i *JWTIssuer) Issue(r *http.Request, subject string, uclaims *UnikornClaims, scope *ScopeList, expiresAt time.Time) (string, error) {
+func (i *JWTIssuer) Issue(r *http.Request, subject string, uclaims *UnikornClaims, scope *ScopeList, expiresAt time.Time) (string, *Claims, error) {
 	publicKey, privateKey, err := i.GetKeyPair()
 	if err != nil {
-		return "", fmt.Errorf("failed to get key pair: %w", err)
+		return "", nil, fmt.Errorf("failed to get key pair: %w", err)
 	}
 
 	now := time.Now()
@@ -285,7 +285,7 @@ func (i *JWTIssuer) Issue(r *http.Request, subject string, uclaims *UnikornClaim
 
 	signer, err := jose.NewSigner(signingKey, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create signer: %w", err)
+		return "", nil, fmt.Errorf("failed to create signer: %w", err)
 	}
 
 	recipient := jose.Recipient{
@@ -298,15 +298,15 @@ func (i *JWTIssuer) Issue(r *http.Request, subject string, uclaims *UnikornClaim
 
 	encrypter, err := jose.NewEncrypter(jose.A256GCM, recipient, encrypterOptions)
 	if err != nil {
-		return "", fmt.Errorf("failed to create encrypter: %w", err)
+		return "", nil, fmt.Errorf("failed to create encrypter: %w", err)
 	}
 
 	token, err := jwt.SignedAndEncrypted(signer, encrypter).Claims(claims).CompactSerialize()
 	if err != nil {
-		return "", fmt.Errorf("failed to create token: %w", err)
+		return "", nil, fmt.Errorf("failed to create token: %w", err)
 	}
 
-	return token, nil
+	return token, &claims, nil
 }
 
 // Verify checks the token parses and validates.

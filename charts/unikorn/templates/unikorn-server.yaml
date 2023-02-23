@@ -137,10 +137,56 @@ spec:
   ports:
   - name: http
     port: 80
-    targetPort: 6080
+    targetPort: http
   - name: prometheus
     port: 8080
     targetPort: prometheus
+{{- if .Values.ui.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unikorn-ui
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unikorn-ui
+  template:
+    metadata:
+      labels:
+        app: unikorn-ui
+    spec:
+      containers:
+      - name: unikorn-ui
+        image: {{ include "unikorn.uiImage" . }}
+        ports:
+        - name: http
+          containerPort: 3000
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unikorn-ui
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: unikorn-ui
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+{{- end }}
 ---
 # TODO: Use ACME for production releases.
 apiVersion: cert-manager.io/v1
@@ -150,6 +196,27 @@ metadata:
 spec:
   selfSigned: {}
 ---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: unikorn-server-ingress-ca
+spec:
+  isCA: true
+  commonName: unikorn-server-ingress-ca
+  secretName: unikorn-server-ingress-ca-tls
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: unikorn-server-ingress
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: unikorn-server-ingress-ca
+spec:
+  ca:
+    secretName: unikorn-server-ingress-ca-tls
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -157,7 +224,7 @@ metadata:
   labels:
     {{- include "unikorn.labels" . | nindent 4 }}
   annotations:
-    cert-manager.io/issuer: unikorn-server-ingress
+    cert-manager.io/issuer: unikorn-server-ingress-ca
 spec:
   ingressClassName: {{ .Values.server.ingressClass }}
   # For development you will want to add these names to /etc/hosts for the ingress
@@ -180,4 +247,13 @@ spec:
             name: unikorn-server
             port:
               name: http
+{{- if .Values.ui.enabled }}
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: unikorn-ui
+            port:
+              name: http
+{{- end }}
 {{- end }}

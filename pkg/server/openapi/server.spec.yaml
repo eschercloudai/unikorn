@@ -355,6 +355,8 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
     delete:
@@ -556,9 +558,13 @@ components:
       type: object
       required:
       - token
+      - email
       properties:
         token:
           description: Authentication token.
+          type: string
+        email:
+          description: The user's email address.
           type: string
     kubernetesResourceStatus:
       description: A Kubernetes resource status.

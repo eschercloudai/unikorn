@@ -17,6 +17,8 @@ limitations under the License.
 package handler
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 )
 
@@ -25,9 +27,14 @@ type Options struct {
 	// applicationCredentialRoles sets the roles an application credential
 	// is granted on creation.
 	applicationCredentialRoles []string
+
+	// cacheMaxAge defines the max age for cachable items e.g. images and
+	// flavors don't change all that often.
+	cacheMaxAge time.Duration
 }
 
 // AddFlags adds the options flags to the given flag set.
 func (o *Options) AddFlags(f *pflag.FlagSet) {
 	f.StringSliceVar(&o.applicationCredentialRoles, "application-credential-roles", nil, "A role to be added to application credentials on creation.  May be specified more than once.")
+	f.DurationVar(&o.cacheMaxAge, "cache-max-age", 24*time.Hour, "How long to cache long-lived queries in the browser.")
 }
