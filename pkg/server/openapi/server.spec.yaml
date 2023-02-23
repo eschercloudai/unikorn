@@ -304,6 +304,28 @@ paths:
           $ref: '#/components/responses/notFoundResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName}/kubeconfig:
+    description: Unikorn cluster services.
+    parameters:
+    - $ref: '#/components/parameters/controlPlaneNameParameter'
+    - $ref: '#/components/parameters/clusterNameParameter'
+    get:
+      description: |-
+        Get a Unikorn cluster kubernetes config.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/kubernetesClusterKubeconfigResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/projects:
     description: OpenStack identity project services.
     get:
@@ -1087,6 +1109,10 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/kubernetesCluster'
+    kubernetesClusterKubeconfigResponse:
+      description: A Unikorn Kubernetes cluster configuration.
+      content:
+        application/octet-stream: {}
     kubernetesClustersResponse:
       description: A list of Unikorn Kubernetes clusters.
       content:

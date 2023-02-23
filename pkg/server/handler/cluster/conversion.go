@@ -428,6 +428,8 @@ func createWorkloadPools(options *generated.KubernetesCluster) (*unikornv1.Kuber
 					}
 				}
 			}
+
+			workloadPool.Autoscaling = autoscaling
 		}
 
 		workloadPools.Pools = append(workloadPools.Pools, workloadPool)
