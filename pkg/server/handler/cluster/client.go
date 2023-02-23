@@ -20,10 +20,12 @@ import (
 	"context"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -77,10 +79,47 @@ func (c *Client) Get(ctx context.Context, controlPlaneName generated.ControlPlan
 			return nil, errors.HTTPNotFound()
 		}
 
-		return nil, err
+		return nil, errors.OAuth2ServerError("unable to get cluster").WithError(err)
 	}
 
 	return convert(result), nil
+}
+
+// GetKubeconfig returns the kubernetes configuation associated with a cluster.
+func (c *Client) GetKubeconfig(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, name generated.ClusterNameParameter) ([]byte, error) {
+	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
+	if err != nil {
+		return nil, err
+	}
+
+	vc := vcluster.NewControllerRuntimeClient(c.client)
+
+	vclusterConfig, err := vc.RESTConfig(ctx, controlPlane.Namespace, false)
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed to get control plane rest config").WithError(err)
+	}
+
+	vclusterClient, err := client.New(vclusterConfig, client.Options{})
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed to get control plane client").WithError(err)
+	}
+
+	objectKey := client.ObjectKey{
+		Namespace: name,
+		Name:      name + "-kubeconfig",
+	}
+
+	secret := &corev1.Secret{}
+
+	if err := vclusterClient.Get(ctx, objectKey, secret); err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, errors.HTTPNotFound()
+		}
+
+		return nil, errors.OAuth2ServerError("unable to get cluster configuration").WithError(err)
+	}
+
+	return secret.Data["value"], nil
 }
 
 // Create creates the implicit cluster indentified by the JTW claims.

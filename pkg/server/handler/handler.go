@@ -236,6 +236,17 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterName(w htt
 func (h *Handler) PutApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
 }
 
+func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubeconfig(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
+	result, err := cluster.NewClient(h.client, h.authenticator.Endpoint()).GetKubeconfig(r.Context(), controlPlaneName, clusterName)
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setUncacheable(w)
+	util.WriteOctetStreamResponse(w, r, http.StatusOK, result)
+}
+
 func (h *Handler) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
 	result, err := providers.NewOpenstack(h.authenticator).GetApplicationCredential(r, applicationCredential)
 	if err != nil {

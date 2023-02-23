@@ -83,7 +83,7 @@ func main() {
 					}
 
 					for mimeType, mediaType := range response.Content {
-						if mediaType.Schema == nil {
+						if mimeType == "application/json" && mediaType.Schema == nil {
 							report("no schema set for", mimeType, code, method, pathName, "response")
 						}
 					}
