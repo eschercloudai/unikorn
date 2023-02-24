@@ -27,6 +27,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/util"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -125,20 +126,6 @@ func convertWorkloadPool(in *unikornv1.KubernetesClusterWorkloadPoolsPoolSpec) g
 			MinimumReplicas: *in.KubernetesWorkloadPoolSpec.Autoscaling.MinimumReplicas,
 			MaximumReplicas: *in.KubernetesWorkloadPoolSpec.Autoscaling.MaximumReplicas,
 		}
-
-		if in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler != nil {
-			workloadPool.Autoscaling.Scheduler = &generated.KubernetesClusterAutoscalingScheduler{
-				Cpus:   *in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.CPU,
-				Memory: int(in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.Memory.Value()) >> 30,
-			}
-
-			if in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.GPU != nil {
-				workloadPool.Autoscaling.Scheduler.Gpu = &generated.Gpu{
-					Type:  *in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.GPU.Type,
-					Count: *in.KubernetesWorkloadPoolSpec.Autoscaling.Scheduler.GPU.Count,
-				}
-			}
-		}
 	}
 
 	return workloadPool
@@ -223,7 +210,7 @@ func (c *Client) createClientConfig(options *generated.KubernetesCluster) ([]byt
 			cloud: {
 				AuthType: clientconfig.AuthV3ApplicationCredential,
 				AuthInfo: &clientconfig.AuthInfo{
-					AuthURL:                     c.endpoint,
+					AuthURL:                     c.authenticator.Endpoint(),
 					ApplicationCredentialID:     *options.Openstack.ApplicationCredentialID,
 					ApplicationCredentialSecret: *options.Openstack.ApplicationCredentialSecret,
 				},
@@ -241,7 +228,7 @@ func (c *Client) createClientConfig(options *generated.KubernetesCluster) ([]byt
 
 // createOpenstack creates the Openstack configuration part of a cluster.
 func (c *Client) createOpenstack(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterOpenstackSpec, error) {
-	ca, err := util.GetURLCACertificate(c.endpoint)
+	ca, err := util.GetURLCACertificate(c.authenticator.Endpoint())
 	if err != nil {
 		return nil, errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
 	}
@@ -337,7 +324,35 @@ func createAPI(options *generated.KubernetesCluster) (*unikornv1.KubernetesClust
 }
 
 // createMachineGeneric creates a generic machine part of the cluster.
-func createMachineGeneric(m *generated.OpenstackMachinePool) (*unikornv1.MachineGeneric, error) {
+func (c *Client) createMachineGeneric(m *generated.OpenstackMachinePool) (*unikornv1.MachineGeneric, *generated.OpenstackFlavor, error) {
+	client := openstack.New(c.authenticator)
+
+	// Check the image passed in is valid.
+	image, err := client.GetImage(c.request, m.ImageName)
+	if err != nil {
+		if errors.IsHTTPNotFound(err) {
+			return nil, nil, errors.OAuth2InvalidRequest("invalid image").WithError(err)
+		}
+
+		return nil, nil, err
+	}
+
+	// TODO: we can derive the version from the image, but its useful to have that
+	// in the GET data.
+	if m.Version != image.Versions.Kubernetes {
+		return nil, nil, errors.OAuth2InvalidRequest("invalid version for image").WithError(err)
+	}
+
+	// Check the flavor is valid
+	flavor, err := client.GetFlavor(c.request, m.FlavorName)
+	if err != nil {
+		if errors.IsHTTPNotFound(err) {
+			return nil, nil, errors.OAuth2InvalidRequest("invalid flavor").WithError(err)
+		}
+
+		return nil, nil, err
+	}
+
 	version := unikornv1.SemanticVersion(m.Version)
 
 	machine := &unikornv1.MachineGeneric{
@@ -350,7 +365,7 @@ func createMachineGeneric(m *generated.OpenstackMachinePool) (*unikornv1.Machine
 	if m.Disk != nil {
 		size, err := resource.ParseQuantity(fmt.Sprintf("%dGi", m.Disk.Size))
 		if err != nil {
-			return nil, errors.OAuth2InvalidRequest("failed to parse disk size").WithError(err)
+			return nil, nil, errors.OAuth2InvalidRequest("failed to parse disk size").WithError(err)
 		}
 
 		machine.DiskSize = &size
@@ -360,12 +375,12 @@ func createMachineGeneric(m *generated.OpenstackMachinePool) (*unikornv1.Machine
 		}
 	}
 
-	return machine, nil
+	return machine, flavor, nil
 }
 
 // createControlPlane creates the control plane part of a cluster.
-func createControlPlane(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterControlPlaneSpec, error) {
-	machine, err := createMachineGeneric(&options.ControlPlane)
+func (c *Client) createControlPlane(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterControlPlaneSpec, error) {
+	machine, _, err := c.createMachineGeneric(&options.ControlPlane)
 	if err != nil {
 		return nil, err
 	}
@@ -378,13 +393,13 @@ func createControlPlane(options *generated.KubernetesCluster) (*unikornv1.Kubern
 }
 
 // createWorkloadPools creates the workload pools part of a cluster.
-func createWorkloadPools(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterWorkloadPoolsSpec, error) {
+func (c *Client) createWorkloadPools(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterWorkloadPoolsSpec, error) {
 	workloadPools := &unikornv1.KubernetesClusterWorkloadPoolsSpec{}
 
 	for i := range options.WorkloadPools {
 		pool := &options.WorkloadPools[i]
 
-		machine, err := createMachineGeneric(&pool.Machine)
+		machine, flavor, err := c.createMachineGeneric(&pool.Machine)
 		if err != nil {
 			return nil, err
 		}
@@ -401,35 +416,32 @@ func createWorkloadPools(options *generated.KubernetesCluster) (*unikornv1.Kuber
 			workloadPool.Labels = *pool.Labels
 		}
 
-		//nolint:nestif
+		// With autoscaling, we automatically fill in the required metadata from
+		// the flavor used in validation, this prevents having to surface this
+		// complexity to the client via the API.
 		if pool.Autoscaling != nil {
-			autoscaling := &unikornv1.MachineGenericAutoscaling{
+			memory, err := resource.ParseQuantity(fmt.Sprintf("%dGi", flavor.Memory))
+			if err != nil {
+				return nil, errors.OAuth2InvalidRequest("failed to parse workload pool memory hint").WithError(err)
+			}
+
+			workloadPool.Autoscaling = &unikornv1.MachineGenericAutoscaling{
 				MinimumReplicas: &pool.Autoscaling.MinimumReplicas,
 				MaximumReplicas: &pool.Autoscaling.MaximumReplicas,
-			}
-
-			if pool.Autoscaling.Scheduler != nil {
-				memory, err := resource.ParseQuantity(fmt.Sprintf("%dGi", pool.Autoscaling.Scheduler.Memory))
-				if err != nil {
-					return nil, errors.OAuth2InvalidRequest("failed to parse workload pool memory hint").WithError(err)
-				}
-
-				autoscaling.Scheduler = &unikornv1.MachineGenericAutoscalingScheduler{
-					CPU:    &pool.Autoscaling.Scheduler.Cpus,
+				Scheduler: &unikornv1.MachineGenericAutoscalingScheduler{
+					CPU:    &flavor.Cpus,
 					Memory: &memory,
-				}
-
-				if pool.Autoscaling.Scheduler.Gpu != nil {
-					t := constants.NvidiaGPUType
-
-					autoscaling.Scheduler.GPU = &unikornv1.MachineGenericAutoscalingSchedulerGPU{
-						Type:  &t,
-						Count: &pool.Autoscaling.Scheduler.Gpu.Count,
-					}
-				}
+				},
 			}
 
-			workloadPool.Autoscaling = autoscaling
+			if flavor.Gpus != nil {
+				t := constants.NvidiaGPUType
+
+				workloadPool.Autoscaling.Scheduler.GPU = &unikornv1.MachineGenericAutoscalingSchedulerGPU{
+					Type:  &t,
+					Count: flavor.Gpus,
+				}
+			}
 		}
 
 		workloadPools.Pools = append(workloadPools.Pools, workloadPool)
@@ -468,12 +480,12 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 		return nil, err
 	}
 
-	kubernetesCcontrolPlane, err := createControlPlane(options)
+	kubernetesCcontrolPlane, err := c.createControlPlane(options)
 	if err != nil {
 		return nil, err
 	}
 
-	kubernetesWorkloadPools, err := createWorkloadPools(options)
+	kubernetesWorkloadPools, err := c.createWorkloadPools(options)
 	if err != nil {
 		return nil, err
 	}

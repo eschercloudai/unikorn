@@ -28,7 +28,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/handler/cluster"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
-	"github.com/eschercloudai/unikorn/pkg/server/handler/providers"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -185,7 +185,7 @@ func (h *Handler) PutApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
-	result, err := cluster.NewClient(h.client, h.authenticator.Endpoint()).List(r.Context(), controlPlaneName)
+	result, err := cluster.NewClient(h.client, r, h.authenticator).List(r.Context(), controlPlaneName)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -203,7 +203,7 @@ func (h *Handler) PostApiV1ControlplanesControlPlaneNameClusters(w http.Response
 		return
 	}
 
-	if err := cluster.NewClient(h.client, h.authenticator.Endpoint()).Create(r.Context(), controlPlaneName, request); err != nil {
+	if err := cluster.NewClient(h.client, r, h.authenticator).Create(r.Context(), controlPlaneName, request); err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
@@ -213,7 +213,7 @@ func (h *Handler) PostApiV1ControlplanesControlPlaneNameClusters(w http.Response
 }
 
 func (h *Handler) DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
-	if err := cluster.NewClient(h.client, h.authenticator.Endpoint()).Delete(r.Context(), controlPlaneName, clusterName); err != nil {
+	if err := cluster.NewClient(h.client, r, h.authenticator).Delete(r.Context(), controlPlaneName, clusterName); err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
@@ -223,7 +223,7 @@ func (h *Handler) DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w 
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
-	result, err := cluster.NewClient(h.client, h.authenticator.Endpoint()).Get(r.Context(), controlPlaneName, clusterName)
+	result, err := cluster.NewClient(h.client, r, h.authenticator).Get(r.Context(), controlPlaneName, clusterName)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -237,7 +237,7 @@ func (h *Handler) PutApiV1ControlplanesControlPlaneNameClustersClusterName(w htt
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubeconfig(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
-	result, err := cluster.NewClient(h.client, h.authenticator.Endpoint()).GetKubeconfig(r.Context(), controlPlaneName, clusterName)
+	result, err := cluster.NewClient(h.client, r, h.authenticator).GetKubeconfig(r.Context(), controlPlaneName, clusterName)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -248,7 +248,7 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubeco
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
-	result, err := providers.NewOpenstack(h.authenticator).GetApplicationCredential(r, applicationCredential)
+	result, err := openstack.New(h.authenticator).GetApplicationCredential(r, applicationCredential)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -266,7 +266,7 @@ func (h *Handler) PostApiV1ProvidersOpenstackApplicationCredentials(w http.Respo
 		return
 	}
 
-	result, err := providers.NewOpenstack(h.authenticator).CreateApplicationCredential(r, options, h.options.applicationCredentialRoles)
+	result, err := openstack.New(h.authenticator).CreateApplicationCredential(r, options, h.options.applicationCredentialRoles)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -277,7 +277,7 @@ func (h *Handler) PostApiV1ProvidersOpenstackApplicationCredentials(w http.Respo
 }
 
 func (h *Handler) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
-	if err := providers.NewOpenstack(h.authenticator).DeleteApplicationCredential(r, applicationCredential); err != nil {
+	if err := openstack.New(h.authenticator).DeleteApplicationCredential(r, applicationCredential); err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
@@ -286,7 +286,7 @@ func (h *Handler) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplication
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request) {
-	result, err := providers.NewOpenstack(h.authenticator).ListAvailabilityZonesCompute(r)
+	result, err := openstack.New(h.authenticator).ListAvailabilityZonesCompute(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -297,7 +297,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.Resp
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http.ResponseWriter, r *http.Request) {
-	result, err := providers.NewOpenstack(h.authenticator).ListAvailabilityZonesBlockStorage(r)
+	result, err := openstack.New(h.authenticator).ListAvailabilityZonesBlockStorage(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -308,7 +308,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWriter, r *http.Request) {
-	result, err := providers.NewOpenstack(h.authenticator).ListExternalNetworks(r)
+	result, err := openstack.New(h.authenticator).ListExternalNetworks(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -319,7 +319,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWrit
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackFlavors(w http.ResponseWriter, r *http.Request) {
-	result, err := providers.NewOpenstack(h.authenticator).ListFlavors(r)
+	result, err := openstack.New(h.authenticator).ListFlavors(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -330,7 +330,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackFlavors(w http.ResponseWriter, r *ht
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *http.Request) {
-	result, err := providers.NewOpenstack(h.authenticator).ListImages(r)
+	result, err := openstack.New(h.authenticator).ListImages(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -341,7 +341,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *htt
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *http.Request) {
-	result, err := providers.NewOpenstack(h.authenticator).ListKeyPairs(r)
+	result, err := openstack.New(h.authenticator).ListKeyPairs(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -352,7 +352,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *h
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request) {
-	result, err := providers.NewOpenstack(h.authenticator).ListAvailableProjects(r)
+	result, err := openstack.New(h.authenticator).ListAvailableProjects(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return

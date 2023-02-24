@@ -18,9 +18,11 @@ package cluster
 
 import (
 	"context"
+	"net/http"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
@@ -37,15 +39,19 @@ type Client struct {
 	// client allows Kubernetes API access.
 	client client.Client
 
-	// endpoint is the Keystone endpoint.
-	endpoint string
+	// request is the http request that invoked this client.
+	request *http.Request
+
+	// authenticator provides access to authentication services.
+	authenticator *authorization.Authenticator
 }
 
 // NewClient returns a new client with required parameters.
-func NewClient(client client.Client, endpoint string) *Client {
+func NewClient(client client.Client, request *http.Request, authenticator *authorization.Authenticator) *Client {
 	return &Client{
-		client:   client,
-		endpoint: endpoint,
+		client:        client,
+		request:       request,
+		authenticator: authenticator,
 	}
 }
 

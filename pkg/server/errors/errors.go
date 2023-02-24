@@ -145,6 +145,20 @@ func HTTPNotFound() *HTTPError {
 	return newHTTPError(http.StatusNotFound, "", "")
 }
 
+func IsHTTPNotFound(err error) bool {
+	httpError := &HTTPError{}
+
+	if ok := errors.As(err, &httpError); !ok {
+		return false
+	}
+
+	if httpError.status != http.StatusNotFound {
+		return false
+	}
+
+	return true
+}
+
 func HTTPMethodNotAllowed() *HTTPError {
 	return newHTTPError(http.StatusMethodNotAllowed, generated.MethodNotAllowed, "the requested method was not allowed")
 }

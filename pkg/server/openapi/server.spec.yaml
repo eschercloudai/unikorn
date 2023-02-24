@@ -741,34 +741,6 @@ components:
           type: string
         disk:
           $ref: '#/components/schemas/openstackVolume'
-    gpu:
-      description: GPU related autoscaling configuration.
-      type: object
-      required:
-      - type
-      - count
-      properties:
-        type:
-          description: The GPU type.
-          type: string
-        count:
-          description: The number of GPUs.
-          type: integer
-    kubernetesClusterAutoscalingScheduler:
-      description: Scheduling hints for scale-from-zero.
-      type: object
-      required:
-      - cpus
-      - memory
-      properties:
-        cpus:
-          description: The number of CPUs defined for the workload pool flavor.
-          type: integer
-        memory:
-          description: The amount of memory defind for the workload pool flavor in GiB.
-          type: integer
-        gpu:
-          $ref: '#/components/schemas/gpu'
     kubernetesClusterAutoscaling:
       description: A Kubernetes cluster workload pool autoscaling configuration.
       type: object
@@ -782,8 +754,6 @@ components:
         maximumReplicas:
           description: The maximum number of replicas to allow.
           type: integer
-        scheduler:
-          $ref: '#/components/schemas/kubernetesClusterAutoscalingScheduler'
     kubernetesClusterWorkloadPool:
       description: A Kuberntes cluster workload pool.
       type: object
