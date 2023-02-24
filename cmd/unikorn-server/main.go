@@ -17,9 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	chi "github.com/go-chi/chi/v5"
@@ -37,6 +41,7 @@ import (
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -73,7 +78,7 @@ func (o *serverOptions) addFlags(f *pflag.FlagSet) {
 
 // getClient grabs a client for the entire server instance so all handers
 // share caches.
-func getClient() (client.Client, error) {
+func getClient(ctx context.Context) (client.Client, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
@@ -91,15 +96,34 @@ func getClient() (client.Client, error) {
 		return nil, err
 	}
 
+	cache, err := cache.New(config, cache.Options{Scheme: scheme})
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		_ = cache.Start(ctx)
+	}()
+
 	clientOptions := client.Options{
 		Scheme: scheme,
 	}
 
-	return client.New(config, clientOptions)
+	c, err := client.New(config, clientOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	input := client.NewDelegatingClientInput{
+		CacheReader: cache,
+		Client:      c,
+	}
+
+	return client.NewDelegatingClient(input)
 }
 
-// main is the entry point to server.
-func main() {
+// start is the entry point to server.
+func start() {
 	// Initialize components with legacy flags.
 	zapOptions := &zap.Options{}
 	zapOptions.BindFlags(flag.CommandLine)
@@ -129,10 +153,15 @@ func main() {
 	// Hello World!
 	logger.Info("service starting", "application", constants.Application, "version", constants.Version, "revision", constants.Revision)
 
-	client, err := getClient()
+	// Create a root context for things to hang off of.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := getClient(ctx)
 	if err != nil {
 		logger.Error(err, "failed to create client")
-		os.Exit(1)
+
+		return
 	}
 
 	// Middleware specified here is applied to all requests pre-routing.
@@ -164,7 +193,37 @@ func main() {
 		Handler:           chiServerhandler,
 	}
 
+	// Register a signal handler to trigger a graceful shutdown.
+	stop := make(chan os.Signal, 1)
+
+	signal.Notify(stop, syscall.SIGTERM)
+
+	go func() {
+		<-stop
+
+		// Cancel anything hanging off the root context.
+		cancel()
+
+		// Shutdown the server, Kubernetes gives us 30 seconds before a SIGKILL.
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			logger.Error(err, "server shutdown error")
+		}
+	}()
+
 	if err := server.ListenAndServe(); err != nil {
-		logger.Error(err, "server died unexpectedly")
+		if errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+
+		logger.Error(err, "unexpected server error")
+
+		return
 	}
+}
+
+func main() {
+	start()
 }
