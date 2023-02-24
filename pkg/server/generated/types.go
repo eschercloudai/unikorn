@@ -47,15 +47,6 @@ type CreateControlPlane struct {
 	Name string `json:"name"`
 }
 
-// Gpu GPU related autoscaling configuration.
-type Gpu struct {
-	// Count The number of GPUs.
-	Count int `json:"count"`
-
-	// Type The GPU type.
-	Type string `json:"type"`
-}
-
 // KubernetesCluster Unikorn Kubernetes cluster creation parameters.
 type KubernetesCluster struct {
 	// Api Kubernetes API settings.
@@ -99,21 +90,6 @@ type KubernetesClusterAutoscaling struct {
 
 	// MinimumReplicas The minimum number of replicas to allow.
 	MinimumReplicas int `json:"minimumReplicas"`
-
-	// Scheduler Scheduling hints for scale-from-zero.
-	Scheduler *KubernetesClusterAutoscalingScheduler `json:"scheduler,omitempty"`
-}
-
-// KubernetesClusterAutoscalingScheduler Scheduling hints for scale-from-zero.
-type KubernetesClusterAutoscalingScheduler struct {
-	// Cpus The number of CPUs defined for the workload pool flavor.
-	Cpus int `json:"cpus"`
-
-	// Gpu GPU related autoscaling configuration.
-	Gpu *Gpu `json:"gpu,omitempty"`
-
-	// Memory The amount of memory defind for the workload pool flavor in GiB.
-	Memory int `json:"memory"`
 }
 
 // KubernetesClusterFeatures A set of optional add on features for the cluster.

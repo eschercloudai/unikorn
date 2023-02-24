@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package providers
+package openstack
 
 import (
 	"net/http"
@@ -34,10 +34,10 @@ type Openstack struct {
 	endpoint string
 }
 
-// NewOpenstack returns a new initialized Openstack handler.
-func NewOpenstack(a *authorization.Authenticator) *Openstack {
+// New returns a new initialized Openstack handler.
+func New(authenticator *authorization.Authenticator) *Openstack {
 	return &Openstack{
-		endpoint: a.Endpoint(),
+		endpoint: authenticator.Endpoint(),
 	}
 }
 
@@ -244,6 +244,22 @@ func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, er
 	return flavors, nil
 }
 
+// GetFlavor does a list and find, while inefficient, it does do image filtering.
+func (o *Openstack) GetFlavor(r *http.Request, name string) (*generated.OpenstackFlavor, error) {
+	flavors, err := o.ListFlavors(r)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range flavors {
+		if flavors[i].Name == name {
+			return &flavors[i], nil
+		}
+	}
+
+	return nil, errors.HTTPNotFound()
+}
+
 func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
@@ -283,11 +299,27 @@ func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, erro
 		images[i].Name = image.Name
 		images[i].Created = created
 		images[i].Modified = modified
-		images[i].Versions.Kubernetes = kubernetesVersion
+		images[i].Versions.Kubernetes = "v" + kubernetesVersion
 		images[i].Versions.NvidiaDriver = nvidiaDriverVersion
 	}
 
 	return images, nil
+}
+
+// GetImage does a list and find, while inefficient, it does do image filtering.
+func (o *Openstack) GetImage(r *http.Request, name string) (*generated.OpenstackImage, error) {
+	images, err := o.ListImages(r)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range images {
+		if images[i].Name == name {
+			return &images[i], nil
+		}
+	}
+
+	return nil, errors.HTTPNotFound()
 }
 
 // ListAvailableProjects lists projects that the token has roles associated with.
