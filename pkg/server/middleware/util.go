@@ -27,8 +27,8 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 )
 
-// openAPI abstracts schema access and validation.
-type openAPI struct {
+// OpenAPI abstracts schema access and validation.
+type OpenAPI struct {
 	// spec is the full specification.
 	spec *openapi3.T
 
@@ -37,19 +37,20 @@ type openAPI struct {
 	router routers.Router
 }
 
-// newOpenRpi extracts the swagger document.
-func newOpenAPI() (*openAPI, error) {
+// NewOpenRpi extracts the swagger document.
+// NOTE: this is surprisingly slow, make sure you cache it and reuse it.
+func NewOpenAPI() (*OpenAPI, error) {
 	spec, err := generated.GetSwagger()
 	if err != nil {
-		return nil, errors.OAuth2ServerError("unable to decode openapi schema").WithError(err)
+		return nil, err
 	}
 
 	router, err := gorillamux.NewRouter(spec)
 	if err != nil {
-		return nil, errors.OAuth2ServerError("unable to create router").WithError(err)
+		return nil, err
 	}
 
-	o := &openAPI{
+	o := &OpenAPI{
 		spec:   spec,
 		router: router,
 	}
@@ -58,7 +59,7 @@ func newOpenAPI() (*openAPI, error) {
 }
 
 // findRoute looks up the route from the specification.
-func (o *openAPI) findRoute(r *http.Request) (*routers.Route, map[string]string, error) {
+func (o *OpenAPI) findRoute(r *http.Request) (*routers.Route, map[string]string, error) {
 	route, params, err := o.router.FindRoute(r)
 	if err != nil {
 		return nil, nil, errors.OAuth2ServerError("unable to find route").WithError(err)

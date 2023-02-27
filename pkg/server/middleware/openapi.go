@@ -39,16 +39,20 @@ type OpenAPIValidator struct {
 
 	// authorizer provides security policy enforcement.
 	authorizer *Authorizer
+
+	// openapi caches the OpenAPI schema.
+	openapi *OpenAPI
 }
 
 // Ensure this implements the required interfaces.
 var _ http.Handler = &OpenAPIValidator{}
 
 // NewOpenAPIValidator returns an initialized validator middleware.
-func NewOpenAPIValidator(authorizer *Authorizer, next http.Handler) *OpenAPIValidator {
+func NewOpenAPIValidator(authorizer *Authorizer, next http.Handler, openapi *OpenAPI) *OpenAPIValidator {
 	return &OpenAPIValidator{
 		authorizer: authorizer,
 		next:       next,
+		openapi:    openapi,
 	}
 }
 
@@ -105,14 +109,7 @@ func (w *bufferingResponseWriter) StatusCode() int {
 func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log := log.FromContext(r.Context())
 
-	openapi, err := newOpenAPI()
-	if err != nil {
-		errors.HandleError(w, r, err)
-
-		return
-	}
-
-	route, params, err := openapi.findRoute(r)
+	route, params, err := v.openapi.findRoute(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 
@@ -179,8 +176,8 @@ func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // OpenAPIValidatorMiddlewareFactory returns a function that generates per-request
 // middleware functions.
-func OpenAPIValidatorMiddlewareFactory(authorizer *Authorizer) func(http.Handler) http.Handler {
+func OpenAPIValidatorMiddlewareFactory(authorizer *Authorizer, openapi *OpenAPI) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return NewOpenAPIValidator(authorizer, next)
+		return NewOpenAPIValidator(authorizer, next, openapi)
 	}
 }

@@ -172,13 +172,20 @@ func start() {
 
 	authorizer := middleware.NewAuthorizer(issuer)
 
+	openapi, err := middleware.NewOpenAPI()
+	if err != nil {
+		logger.Error(err, "failed to create openapi")
+
+		return
+	}
+
 	// Middleware specified here is applied to all requests post-routing.
 	// NOTE: these are applied in reverse order!!
 	chiServerOptions := generated.ChiServerOptions{
 		BaseRouter:       router,
 		ErrorHandlerFunc: handler.HandleError,
 		Middlewares: []generated.MiddlewareFunc{
-			middleware.OpenAPIValidatorMiddlewareFactory(authorizer),
+			middleware.OpenAPIValidatorMiddlewareFactory(authorizer, openapi),
 		},
 	}
 
