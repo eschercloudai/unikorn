@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/managers/options"
 	"github.com/eschercloudai/unikorn/pkg/managers/project"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -30,19 +31,23 @@ import (
 )
 
 func main() {
-	options := &zap.Options{}
-	options.BindFlags(flag.CommandLine)
+	zapOptions := &zap.Options{}
+	zapOptions.BindFlags(flag.CommandLine)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+
+	o := &options.Options{}
+	o.AddFlags(pflag.CommandLine)
+
 	pflag.Parse()
 
-	log.SetLogger(zap.New(zap.UseFlagOptions(options)))
+	log.SetLogger(zap.New(zap.UseFlagOptions(zapOptions)))
 
 	logger := log.Log.WithName("main")
 
 	logger.Info("service starting", "application", constants.Application, "version", constants.Version, "revision", constants.Revision)
 
-	if err := project.Run(); err != nil {
+	if err := project.Run(o); err != nil {
 		logger.Error(err, "controller error")
 		os.Exit(1)
 	}
