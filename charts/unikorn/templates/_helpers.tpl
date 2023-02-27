@@ -88,10 +88,6 @@ Create the container images
 {{- .Values.server.image | default (printf "%s/unikorn-server:%s" (include "unikorn.defaultRepositoryPath" .) (.Values.tag | default .Chart.Version)) }}
 {{- end }}
 
-{{- define "unikorn.uiImage" -}}
-{{- .Values.ui.image | default (printf "%s/unikorn-ui:%s" (include "unikorn.defaultRepositoryPath" .) (.Values.tag | default .Chart.Version)) }}
-{{- end }}
-
 {{/*
 Create Prometheus labels
 */}}
