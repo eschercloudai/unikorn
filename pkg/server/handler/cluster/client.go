@@ -19,6 +19,7 @@ package cluster
 import (
 	"context"
 	"net/http"
+	"sort"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
@@ -67,6 +68,8 @@ func (c *Client) List(ctx context.Context, controlPlaneName generated.ControlPla
 	if err := c.client.List(ctx, result, &client.ListOptions{Namespace: controlPlane.Namespace}); err != nil {
 		return nil, errors.OAuth2ServerError("failed to list control planes").WithError(err)
 	}
+
+	sort.Stable(result)
 
 	return convertList(result), nil
 }

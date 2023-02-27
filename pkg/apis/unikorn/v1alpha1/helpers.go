@@ -19,6 +19,8 @@ package v1alpha1
 import (
 	"errors"
 	"net"
+	"sort"
+	"strings"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
 
@@ -259,4 +261,49 @@ func (w *KubernetesWorkloadPool) GetName() string {
 	}
 
 	return w.Name
+}
+
+// Ensure type is sortable for stable deterministic output.
+var _ sort.Interface = &ProjectList{}
+
+func (l ProjectList) Len() int {
+	return len(l.Items)
+}
+
+func (l ProjectList) Less(i, j int) bool {
+	return strings.Compare(l.Items[i].Name, l.Items[j].Name) == -1
+}
+
+func (l ProjectList) Swap(i, j int) {
+	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
+}
+
+// Ensure type is sortable for stable deterministic output.
+var _ sort.Interface = &ControlPlaneList{}
+
+func (l ControlPlaneList) Len() int {
+	return len(l.Items)
+}
+
+func (l ControlPlaneList) Less(i, j int) bool {
+	return strings.Compare(l.Items[i].Name, l.Items[j].Name) == -1
+}
+
+func (l ControlPlaneList) Swap(i, j int) {
+	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
+}
+
+// Ensure type is sortable for stable deterministic output.
+var _ sort.Interface = &KubernetesClusterList{}
+
+func (l KubernetesClusterList) Len() int {
+	return len(l.Items)
+}
+
+func (l KubernetesClusterList) Less(i, j int) bool {
+	return strings.Compare(l.Items[i].Name, l.Items[j].Name) == -1
+}
+
+func (l KubernetesClusterList) Swap(i, j int) {
+	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
 }
