@@ -19,6 +19,7 @@ package project
 import (
 	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/managers/options"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
@@ -36,7 +37,7 @@ const (
 	identity = "unikorn-project-manager"
 )
 
-func Run() error {
+func Run(o *options.Options) error {
 	// Create a scheme and ensure it knows about Kubernetes and Unikorn
 	// resource types.
 	scheme := runtime.NewScheme()
@@ -72,6 +73,7 @@ func Run() error {
 		Reconciler: &reconciler{
 			client: manager.GetClient(),
 		},
+		MaxConcurrentReconciles: o.MaxConcurrentReconciles,
 	}
 
 	c, err := controller.New(identity, manager, controllerOptions)
