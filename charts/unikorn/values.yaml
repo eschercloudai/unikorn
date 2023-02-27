@@ -62,9 +62,6 @@ ui:
   # Temporarily block deployment until it's complete.
   enabled: false
 
-  # Allows override of the global default image.
-  image:
-
 # Defines Prometheus monitoring integration.
 monitoring:
   # Enable monitoring, ensure Prometheus is installed first to define the CRDs.
