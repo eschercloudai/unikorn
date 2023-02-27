@@ -18,6 +18,7 @@ package controlplane
 
 import (
 	"context"
+	"sort"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -153,6 +154,8 @@ func (c *Client) List(ctx context.Context) ([]*generated.ControlPlane, error) {
 	if err := c.client.List(ctx, result, &client.ListOptions{Namespace: project.Namespace}); err != nil {
 		return nil, errors.OAuth2ServerError("failed to list control planes").WithError(err)
 	}
+
+	sort.Stable(result)
 
 	return convertList(result), nil
 }
