@@ -117,12 +117,14 @@ spec:
           containerPort: 6080
         - name: prometheus
           containerPort: 8080
+        # Note, this is quite CPU intensive, especially when going wide!
+        # TODO: profile me.
         resources:
           requests:
-            cpu: 50m
+            cpu: "1"
             memory: 50Mi
           limits:
-            cpu: 100m
+            cpu: "2"
             memory: 100Mi
         securityContext:
           readOnlyRootFilesystem: true
