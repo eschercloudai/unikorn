@@ -18,10 +18,13 @@ package openstack
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/applicationcredentials"
+	lru "github.com/hashicorp/golang-lru/v2"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
@@ -32,13 +35,45 @@ import (
 // Openstack provides an HTTP handler for Openstack resources.
 type Openstack struct {
 	endpoint string
+
+	// Cache clients as that's quite expensive.
+	identityClientCache     *lru.Cache[string, *openstack.IdentityClient]
+	computeClientCache      *lru.Cache[string, *openstack.ComputeClient]
+	blockStorageClientCache *lru.Cache[string, *openstack.BlockStorageClient]
+	networkClientCache      *lru.Cache[string, *openstack.NetworkClient]
 }
 
 // New returns a new initialized Openstack handler.
-func New(authenticator *authorization.Authenticator) *Openstack {
-	return &Openstack{
-		endpoint: authenticator.Endpoint(),
+func New(authenticator *authorization.Authenticator) (*Openstack, error) {
+	identityClientCache, err := lru.New[string, *openstack.IdentityClient](1024)
+	if err != nil {
+		return nil, err
 	}
+
+	computeClientCache, err := lru.New[string, *openstack.ComputeClient](1024)
+	if err != nil {
+		return nil, err
+	}
+
+	blockStorageClientCache, err := lru.New[string, *openstack.BlockStorageClient](1024)
+	if err != nil {
+		return nil, err
+	}
+
+	networkClientCache, err := lru.New[string, *openstack.NetworkClient](1024)
+	if err != nil {
+		return nil, err
+	}
+
+	o := &Openstack{
+		endpoint:                authenticator.Endpoint(),
+		identityClientCache:     identityClientCache,
+		computeClientCache:      computeClientCache,
+		blockStorageClientCache: blockStorageClientCache,
+		networkClientCache:      networkClientCache,
+	}
+
+	return o, nil
 }
 
 func getToken(r *http.Request) (string, error) {
@@ -73,10 +108,16 @@ func (o *Openstack) IdentityClient(r *http.Request) (*openstack.IdentityClient, 
 		return nil, err
 	}
 
+	if client, ok := o.identityClientCache.Get(token); ok {
+		return client, nil
+	}
+
 	client, err := openstack.NewIdentityClient(openstack.NewTokenProvider(o.endpoint, token))
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get identity client").WithError(err)
 	}
+
+	o.identityClientCache.Add(token, client)
 
 	return client, nil
 }
@@ -87,10 +128,16 @@ func (o *Openstack) ComputeClient(r *http.Request) (*openstack.ComputeClient, er
 		return nil, err
 	}
 
+	if client, ok := o.computeClientCache.Get(token); ok {
+		return client, nil
+	}
+
 	client, err := openstack.NewComputeClient(openstack.NewTokenProvider(o.endpoint, token))
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
 	}
+
+	o.computeClientCache.Add(token, client)
 
 	return client, nil
 }
@@ -101,10 +148,16 @@ func (o *Openstack) BlockStorageClient(r *http.Request) (*openstack.BlockStorage
 		return nil, err
 	}
 
+	if client, ok := o.blockStorageClientCache.Get(token); ok {
+		return client, nil
+	}
+
 	client, err := openstack.NewBlockStorageClient(openstack.NewTokenProvider(o.endpoint, token))
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get block storage client").WithError(err)
 	}
+
+	o.blockStorageClientCache.Add(token, client)
 
 	return client, nil
 }
@@ -115,10 +168,16 @@ func (o *Openstack) NetworkClient(r *http.Request) (*openstack.NetworkClient, er
 		return nil, err
 	}
 
+	if client, ok := o.networkClientCache.Get(token); ok {
+		return client, nil
+	}
+
 	client, err := openstack.NewNetworkClient(openstack.NewTokenProvider(o.endpoint, token))
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get network client").WithError(err)
 	}
+
+	o.networkClientCache.Add(token, client)
 
 	return client, nil
 }
@@ -219,26 +278,41 @@ func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, er
 	}
 
 	flavors := generated.OpenstackFlavors{}
+	lock := &sync.Mutex{}
+
+	// Openstack sucks at this, so we need to fan out and run concurrently.
+	group, gctx := errgroup.WithContext(r.Context())
 
 	for i := range result {
 		f := &result[i]
 
-		extraSpecs, err := client.FlavorExtraSpecs(r.Context(), f)
-		if err != nil {
-			return nil, errors.OAuth2ServerError("failed list flavor extra specs").WithError(err)
-		}
+		group.Go(func() error {
+			extraSpecs, err := client.FlavorExtraSpecs(gctx, f)
+			if err != nil {
+				return errors.OAuth2ServerError("failed list flavor extra specs").WithError(err)
+			}
 
-		// Filter out baremetal nodes.
-		if _, ok := extraSpecs["resources:CUSTOM_BAREMETAL"]; ok {
-			continue
-		}
+			// Filter out baremetal nodes.
+			if _, ok := extraSpecs["resources:CUSTOM_BAREMETAL"]; ok {
+				return nil
+			}
 
-		flavor, err := convertFlavor(f, extraSpecs)
-		if err != nil {
-			return nil, err
-		}
+			flavor, err := convertFlavor(f, extraSpecs)
+			if err != nil {
+				return err
+			}
 
-		flavors = append(flavors, *flavor)
+			lock.Lock()
+			defer lock.Unlock()
+
+			flavors = append(flavors, *flavor)
+
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 
 	return flavors, nil

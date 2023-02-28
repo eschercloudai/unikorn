@@ -325,7 +325,11 @@ func createAPI(options *generated.KubernetesCluster) (*unikornv1.KubernetesClust
 
 // createMachineGeneric creates a generic machine part of the cluster.
 func (c *Client) createMachineGeneric(m *generated.OpenstackMachinePool) (*unikornv1.MachineGeneric, *generated.OpenstackFlavor, error) {
-	client := openstack.New(c.authenticator)
+	// TODO: propagate client down.
+	client, err := openstack.New(c.authenticator)
+	if err != nil {
+		return nil, nil, errors.OAuth2ServerError("failed to create client").WithError(err)
+	}
 
 	// Check the image passed in is valid.
 	image, err := client.GetImage(c.request, m.ImageName)

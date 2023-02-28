@@ -185,7 +185,13 @@ func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	responseValidationInput, err := v.validateRequest(r, authContext)
 	if err != nil {
-		errors.HandleError(w, r, err)
+		if authContext.err != nil {
+			errors.HandleError(w, r, authContext.err)
+
+			return
+		}
+
+		errors.OAuth2InvalidRequest("request invalid").WithError(err).Write(w, r)
 
 		return
 	}

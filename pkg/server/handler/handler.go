@@ -43,14 +43,25 @@ type Handler struct {
 
 	// options allows behaviour to be defined on the CLI.
 	options *Options
+
+	// openstack is the Openstack client.
+	openstack *openstack.Openstack
 }
 
-func New(client client.Client, authenticator *authorization.Authenticator, options *Options) *Handler {
-	return &Handler{
+func New(client client.Client, authenticator *authorization.Authenticator, options *Options) (*Handler, error) {
+	o, err := openstack.New(authenticator)
+	if err != nil {
+		return nil, err
+	}
+
+	h := &Handler{
 		client:        client,
 		authenticator: authenticator,
 		options:       options,
+		openstack:     o,
 	}
+
+	return h, nil
 }
 
 func (h *Handler) setCacheable(w http.ResponseWriter) {
@@ -248,7 +259,7 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubeco
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
-	result, err := openstack.New(h.authenticator).GetApplicationCredential(r, applicationCredential)
+	result, err := h.openstack.GetApplicationCredential(r, applicationCredential)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -266,7 +277,7 @@ func (h *Handler) PostApiV1ProvidersOpenstackApplicationCredentials(w http.Respo
 		return
 	}
 
-	result, err := openstack.New(h.authenticator).CreateApplicationCredential(r, options, h.options.applicationCredentialRoles)
+	result, err := h.openstack.CreateApplicationCredential(r, options, h.options.applicationCredentialRoles)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -277,7 +288,7 @@ func (h *Handler) PostApiV1ProvidersOpenstackApplicationCredentials(w http.Respo
 }
 
 func (h *Handler) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
-	if err := openstack.New(h.authenticator).DeleteApplicationCredential(r, applicationCredential); err != nil {
+	if err := h.openstack.DeleteApplicationCredential(r, applicationCredential); err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
@@ -286,7 +297,7 @@ func (h *Handler) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplication
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request) {
-	result, err := openstack.New(h.authenticator).ListAvailabilityZonesCompute(r)
+	result, err := h.openstack.ListAvailabilityZonesCompute(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -297,7 +308,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.Resp
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http.ResponseWriter, r *http.Request) {
-	result, err := openstack.New(h.authenticator).ListAvailabilityZonesBlockStorage(r)
+	result, err := h.openstack.ListAvailabilityZonesBlockStorage(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -308,7 +319,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(w http
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWriter, r *http.Request) {
-	result, err := openstack.New(h.authenticator).ListExternalNetworks(r)
+	result, err := h.openstack.ListExternalNetworks(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -319,7 +330,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackExternalNetworks(w http.ResponseWrit
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackFlavors(w http.ResponseWriter, r *http.Request) {
-	result, err := openstack.New(h.authenticator).ListFlavors(r)
+	result, err := h.openstack.ListFlavors(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -330,7 +341,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackFlavors(w http.ResponseWriter, r *ht
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *http.Request) {
-	result, err := openstack.New(h.authenticator).ListImages(r)
+	result, err := h.openstack.ListImages(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -341,7 +352,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackImages(w http.ResponseWriter, r *htt
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *http.Request) {
-	result, err := openstack.New(h.authenticator).ListKeyPairs(r)
+	result, err := h.openstack.ListKeyPairs(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -352,7 +363,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *h
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request) {
-	result, err := openstack.New(h.authenticator).ListAvailableProjects(r)
+	result, err := h.openstack.ListAvailableProjects(r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
