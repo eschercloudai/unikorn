@@ -17,9 +17,15 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/pagination"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/eschercloudai/unikorn/pkg/constants"
 )
 
 // BlockStorageClient wraps the generic client because gophercloud is unsafe.
@@ -67,8 +73,15 @@ type AvailabilityZoneState struct {
 // Obviously this is undocumented by Openstack, and unimplemented by
 // gophercloud, so we have to do it ourselves.
 // TODO: upstream me.
-func (c *BlockStorageClient) AvailabilityZones() ([]AvailabilityZone, error) {
-	pager := pagination.NewPager(c.client, c.client.ServiceURL("os-availability-zone"), func(r pagination.PageResult) pagination.Page {
+func (c *BlockStorageClient) AvailabilityZones(ctx context.Context) ([]AvailabilityZone, error) {
+	url := c.client.ServiceURL("os-availability-zone")
+
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, url, trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
+	pager := pagination.NewPager(c.client, url, func(r pagination.PageResult) pagination.Page {
 		return AvailabilityZonePage{pagination.SinglePageBase(r)}
 	})
 

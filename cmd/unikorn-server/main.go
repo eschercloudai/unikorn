@@ -27,8 +27,11 @@ import (
 	"time"
 
 	chi "github.com/go-chi/chi/v5"
+	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/trace"
 
 	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -66,6 +69,10 @@ type serverOptions struct {
 	// Ideally we'd like this to be short, but Openstack in general sucks
 	// for performance.
 	writeTimeout time.Duration
+
+	// otlpEndpoint defines whether to ship spans to an OTLP consumer or
+	// not, and where to send them to.
+	otlpEndpoint string
 }
 
 // addFlags allows server options to be modified.
@@ -74,6 +81,7 @@ func (o *serverOptions) addFlags(f *pflag.FlagSet) {
 	f.DurationVar(&o.readTimeout, "server-read-timeout", time.Second, "How long to wait for the client to send the request body.")
 	f.DurationVar(&o.readHeaderTimeout, "server-read-header-timeout", time.Second, "How long to wait for the client to send headers.")
 	f.DurationVar(&o.writeTimeout, "server-write-timeout", 10*time.Second, "How long to wait for the API to respond to the client.")
+	f.StringVar(&o.otlpEndpoint, "otlp-endpoint", "", "An optional OTLP endpoint to ship spans to.")
 }
 
 // getClient grabs a client for the entire server instance so all handers
@@ -122,6 +130,33 @@ func getClient(ctx context.Context) (client.Client, error) {
 	return client.NewDelegatingClient(input)
 }
 
+// setupOpenTelemetry adds a span processor that will print root spans to the
+// logs by default, and optionally ship the spans to an OTLP listener.
+func (o *serverOptions) setupOpenTelemetry(ctx context.Context, logger logr.Logger) error {
+	otel.SetLogger(logger)
+
+	opts := []trace.TracerProviderOption{
+		trace.WithSpanProcessor(&middleware.LoggingSpanProcessor{}),
+	}
+
+	if o.otlpEndpoint != "" {
+		exporter, err := otlptracehttp.New(ctx,
+			otlptracehttp.WithEndpoint(o.otlpEndpoint),
+			otlptracehttp.WithInsecure(),
+		)
+
+		if err != nil {
+			return err
+		}
+
+		opts = append(opts, trace.WithBatcher(exporter))
+	}
+
+	otel.SetTracerProvider(trace.NewTracerProvider(opts...))
+
+	return nil
+}
+
 // start is the entry point to server.
 func start() {
 	// Initialize components with legacy flags.
@@ -148,7 +183,6 @@ func start() {
 	log.SetLogger(zap.New(zap.UseFlagOptions(zapOptions)))
 
 	logger := log.Log.WithName(constants.Application)
-	otel.SetLogger(logger)
 
 	// Hello World!
 	logger.Info("service starting", "application", constants.Application, "version", constants.Version, "revision", constants.Revision)
@@ -164,9 +198,15 @@ func start() {
 		return
 	}
 
+	if err := serverOptions.setupOpenTelemetry(ctx, logger); err != nil {
+		logger.Error(err, "failed to setup OpenTelemetry")
+
+		return
+	}
+
 	// Middleware specified here is applied to all requests pre-routing.
 	router := chi.NewRouter()
-	router.Use(middleware.Logger)
+	router.Use(middleware.Logger())
 	router.NotFound(http.HandlerFunc(handler.NotFound))
 	router.MethodNotAllowed(http.HandlerFunc(handler.MethodNotAllowed))
 

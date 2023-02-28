@@ -43,6 +43,18 @@ To fudge this, add the `--kubelet-insecure-tls` flag to the server:
 kubectl edit -n kube-system deployment/metrics-server
 ```
 
+## OpenTelemetry Tracing
+
+Unikorn makes use of the OTLP protocol to ship information on spans.
+This provides a break down of transaction based workloads.
+
+You can install Jaeger's stack with:
+
+```shell
+helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+helm upgrade jaeger jaegertracing/jaeger --set collector.service.otlp.http.port=4318
+```
+
 ## Logs
 
 Coming soon!

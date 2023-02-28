@@ -87,7 +87,7 @@ func (a *Authenticator) Basic(r *http.Request) (string, *Claims, error) {
 	// Do an unscoped authentication against Keystone.  The client is expected
 	// to list visible projects (or indeed cache them in local web-storage) then
 	// use that to do a scoped bearer token based upgrade.
-	keystoneToken, user, err := identity.CreateToken(openstack.NewCreateTokenOptionsUnscopedPassword(a.domain, username, password))
+	keystoneToken, user, err := identity.CreateToken(r.Context(), openstack.NewCreateTokenOptionsUnscopedPassword(a.domain, username, password))
 	if err != nil {
 		return "", nil, errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
@@ -122,7 +122,7 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (str
 		return "", nil, errors.OAuth2ServerError("unable to get unikorn claims")
 	}
 
-	keystoneToken, user, err := identity.CreateToken(openstack.NewCreateTokenOptionsScopedToken(tokenClaims.UnikornClaims.Token, scope.Project.Id))
+	keystoneToken, user, err := identity.CreateToken(r.Context(), openstack.NewCreateTokenOptionsScopedToken(tokenClaims.UnikornClaims.Token, scope.Project.Id))
 	if err != nil {
 		return "", nil, errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -28,6 +29,10 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/images"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/eschercloudai/unikorn/pkg/constants"
 )
 
 var (
@@ -60,7 +65,12 @@ func NewComputeClient(provider Provider) (*ComputeClient, error) {
 }
 
 // KeyPairs returns a list of key pairs.
-func (c *ComputeClient) KeyPairs() ([]keypairs.KeyPair, error) {
+func (c *ComputeClient) KeyPairs(ctx context.Context) ([]keypairs.KeyPair, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/compute/v2/os-keypairs", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	page, err := keypairs.List(c.client, &keypairs.ListOpts{}).AllPages()
 	if err != nil {
 		return nil, err
@@ -70,7 +80,12 @@ func (c *ComputeClient) KeyPairs() ([]keypairs.KeyPair, error) {
 }
 
 // Flavors returns a list of flavors.
-func (c *ComputeClient) Flavors() ([]flavors.Flavor, error) {
+func (c *ComputeClient) Flavors(ctx context.Context) ([]flavors.Flavor, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/compute/v2/flavors", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	page, err := flavors.ListDetail(c.client, &flavors.ListOpts{}).AllPages()
 	if err != nil {
 		return nil, err
@@ -80,9 +95,9 @@ func (c *ComputeClient) Flavors() ([]flavors.Flavor, error) {
 }
 
 // Flavor returns a single flavor.
-func (c *ComputeClient) Flavor(name string) (*flavors.Flavor, error) {
+func (c *ComputeClient) Flavor(ctx context.Context, name string) (*flavors.Flavor, error) {
 	// Arse, OS only deals in IDs, we deal in human readable names.
-	flavors, err := c.Flavors()
+	flavors, err := c.Flavors(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +114,12 @@ func (c *ComputeClient) Flavor(name string) (*flavors.Flavor, error) {
 }
 
 // FlavorExtraSpecs returns extra metadata for a flavor.
-func (c *ComputeClient) FlavorExtraSpecs(flavor *flavors.Flavor) (map[string]string, error) {
+func (c *ComputeClient) FlavorExtraSpecs(ctx context.Context, flavor *flavors.Flavor) (map[string]string, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/compute/v2/flavors/"+flavor.ID+"/os-extra_specs", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	result := flavors.ListExtraSpecs(c.client, flavor.ID)
 	if result.Err != nil {
 		return nil, result.Err
@@ -167,7 +187,12 @@ func FlavorGPUs(flavor *flavors.Flavor, extraSpecs map[string]string) (*GPUMeta,
 }
 
 // Images returns a list of images.
-func (c *ComputeClient) Images() ([]images.Image, error) {
+func (c *ComputeClient) Images(ctx context.Context) ([]images.Image, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/compute/v2/images", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	// Only return active images that are ready to be used.
 	opts := &images.ListOpts{
 		Status: "ACTIVE",
@@ -210,7 +235,12 @@ func (c *ComputeClient) Images() ([]images.Image, error) {
 }
 
 // AvailabilityZones returns a list of availability zones.
-func (c *ComputeClient) AvailabilityZones() ([]availabilityzones.AvailabilityZone, error) {
+func (c *ComputeClient) AvailabilityZones(ctx context.Context) ([]availabilityzones.AvailabilityZone, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/compute/v2/os-availability-zones", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	page, err := availabilityzones.List(c.client).AllPages()
 	if err != nil {
 		return nil, err

@@ -17,11 +17,16 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/eschercloudai/unikorn/pkg/constants"
 )
 
 // NetworkClient wraps the generic client because gophercloud is unsafe.
@@ -83,7 +88,12 @@ func (n *Network) UnmarshalJSON(b []byte) error {
 }
 
 // ExternalNetworks returns a list of external networks.
-func (c *NetworkClient) ExternalNetworks() ([]Network, error) {
+func (c *NetworkClient) ExternalNetworks(ctx context.Context) ([]Network, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/networking/v2.0/networks", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	// This sucks, you cannot directly query for external networks...
 	page, err := networks.List(c.client, &networks.ListOpts{}).AllPages()
 	if err != nil {

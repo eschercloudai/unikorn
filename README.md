@@ -230,8 +230,10 @@ To enable it add the parameter `--set server.enabled=true`.
 
 ## Monitoring & Logging
 
-Can be enabled with the `--set monitoring.enabled=true` flag.
-See the [monitoring & logging](docs/monitoring.md) documentation from more information.
+* Prometheus monitoring can be enabled with the `--set monitoring.enabled=true` flag.
+* OTLP (e.g. Jaeger) tracing can be enabled with the `set server.otlpEndpoint=jaeger-collector.default:4318` flag.
+
+See the [monitoring & logging](docs/monitoring.md) documentation from more information on configuring those services in the first instance..
 
 ## Documentation
 
