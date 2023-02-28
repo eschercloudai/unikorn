@@ -229,7 +229,13 @@ func start() {
 		},
 	}
 
-	handlerInterface := handler.New(client, authenticator, handlerOptions)
+	handlerInterface, err := handler.New(client, authenticator, handlerOptions)
+	if err != nil {
+		logger.Error(err, "failed to handler")
+
+		return
+	}
+
 	chiServerhandler := generated.HandlerWithOptions(handlerInterface, chiServerOptions)
 
 	server := &http.Server{
