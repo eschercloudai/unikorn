@@ -17,11 +17,17 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/applicationcredentials"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/eschercloudai/unikorn/pkg/constants"
 )
 
 // IdentityClient wraps up gophercloud identity management.
@@ -126,7 +132,12 @@ func (o *CreateTokenOptionsScopedToken) Options() *tokens.AuthOptions {
 }
 
 // CreateToken issues a new token.
-func (c *IdentityClient) CreateToken(options CreateTokenOptions) (*tokens.Token, *tokens.User, error) {
+func (c *IdentityClient) CreateToken(ctx context.Context, options CreateTokenOptions) (*tokens.Token, *tokens.User, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/identity/v3/auth/tokens", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	result := tokens.Create(c.client, options.Options())
 
 	token, err := result.ExtractToken()
@@ -144,7 +155,12 @@ func (c *IdentityClient) CreateToken(options CreateTokenOptions) (*tokens.Token,
 
 // ListAvailableProjects lists projects that an authenticated (but unscoped) user can
 // scope to.
-func (c *IdentityClient) ListAvailableProjects() ([]projects.Project, error) {
+func (c *IdentityClient) ListAvailableProjects(ctx context.Context) ([]projects.Project, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/identity/v3/auth/projects", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	page, err := projects.ListAvailable(c.client).AllPages()
 	if err != nil {
 		return nil, err
@@ -159,7 +175,12 @@ func (c *IdentityClient) ListAvailableProjects() ([]projects.Project, error) {
 }
 
 // ListApplicationCredentials lists application credentials for the scoped user.
-func (c *IdentityClient) ListApplicationCredentials(userID string) ([]applicationcredentials.ApplicationCredential, error) {
+func (c *IdentityClient) ListApplicationCredentials(ctx context.Context, userID string) ([]applicationcredentials.ApplicationCredential, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/identity/v3/users/"+userID+"/application_credentials", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	page, err := applicationcredentials.List(c.client, userID, nil).AllPages()
 	if err != nil {
 		return nil, err
@@ -174,7 +195,12 @@ func (c *IdentityClient) ListApplicationCredentials(userID string) ([]applicatio
 }
 
 // CreateApplicationCredential creates an application credential for the user.
-func (c *IdentityClient) CreateApplicationCredential(userID, name, description string, roles []string) (*applicationcredentials.ApplicationCredential, error) {
+func (c *IdentityClient) CreateApplicationCredential(ctx context.Context, userID, name, description string, roles []string) (*applicationcredentials.ApplicationCredential, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/identity/v3/users/"+userID+"/application_credentials", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	applicationRoles := make([]applicationcredentials.Role, len(roles))
 
 	for i, role := range roles {
@@ -196,6 +222,11 @@ func (c *IdentityClient) CreateApplicationCredential(userID, name, description s
 }
 
 // DeleteApplicationCredential deletes an application credential for the user.
-func (c *IdentityClient) DeleteApplicationCredential(userID, id string) error {
+func (c *IdentityClient) DeleteApplicationCredential(ctx context.Context, userID, id string) error {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/identity/v3/users/"+userID+"/application_credentials/"+id, trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
 	return applicationcredentials.Delete(c.client, userID, id).ExtractErr()
 }

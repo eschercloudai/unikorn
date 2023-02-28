@@ -17,6 +17,7 @@ limitations under the License.
 package completion
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gophercloud/utils/openstack/clientconfig"
@@ -53,7 +54,7 @@ func OpenstackExternalNetworkCompletionFunc(cloud *string) func(*cobra.Command, 
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		results, err := client.ExternalNetworks()
+		results, err := client.ExternalNetworks(context.Background())
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -78,7 +79,7 @@ func OpenstackSSHKeyCompletionFunc(cloud *string) func(*cobra.Command, []string,
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		results, err := client.KeyPairs()
+		results, err := client.KeyPairs(context.Background())
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -105,7 +106,7 @@ func OpenstackFlavorCompletionFunc(cloud *string) func(*cobra.Command, []string,
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		results, err := client.Flavors()
+		results, err := client.Flavors(context.Background())
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -130,7 +131,7 @@ func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, 
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		results, err := client.Images()
+		results, err := client.Images(context.Background())
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -155,7 +156,7 @@ func OpenstackComputeAvailabilityZoneCompletionFunc(cloud *string) func(*cobra.C
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		results, err := client.AvailabilityZones()
+		results, err := client.AvailabilityZones(context.Background())
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -180,7 +181,7 @@ func OpenstackVolumeAvailabilityZoneCompletionFunc(cloud *string) func(*cobra.Co
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		results, err := client.AvailabilityZones()
+		results, err := client.AvailabilityZones(context.Background())
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

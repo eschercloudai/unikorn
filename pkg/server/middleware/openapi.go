@@ -23,7 +23,10 @@ import (
 	"net/http"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 
@@ -105,20 +108,25 @@ func (w *bufferingResponseWriter) StatusCode() int {
 	return w.code
 }
 
-// ServeHTTP implements the http.Handler interface.
-func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log := log.FromContext(r.Context())
+func (v *OpenAPIValidator) validateRequest(r *http.Request, authContext *authorizationContext) (*openapi3filter.ResponseValidationInput, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	ctx, span := tracer.Start(r.Context(), "openapi request validation",
+		trace.WithSpanKind(trace.SpanKindInternal),
+	)
+	defer span.End()
 
 	route, params, err := v.openapi.findRoute(r)
 	if err != nil {
-		errors.HandleError(w, r, err)
-
-		return
+		return nil, errors.OAuth2ServerError("route lookup failure").WithError(err)
 	}
 
-	authContext := &authorizationContext{}
-
 	authorizationFunc := func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+		_, span := tracer.Start(ctx, "authentication",
+			trace.WithSpanKind(trace.SpanKindInternal),
+		)
+		defer span.End()
+
 		err := v.authorizer.authorizeScheme(authContext, input.RequestValidationInput.Request, input.SecurityScheme, input.Scopes)
 
 		authContext.err = err
@@ -131,28 +139,59 @@ func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		AuthenticationFunc:    authorizationFunc,
 	}
 
-	requestOptions := &openapi3filter.RequestValidationInput{
+	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
 		PathParams: params,
 		Route:      route,
 		Options:    options,
 	}
 
-	if err := openapi3filter.ValidateRequest(r.Context(), requestOptions); err != nil {
+	if err := openapi3filter.ValidateRequest(ctx, requestValidationInput); err != nil {
 		if authContext.err != nil {
-			errors.HandleError(w, r, authContext.err)
-
-			return
+			return nil, err
 		}
 
-		errors.OAuth2InvalidRequest("request invalid").WithError(err).Write(w, r)
+		return nil, errors.OAuth2InvalidRequest("request invalid").WithError(err)
+	}
+
+	responseValidationInput := &openapi3filter.ResponseValidationInput{
+		RequestValidationInput: requestValidationInput,
+		Options:                options,
+	}
+
+	return responseValidationInput, nil
+}
+
+func (v *OpenAPIValidator) validateResponse(w *bufferingResponseWriter, r *http.Request, responseValidationInput *openapi3filter.ResponseValidationInput) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	ctx, span := tracer.Start(r.Context(), "openapi response validation",
+		trace.WithSpanKind(trace.SpanKindInternal),
+	)
+	defer span.End()
+
+	responseValidationInput.Status = w.StatusCode()
+	responseValidationInput.Header = w.Header()
+	responseValidationInput.Body = w.body
+
+	if err := openapi3filter.ValidateResponse(ctx, responseValidationInput); err != nil {
+		log.FromContext(ctx).Error(err, "response openapi schema validation failure")
+	}
+}
+
+// ServeHTTP implements the http.Handler interface.
+func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	authContext := &authorizationContext{}
+
+	responseValidationInput, err := v.validateRequest(r, authContext)
+	if err != nil {
+		errors.HandleError(w, r, err)
 
 		return
 	}
 
 	// Add any contextual information to bubble up to the handler.
-	c := authorization.NewContextWithClaims(r.Context(), authContext.claims)
-	r = r.WithContext(c)
+	r = r.WithContext(authorization.NewContextWithClaims(r.Context(), authContext.claims))
 
 	// Override the writer so we can inspect the contents and status.
 	writer := &bufferingResponseWriter{
@@ -161,17 +200,7 @@ func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	v.next.ServeHTTP(writer, r)
 
-	responseOptions := &openapi3filter.ResponseValidationInput{
-		RequestValidationInput: requestOptions,
-		Status:                 writer.StatusCode(),
-		Header:                 writer.Header(),
-		Body:                   writer.body,
-		Options:                options,
-	}
-
-	if err := openapi3filter.ValidateResponse(c, responseOptions); err != nil {
-		log.Error(err, "response openapi schema validation failure")
-	}
+	v.validateResponse(writer, r, responseValidationInput)
 }
 
 // OpenAPIValidatorMiddlewareFactory returns a function that generates per-request

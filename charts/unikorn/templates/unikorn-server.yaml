@@ -108,6 +108,9 @@ spec:
             {{ printf "- --application-credential-roles=%s" (join "," $roles) | nindent 8 }}
           {{- end }}
         {{- end }}
+        {{- if .Values.server.otlpEndpoint }}
+          {{ printf "- --otlp-endpoint=%s" .Values.server.otlpEndpoint | nindent 8 }}
+        {{- end }}
         volumeMounts:
         - name: unikorn-server-jose-tls
           mountPath: /var/lib/secrets/unikorn.eschercloud.ai/jose

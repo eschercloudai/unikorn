@@ -155,12 +155,12 @@ func (o *createWorkloadPoolOptions) applyAutoscaling(workloadPool *unikornv1alph
 		return err
 	}
 
-	flavor, err := compute.Flavor(o.flavor)
+	flavor, err := compute.Flavor(context.Background(), o.flavor)
 	if err != nil {
 		return err
 	}
 
-	flavorExtraSpecs, err := compute.FlavorExtraSpecs(flavor)
+	flavorExtraSpecs, err := compute.FlavorExtraSpecs(context.Background(), flavor)
 	if err != nil {
 		return err
 	}

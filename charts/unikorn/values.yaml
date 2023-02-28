@@ -48,6 +48,9 @@ server:
   # Sets the DNS hosts/X.509 Certs.
   host: kubernetes.eschercloud.com
 
+  # Sets the OTLP endpoint for shipping spans.
+  # otlpEndpoint: jaeger-collector.default:4318
+
   # Allow configuration of application credentials.
   applicationCredentials:
     # Sets the roles to grant to credentials.  It is up to the Openstack administrator

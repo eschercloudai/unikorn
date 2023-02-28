@@ -24,7 +24,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.18.0"
+	"go.opentelemetry.io/otel/semconv/v1.18.0/httpconv"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -71,14 +72,19 @@ func logValuesFromSpanContext(s trace.SpanContext) []interface{} {
 	}
 }
 
-// loggingSpanProcessor is a OpenTelemetry span processor that logs to standard out
+// LoggingSpanProcessor is a OpenTelemetry span processor that logs to standard out
 // in whatever format is defined by the logger.
-type loggingSpanProcessor struct{}
+type LoggingSpanProcessor struct{}
 
 // Check the correct interface is implmented.
-var _ sdktrace.SpanProcessor = &loggingSpanProcessor{}
+var _ sdktrace.SpanProcessor = &LoggingSpanProcessor{}
 
-func (*loggingSpanProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {
+func (*LoggingSpanProcessor) OnStart(ctx context.Context, s sdktrace.ReadWriteSpan) {
+	// Only log root spans.
+	if s.Parent().IsValid() {
+		return
+	}
+
 	attributes := logValuesFromSpanContext(s.SpanContext())
 
 	for _, attribute := range s.Attributes() {
@@ -88,7 +94,12 @@ func (*loggingSpanProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	log.Log.Info("request started", attributes...)
 }
 
-func (*loggingSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
+func (*LoggingSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
+	// Only log root spans.
+	if s.Parent().IsValid() {
+		return
+	}
+
 	attributes := logValuesFromSpanContext(s.SpanContext())
 
 	for _, attribute := range s.Attributes() {
@@ -98,64 +109,60 @@ func (*loggingSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 	log.Log.Info("request completed", attributes...)
 }
 
-func (*loggingSpanProcessor) Shutdown(ctx context.Context) error {
+func (*LoggingSpanProcessor) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (*loggingSpanProcessor) ForceFlush(ctx context.Context) error {
+func (*LoggingSpanProcessor) ForceFlush(ctx context.Context) error {
 	return nil
 }
 
 // Logger attaches logging context to the request.
-func Logger(next http.Handler) http.Handler {
+func Logger() func(next http.Handler) http.Handler {
 	// TODO: this needs an implmenetation of https://www.w3.org/TR/trace-context/.
 	// Like everything here, OpenTelemetry is very good at doing nothing by default.
 	propagator := otel.GetTextMapPropagator()
 
-	// Setup a tracer handler that emits the output to the log stream.  In future
-	// this could be an API that exposes to Jaeger or some other visualization.
-	opts := []sdktrace.TracerProviderOption{
-		sdktrace.WithSpanProcessor(&loggingSpanProcessor{}),
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract the tracing information from the HTTP headers.  See above
+			// for what this entails.
+			ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+
+			var attributes []attribute.KeyValue
+
+			// Add in service information.
+			attributes = append(attributes, semconv.ServiceName(constants.Application))
+			attributes = append(attributes, semconv.ServiceVersion(constants.Version))
+
+			// Extract information from the HTTP request for logging purposes.
+			attributes = append(attributes, httpconv.ServerRequest("", r)...)
+			attributes = append(attributes, httpconv.RequestHeader(r.Header)...)
+
+			tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+			// Begin the span processing.
+			ctx, span := tracer.Start(ctx, r.URL.Path,
+				trace.WithSpanKind(trace.SpanKindServer),
+				trace.WithAttributes(attributes...),
+			)
+			defer span.End()
+
+			// Setup logging.
+			ctx = log.IntoContext(ctx, log.Log.WithValues(logValuesFromSpanContext(span.SpanContext())...))
+
+			// Create a new request with any contextual information the tracer has added.
+			request := r.WithContext(ctx)
+
+			writer := &loggingResponseWriter{
+				next: w,
+			}
+
+			next.ServeHTTP(writer, request)
+
+			// Extract HTTP response information for logging purposes.
+			span.SetStatus(httpconv.ServerStatus(writer.StatusCode()))
+			span.SetAttributes(httpconv.ResponseHeader(writer.Header())...)
+		})
 	}
-
-	// TODO: I imagine this is supposed to be shared rather than per-request, it's
-	// probably quite light-weight though.
-	traceProvider := sdktrace.NewTracerProvider(opts...)
-	tracer := traceProvider.Tracer("root")
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Extract the tracing information from the HTTP headers.  See above
-		// for what this entails.
-		ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-
-		// Extract information from the HTTP request for logging purposes.
-		var attributes []attribute.KeyValue
-
-		attributes = append(attributes, semconv.NetAttributesFromHTTPRequest("tcp", r)...)
-		attributes = append(attributes, semconv.EndUserAttributesFromHTTPRequest(r)...)
-		attributes = append(attributes, semconv.HTTPClientAttributesFromHTTPRequest(r)...)
-		attributes = append(attributes, semconv.HTTPServerAttributesFromHTTPRequest(constants.Application, r.URL.Path, r)...)
-
-		// Begin the span processing.
-		ctx, span := tracer.Start(ctx, r.URL.Path, trace.WithSpanKind(trace.SpanKindServer))
-		defer span.End()
-
-		span.SetAttributes(attributes...)
-
-		// Setup logging.
-		ctx = log.IntoContext(ctx, log.Log.WithValues(logValuesFromSpanContext(span.SpanContext())...))
-
-		// Create a new request with any contextual information the tracer has added.
-		request := r.WithContext(ctx)
-
-		writer := &loggingResponseWriter{
-			next: w,
-		}
-
-		next.ServeHTTP(writer, request)
-
-		// Extract HTTP response information for logging purposes.
-		span.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(writer.StatusCode())...)
-		span.SetStatus(semconv.SpanStatusFromHTTPStatusCodeAndSpanKind(writer.StatusCode(), trace.SpanKindServer))
-	})
 }
