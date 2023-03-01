@@ -156,7 +156,8 @@ spec:
   - name: prometheus
     port: 8080
     targetPort: prometheus
-{{- if (and .Values.server.acme .Values.server.acme.cloudflare) }}
+{{- if .Values.server.acme }}
+  {{- if .Values.server.acme.cloudflare }}
 ---
 apiVersion: v1
 kind: Secret
@@ -166,6 +167,7 @@ metadata:
     {{- include "unikorn.labels" . | nindent 4 }}
 data:
   token: {{ .Values.server.acme.cloudflare.apiToken }}
+  {{- end }}
 {{- end }}
 ---
 apiVersion: cert-manager.io/v1
