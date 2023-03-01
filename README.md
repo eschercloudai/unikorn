@@ -30,17 +30,20 @@ Consult the [developer documentation](DEVELOPER.md) for local development instru
 
 ### Installing the Management Binary
 
+**NOTE**: You are better off installing Unikorn Server/UI as a shell, see below for details.
+
 Download the official binary (update the version as appropriate):
 
 ```shell
-wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.2.0/unikornctl-linux-amd64
+wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.3.16/unikornctl-linux-amd64
 ```
 
 ### Set up shell completion
 
 `unikornctl` has a large amount of convenience and contextual awareness built into its various subcommands.  It's strongly recommended to set up shell completion to make your life a lot easier.
 
-#### bash
+<details>
+<summary>BASH</summary>
 
 ```shell
 export TEMP=$(mktemp)
@@ -49,8 +52,10 @@ source ${TEMP}
 ```
 
 For the more adventurous, you can add it to `/etc/bash_completion.d/` or whatever you use.
+</details>
 
-#### zsh
+<details>
+<summary>ZSH</summary>
 
 With zsh, the [recommendation](https://jzelinskie.com/posts/dont-recommend-sourcing-shell-completion/) is to do the following:
 
@@ -66,6 +71,7 @@ fpath=( ~/.zshfunc "${fpath[@]}" )
 ```
 
 And then redirect the output of `unikornctl completion zsh` to `~/.zshfunc/_unikornctl`.
+</details>
 
 ### Installing the Service
 
@@ -171,7 +177,6 @@ spec:
     - CreateNamespace=true
 ```
 </details>
-
 
 #### Installing Unikorn
 
