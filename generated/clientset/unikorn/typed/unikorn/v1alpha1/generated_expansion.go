@@ -18,7 +18,11 @@ limitations under the License.
 
 package v1alpha1
 
+type ApplicationBundleExpansion interface{}
+
 type ControlPlaneExpansion interface{}
+
+type HelmApplicationExpansion interface{}
 
 type KubernetesClusterExpansion interface{}
 

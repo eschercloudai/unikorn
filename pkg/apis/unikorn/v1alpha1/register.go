@@ -49,6 +49,14 @@ const (
 	KubernetesWorkloadPoolKind = "KubernetesWorkloadPool"
 	// KubernetesWorkloadPoolResource is the API endpoint for a workload pool resource.
 	KubernetesWorkloadPoolResource = "kubernetesworkloadpools"
+	// HelmApplicationKind is the API kind for helm application descriptors.
+	HelmApplicationKind = "HelmApplication"
+	// HelmApplicationResource is the API endpoint for helm application descriptors.
+	HelmApplicationResource = "helmapplications"
+	// ApplicationBundleKind is the API kind for a bundle of applications.
+	ApplicationBundleKind = "ApplicationBundle"
+	// ApplicationBundleResource is the API endpoint for bundles of applications.
+	ApplicationBundleResource = "applicationbundles"
 )
 
 var (
@@ -71,6 +79,8 @@ func init() {
 	SchemeBuilder.Register(&ControlPlane{}, &ControlPlaneList{})
 	SchemeBuilder.Register(&KubernetesWorkloadPool{}, &KubernetesWorkloadPoolList{})
 	SchemeBuilder.Register(&KubernetesCluster{}, &KubernetesClusterList{})
+	SchemeBuilder.Register(&HelmApplication{}, &HelmApplicationList{})
+	SchemeBuilder.Register(&ApplicationBundle{}, &ApplicationBundleList{})
 }
 
 // Resource maps a resource type to a group resource.

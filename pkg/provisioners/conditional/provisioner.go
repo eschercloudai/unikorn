@@ -25,41 +25,59 @@ import (
 )
 
 type Provisioner struct {
-	// Name is the conditional name.
-	Name string
+	// name is the conditional name.
+	name string
 
 	// condition will execute the provisioner if true.
-	Condition func() bool
+	condition func() bool
 
-	// Provisioner is the provisioner to provision.
-	Provisioner provisioners.Provisioner
+	// provisioner is the provisioner to provision.
+	provisioner provisioners.Provisioner
+}
+
+func New(name string, condition func() bool, provisioner provisioners.Provisioner) *Provisioner {
+	return &Provisioner{
+		name:        name,
+		condition:   condition,
+		provisioner: provisioner,
+	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+// OnRemote implements the Provision interface.
+func (p *Provisioner) OnRemote(_ provisioners.RemoteCluster) provisioners.Provisioner {
+	return p
+}
+
+// InNamespace implements the Provision interface.
+func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
+	return p
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	if !p.Condition() {
-		log.Info("skipping conditional provision", "provisioner", p.Name)
+	if !p.condition() {
+		log.Info("skipping conditional provision", "provisioner", p.name)
 
 		return nil
 	}
 
-	return p.Provisioner.Provision(ctx)
+	return p.provisioner.Provision(ctx)
 }
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	if !p.Condition() {
-		log.Info("skipping conditional deprovision", "provisioner", p.Name)
+	if !p.condition() {
+		log.Info("skipping conditional deprovision", "provisioner", p.name)
 
 		return nil
 	}
 
-	return p.Provisioner.Deprovision(ctx)
+	return p.provisioner.Deprovision(ctx)
 }

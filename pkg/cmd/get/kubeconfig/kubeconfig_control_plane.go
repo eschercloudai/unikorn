@@ -26,7 +26,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"

@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
@@ -42,6 +42,9 @@ type createControlPlaneOptions struct {
 	// name is the name of the control plane to create.
 	name string
 
+	// applicationBundle is the version to provision.
+	applicationBundle string
+
 	// client gives access to our custom resources.
 	client unikorn.Interface
 }
@@ -49,6 +52,7 @@ type createControlPlaneOptions struct {
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	o.projectFlags.AddFlags(f, cmd)
+	flags.RequiredStringVarWithCompletion(cmd, &o.applicationBundle, "application-bundle", "", "Application bundle, defining component versions, to deploy", flags.CompleteApplicationBundle(f, unikornv1.ApplicationBundleResourceKindControlPlane))
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -88,7 +92,7 @@ func (o *createControlPlaneOptions) run() error {
 		return err
 	}
 
-	controlPlane := &unikornv1alpha1.ControlPlane{
+	controlPlane := &unikornv1.ControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.name,
 			Labels: map[string]string{
@@ -96,13 +100,16 @@ func (o *createControlPlaneOptions) run() error {
 				constants.ProjectLabel: o.projectFlags.Project,
 			},
 		},
+		Spec: unikornv1.ControlPlaneSpec{
+			ApplicationBundle: &o.applicationBundle,
+		},
 	}
 
 	if _, err := o.client.UnikornV1alpha1().ControlPlanes(namespace).Create(context.TODO(), controlPlane, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
-	fmt.Printf("%s.%s/%s created\n", unikornv1alpha1.ControlPlaneResource, unikornv1alpha1.GroupName, o.name)
+	fmt.Printf("%s.%s/%s created\n", unikornv1.ControlPlaneResource, unikornv1.GroupName, o.name)
 
 	return nil
 }

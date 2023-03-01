@@ -24,7 +24,7 @@ import (
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/controlplane"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/controlplane"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -57,7 +57,7 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 
-	provisioner, err := controlplane.New(r.client, object)
+	provisioner, err := controlplane.New(ctx, r.client, object)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

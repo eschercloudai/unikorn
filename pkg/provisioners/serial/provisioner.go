@@ -25,29 +25,46 @@ import (
 )
 
 type Provisioner struct {
-	// Name is the group name.
-	Name string
+	// name is the group name.
+	name string
 
-	// Provisioners are the provisioner to provision in order.
-	Provisioners []provisioners.Provisioner
+	// provisioners are the provisioner to provision in order.
+	provisioners []provisioners.Provisioner
+}
+
+func New(name string, provisioners ...provisioners.Provisioner) *Provisioner {
+	return &Provisioner{
+		name:         name,
+		provisioners: provisioners,
+	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+// OnRemote implements the Provision interface.
+func (p *Provisioner) OnRemote(_ provisioners.RemoteCluster) provisioners.Provisioner {
+	return p
+}
+
+// InNamespace implements the Provision interface.
+func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
+	return p
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning serial group", "group", p.Name)
+	log.Info("provisioning serial group", "group", p.name)
 
-	for _, provisioner := range p.Provisioners {
+	for _, provisioner := range p.provisioners {
 		if err := provisioner.Provision(ctx); err != nil {
 			return err
 		}
 	}
 
-	log.Info("serial group provisioned", "group", p.Name)
+	log.Info("serial group provisioned", "group", p.name)
 
 	return nil
 }
@@ -59,17 +76,17 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning serial group", "group", p.Name)
+	log.Info("deprovisioning serial group", "group", p.name)
 
-	for i := range p.Provisioners {
-		provisioner := p.Provisioners[len(p.Provisioners)-(i+1)]
+	for i := range p.provisioners {
+		provisioner := p.provisioners[len(p.provisioners)-(i+1)]
 
 		if err := provisioner.Deprovision(ctx); err != nil {
 			return err
 		}
 	}
 
-	log.Info("serial group deprovisioned", "group", p.Name)
+	log.Info("serial group deprovisioned", "group", p.name)
 
 	return nil
 }

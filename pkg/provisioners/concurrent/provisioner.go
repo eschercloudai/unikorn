@@ -27,27 +27,44 @@ import (
 )
 
 type Provisioner struct {
-	// Group is the concurrency group name.
-	Group string
+	// anem is the concurrency group name.
+	name string
 
-	// Provisioners is the set of provisions to provision
+	// provisioners is the set of provisions to provision
 	// concurrently.
-	Provisioners []provisioners.Provisioner
+	provisioners []provisioners.Provisioner
+}
+
+func New(name string, provisioners ...provisioners.Provisioner) *Provisioner {
+	return &Provisioner{
+		name:         name,
+		provisioners: provisioners,
+	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+// OnRemote implements the Provision interface.
+func (p *Provisioner) OnRemote(_ provisioners.RemoteCluster) provisioners.Provisioner {
+	return p
+}
+
+// InNamespace implements the Provision interface.
+func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
+	return p
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning concurrency group", "group", p.Group)
+	log.Info("provisioning concurrency group", "group", p.name)
 
 	group, gctx := errgroup.WithContext(ctx)
 
-	for i := range p.Provisioners {
-		provisioner := p.Provisioners[i]
+	for i := range p.provisioners {
+		provisioner := p.provisioners[i]
 
 		group.Go(func() error { return provisioner.Provision(gctx) })
 	}
@@ -56,7 +73,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("concurrency group provisioned", "group", p.Group)
+	log.Info("concurrency group provisioned", "group", p.name)
 
 	return nil
 }
@@ -65,12 +82,12 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning concurrency group", "group", p.Group)
+	log.Info("deprovisioning concurrency group", "group", p.name)
 
 	group, gctx := errgroup.WithContext(ctx)
 
-	for i := range p.Provisioners {
-		provisioner := p.Provisioners[i]
+	for i := range p.provisioners {
+		provisioner := p.provisioners[i]
 
 		group.Go(func() error { return provisioner.Deprovision(gctx) })
 	}
@@ -79,7 +96,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("concurrency group deprovisioned", "group", p.Group)
+	log.Info("concurrency group deprovisioned", "group", p.name)
 
 	return nil
 }

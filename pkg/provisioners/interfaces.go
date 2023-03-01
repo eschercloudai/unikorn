@@ -18,12 +18,41 @@ package provisioners
 
 import (
 	"context"
+
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
+
+// Generator is an abstraction around the sources of remote
+// clusters e.g. a cluster API or vcluster Kubernetes instance.
+type RemoteCluster interface {
+	// Name is a unique name for the remote cluster provider. This,
+	// and labels, must be able to be procedurally generated in order to
+	// delete the remote by name, when the Server() is unavailable e.g
+	// derived from a deleted resource.
+	Name() string
+
+	// Labels define a set of strings that combine with the
+	// name to yield a unique remote cluster name.
+	Labels() []string
+
+	// Server is the URL for the remote cluster endpoint.
+	Server(ctx context.Context) (string, error)
+
+	// Config returns the client configuration (aka parsed Kubeconfig.)
+	Config(ctx context.Context) (*clientcmdapi.Config, error)
+}
 
 // Provisioner is an abstract type that allows provisioning of Kubernetes
 // packages in a technology agnostic way.  For example some things may be
 // installed as a raw set of resources, a YAML manifest, Helm etc.
 type Provisioner interface {
+	// OnRemote allows a provisioner to target a specific cluster.
+	OnRemote(RemoteCluster) Provisioner
+
+	// InNamespace allows the setting of the provisioning namespace
+	// at a generic level.
+	InNamespace(string) Provisioner
+
 	// Provision deploys the requested package.
 	// Implementations should ensure this receiver is idempotent.
 	Provision(context.Context) error

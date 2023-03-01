@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
@@ -30,6 +31,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -57,22 +59,30 @@ type MutuallyExclusiveResource interface {
 	ResourceLabels() (labels.Set, error)
 }
 
-// Generator defines a common interface for clients to
-// generate application templates.
-type Generator interface {
-	// Resouece returns the parent resource an application
-	// belongs to.
-	Resource() MutuallyExclusiveResource
+// ReleaseNamer is an interface that allows generators to supply an implicit release
+// name to Helm.
+type ReleaseNamer interface {
+	ReleaseName() string
+}
 
-	// Name returns the unique application name.
-	Name() string
+// Paramterizer is an interface that allows generators to supply a list of parameters
+// to Helm.  These are in addition to those defined by the application template.  At
+// present, there is nothing special about overriding, it just appends, so ensure the
+// explicit and implicit sets don't overlap.
+type Paramterizer interface {
+	Parameters(version *string) (map[string]string, error)
+}
 
-	// Generate creates an application resource template. It just needs
-	// to return the spec as a top level key, all other type and object
-	// meta are filled in by this.
-	// TODO: This is still very Argo specific, we need to abstract away
-	// this to be more Helm-centric.
-	Generate() (client.Object, error)
+// ValuesGenerator is an interface that allows generators to supply a raw values.yaml
+// file to Helm.  This accepts an object that can be marshaled to YAML.
+type ValuesGenerator interface {
+	Values(version *string) (interface{}, error)
+}
+
+// Customizer is a generic generator interface that implemnets raw customizations to
+// the application template.  Try to avoid using this.
+type Customizer interface {
+	Customize(version *string, object *unstructured.Unstructured) error
 }
 
 // Provisioner deploys an application that is keyed to a specific resource.
@@ -88,69 +98,240 @@ type Provisioner struct {
 	client client.Client
 
 	// remote is the remote cluster to deploy to.
-	remote remotecluster.Generator
+	remote provisioners.RemoteCluster
 
 	// remoteNamespace explicitly sets the namespace for the application.
 	namespace string
 
 	// generator provides application generation functionality.
-	generator Generator
+	generator interface{}
+
+	// resource is the top level resource an application belongs to, this
+	// is used to derive a unique label set to identify the resource.
+	resource MutuallyExclusiveResource
+
+	// name is the application name.
+	name string
+
+	// application is the generic Helm application descriptor.
+	application *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, generator Generator) *Provisioner {
+func New(client client.Client, name string, resource MutuallyExclusiveResource, application *unikornv1.HelmApplication) *Provisioner {
 	return &Provisioner{
-		client:    client,
-		generator: generator,
+		client:      client,
+		name:        name,
+		resource:    resource,
+		application: application,
 	}
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-// OnRemote deploys the application on a remote cluster.
-func (p *Provisioner) OnRemote(remote remotecluster.Generator) *Provisioner {
+// OnRemote implements the Provision interface.
+func (p *Provisioner) OnRemote(remote provisioners.RemoteCluster) provisioners.Provisioner {
 	p.remote = remote
 
 	return p
 }
 
 // InNamespace deploys the application into an explicit namespace.
-func (p *Provisioner) InNamespace(namespace string) *Provisioner {
+func (p *Provisioner) InNamespace(namespace string) provisioners.Provisioner {
 	p.namespace = namespace
 
 	return p
 }
 
-// labels returns a unique set of labels for the application.
-func (p *Provisioner) labels() (labels.Set, error) {
-	l, err := p.generator.Resource().ResourceLabels()
-	if err != nil {
-		return nil, err
-	}
+// WithGenerator registers an object that can generate implicit configuration where
+// you cannot do it all from the default set of arguments.
+func (p *Provisioner) WithGenerator(generator interface{}) *Provisioner {
+	p.generator = generator
 
-	return labels.Merge(l, labels.Set{constants.ApplicationLabel: p.generator.Name()}), nil
+	return p
 }
 
-// toUnstructured converts the provided object to a canonical unstructured form.
-func (p *Provisioner) toUnstructured() (*unstructured.Unstructured, error) {
-	object, err := p.generator.Generate()
+// getLabels returns a unique set of labels for the application.
+func (p *Provisioner) getLabels() (labels.Set, error) {
+	l, err := p.resource.ResourceLabels()
 	if err != nil {
 		return nil, err
 	}
 
-	switch t := object.(type) {
-	case *unstructured.Unstructured:
-		return t, nil
-	default:
-		u := &unstructured.Unstructured{}
+	return labels.Merge(l, labels.Set{constants.ApplicationLabel: p.name}), nil
+}
 
-		if err := p.client.Scheme().Convert(t, u, nil); err != nil {
-			return nil, err
+// getReleaseName uses the release name in the application spec by default
+// but allows the generator to override it.
+func (p *Provisioner) getReleaseName() *string {
+	name := p.application.Spec.Release
+
+	if p.generator != nil {
+		if releaseNamer, ok := p.generator.(ReleaseNamer); ok {
+			override := releaseNamer.ReleaseName()
+
+			if override != "" {
+				name = &override
+			}
 		}
-
-		return u, nil
 	}
+
+	return name
+}
+
+// getParameters constructs a full list of Helm parameters by taking those provided
+// in the application spec, and appending any that the generator yields.
+func (p *Provisioner) getParameters() ([]interface{}, error) {
+	parameters := make([]interface{}, 0, len(p.application.Spec.Parameters))
+
+	for _, parameter := range p.application.Spec.Parameters {
+		parameters = append(parameters, map[string]interface{}{
+			"name":  parameter.Name,
+			"value": parameter.Value,
+		})
+	}
+
+	if p.generator != nil {
+		if parameterizer, ok := p.generator.(Paramterizer); ok {
+			p, err := parameterizer.Parameters(p.application.Spec.Interface)
+			if err != nil {
+				return nil, err
+			}
+
+			for name, value := range p {
+				parameters = append(parameters, map[string]interface{}{
+					"name":  name,
+					"value": value,
+				})
+			}
+		}
+	}
+
+	return parameters, nil
+}
+
+// getValues delegates to the generator to get an option values.yaml file to
+// pass to Helm.
+func (p *Provisioner) getValues() (string, error) {
+	if p.generator == nil {
+		return "", nil
+	}
+
+	valuesGenerator, ok := p.generator.(ValuesGenerator)
+	if !ok {
+		return "", nil
+	}
+
+	values, err := valuesGenerator.Values(p.application.Spec.Interface)
+	if err != nil {
+		return "", err
+	}
+
+	marshaled, err := yaml.Marshal(values)
+	if err != nil {
+		return "", err
+	}
+
+	return string(marshaled), nil
+}
+
+// getDestinationName returns the destination cluster name.
+func (p *Provisioner) getDestinationName() string {
+	name := "in-cluster"
+
+	if p.remote != nil {
+		name = remotecluster.GenerateName(p.remote)
+	}
+
+	return name
+}
+
+// getDestinationNamespace returns an explicit namespace if one is set.
+func (p *Provisioner) getDestinationNamespace() string {
+	namespace := ""
+
+	if p.namespace != "" {
+		namespace = p.namespace
+	}
+
+	return namespace
+}
+
+// getSyncOptions accumulates any synchronization options.
+func (p *Provisioner) getSyncOptions() []interface{} {
+	var options []interface{}
+
+	if p.application.Spec.CreateNamespace != nil && *p.application.Spec.CreateNamespace {
+		options = append(options, "CreateNamespace=true")
+	}
+
+	return options
+}
+
+// generateResource converts the provided object to a canonical unstructured form.
+func (p *Provisioner) generateResource() (*unstructured.Unstructured, error) {
+	labels, err := p.getLabels()
+	if err != nil {
+		return nil, err
+	}
+
+	parameters, err := p.getParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	values, err := p.getValues()
+	if err != nil {
+		return nil, err
+	}
+
+	object := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "Application",
+			"metadata": map[string]interface{}{
+				"generateName": p.name + "-",
+				"namespace":    namespace,
+				"labels":       labels,
+			},
+			"spec": map[string]interface{}{
+				"project": "default",
+				"source": map[string]interface{}{
+					"repoURL":        p.application.Spec.Repo,
+					"chart":          p.application.Spec.Chart,
+					"path":           p.application.Spec.Path,
+					"targetRevision": p.application.Spec.Version,
+					"helm": map[string]interface{}{
+						"releaseName": p.getReleaseName(),
+						"parameters":  parameters,
+						"values":      values,
+					},
+				},
+				"destination": map[string]interface{}{
+					"name":      p.getDestinationName(),
+					"namespace": p.getDestinationNamespace(),
+				},
+				"syncPolicy": map[string]interface{}{
+					"automated": map[string]interface{}{
+						"selfHeal": true,
+						"prune":    true,
+					},
+					"syncOptions": p.getSyncOptions(),
+				},
+			},
+		},
+	}
+
+	if p.generator != nil {
+		if customization, ok := p.generator.(Customizer); ok {
+			if err := customization.Customize(p.application.Spec.Interface, object); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return object, nil
 }
 
 // findApplication looks up any existing resource using a label selector, you must use
@@ -165,7 +346,7 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 		},
 	}
 
-	l, err := p.labels()
+	l, err := p.getLabels()
 	if err != nil {
 		return nil, err
 	}
@@ -187,60 +368,15 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 	return resource, nil
 }
 
-// applyResourceDefaults adds in things we explicitly control about the application.
-func (p *Provisioner) applyResourceDefaults(object *unstructured.Unstructured) error {
-	labels, err := p.labels()
-	if err != nil {
-		return err
-	}
-
-	object.SetAPIVersion("argoproj.io/v1alpha1")
-	object.SetKind("Application")
-	object.SetGenerateName(p.generator.Name() + "-")
-	object.SetNamespace(namespace)
-	object.SetLabels(labels)
-
-	return nil
-}
-
-// applyResourceDestination adds in optional destination information.
-func (p *Provisioner) applyResourceDestination(object *unstructured.Unstructured) error {
-	destination := map[string]interface{}{}
-
-	if p.remote != nil {
-		destination["name"] = remotecluster.GenerateName(p.remote)
-	}
-
-	if p.namespace != "" {
-		destination["namespace"] = p.namespace
-	}
-
-	if len(destination) != 0 {
-		if err := unstructured.SetNestedField(object.Object, destination, "spec", "destination"); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning application", "application", p.generator.Name())
+	log.Info("provisioning application", "application", p.name)
 
 	// Convert the generic object type into unstructured for the next bit...
-	required, err := p.toUnstructured()
+	required, err := p.generateResource()
 	if err != nil {
-		return err
-	}
-
-	if err := p.applyResourceDefaults(required); err != nil {
-		return err
-	}
-
-	if err := p.applyResourceDestination(required); err != nil {
 		return err
 	}
 
@@ -253,7 +389,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	if resource == nil {
-		log.Info("creating new application", "application", p.generator.Name())
+		log.Info("creating new application", "application", p.name)
 
 		if err := p.client.Create(ctx, required); err != nil {
 			return err
@@ -261,7 +397,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 		resource = required
 	} else {
-		log.Info("updating existing application", "application", p.generator.Name())
+		log.Info("updating existing application", "application", p.name)
 
 		// Replace the specification with what we expect.
 		temp := resource.DeepCopy()
@@ -272,7 +408,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		}
 	}
 
-	log.Info("waiting for application to become healthy", "application", p.generator.Name())
+	log.Info("waiting for application to become healthy", "application", p.name)
 
 	applicationHealthy := readiness.NewApplicationHealthy(p.client, resource)
 
@@ -280,7 +416,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("application provisioned", "application", p.generator.Name())
+	log.Info("application provisioned", "application", p.name)
 
 	return nil
 }
@@ -289,7 +425,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning application", "application", p.generator.Name())
+	log.Info("deprovisioning application", "application", p.name)
 
 	resource, err := p.findApplication(ctx)
 	if err != nil {
@@ -297,12 +433,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	if resource == nil {
-		log.Info("application does not exist", "application", p.generator.Name())
+		log.Info("application does not exist", "application", p.name)
 
 		return nil
 	}
 
-	log.Info("adding application finalizer", "application", p.generator.Name())
+	log.Info("adding application finalizer", "application", p.name)
 
 	// Apply a finalizer to ensure synchronous deletion. See
 	// https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/
@@ -313,19 +449,19 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("deleting application", "application", p.generator.Name())
+	log.Info("deleting application", "application", p.name)
 
 	if err := p.client.Delete(ctx, resource); err != nil {
 		return err
 	}
 
-	log.Info("waiting for application deletion", "application", p.generator.Name())
+	log.Info("waiting for application deletion", "application", p.name)
 
 	if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, resource)).Check(ctx); err != nil {
 		return err
 	}
 
-	log.Info("application deleted", "application", p.generator.Name())
+	log.Info("application deleted", "application", p.name)
 
 	return nil
 }
