@@ -156,35 +156,43 @@ spec:
   - name: prometheus
     port: 8080
     targetPort: prometheus
+{{- if (and .Values.server.acme .Values.server.acme.cloudflare) }}
 ---
-# TODO: Use ACME for production releases.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: unikorn-server-ingress-cloudflare-api-token
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
+data:
+  token: {{ .Values.server.acme.cloudflare.apiToken }}
+{{- end }}
+---
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: unikorn-server-ingress
+  labels:
+    {{- include "unikorn.labels" . | nindent 4 }}
 spec:
+{{- if .Values.server.acme }}
+  acme:
+    email: {{ .Values.server.acme.email }}
+    server: {{ .Values.server.acme.server }}
+    privateKeySecretRef:
+      name: unikorn-server-ingress-acme-key
+    solvers:
+    - dns01:
+      {{- with $solver := .Values.server.acme.cloudflare }}
+        cloudflare:
+          email: {{ $solver.email }}
+          apiTokenSecretRef:
+            name: unikorn-server-ingress-cloudflare-api-token
+            key: token
+      {{- end }}
+{{- else }}
   selfSigned: {}
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: unikorn-server-ingress-ca
-spec:
-  isCA: true
-  commonName: unikorn-server-ingress-ca
-  secretName: unikorn-server-ingress-ca-tls
-  issuerRef:
-    group: cert-manager.io
-    kind: Issuer
-    name: unikorn-server-ingress
----
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: unikorn-server-ingress-ca
-spec:
-  ca:
-    secretName: unikorn-server-ingress-ca-tls
+{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -193,7 +201,7 @@ metadata:
   labels:
     {{- include "unikorn.labels" . | nindent 4 }}
   annotations:
-    cert-manager.io/issuer: unikorn-server-ingress-ca
+    cert-manager.io/issuer: unikorn-server-ingress
 spec:
   ingressClassName: {{ .Values.server.ingressClass }}
   # For development you will want to add these names to /etc/hosts for the ingress

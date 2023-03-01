@@ -175,6 +175,8 @@ spec:
 
 #### Installing Unikorn
 
+**NOTE**: Unikorn Server is not installed by default, see below for details.
+
 You can install using the local repo, or with CD.
 
 First, unless you are doing local development and want to manually load images, you will want to configure image pull secrets in order to be able to pull the images.
@@ -208,7 +210,7 @@ spec:
   source:
     path: charts/unikorn
     repoURL: git@github.com:eschercloudai/unikorn
-    targetRevision: 0.3.15
+    targetRevision: 0.3.16
     helm:
       parameters:
       - name: dockerConfig
@@ -225,8 +227,43 @@ spec:
 ```
 </details>
 
-**Note:** Unikorn server is not installed by default.
+#### Installing Unikorn Server
+
 To enable it add the parameter `--set server.enabled=true`.
+This will install a developer version of the server with a self-signed certificate.
+
+Rudimentary support exists for ACME certificates using the DNS01 protocol.
+Only Cloudflare has been implemented and tested.
+
+A typical `values.yaml` that uses ACME could look like:
+
+```yaml
+server:
+  enabled: true
+  host: kubernetes.my-domain.com
+  acme:
+    email: spam@my-domain.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    cloudflare:
+      email: cloudflare-user@my-domain.com
+      apiToken: bW92ZV9hbG9uZ19jbGV2ZXJfZGljaw==
+```
+
+The host defines the X.509 SAN, and indeed the host the Ingress will respond to.
+There is no automated DDNS yet, so you will need to manually add the A record when the ingress comes up.
+
+The server shown is the production server, and will be trusted by browsers.
+You can use the `acme-staging-v02` host if just playing around as it's not as badly rate limited.
+
+Finally the API token you will need to configure to allow editing of records in your domain.
+It's base64 encoded e.g. `echo -n MY_TOKEN | base64 -w0`.
+
+#### Installing Unikorn UI
+
+To enable Unikorn UI `--set ui.enabled=true`.
+This only enables the ingress route for now.
+You will also need to install the UI using Helm as described in the [unikorn-ui repository](https://github.com/eschercloudai/unikorn-ui).
+It **must** be installed in the same namespace as Unikorn server in order for the service to be seen by the Ingress.
 
 ## Monitoring & Logging
 
