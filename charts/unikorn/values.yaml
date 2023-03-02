@@ -42,30 +42,17 @@ server:
   # Allows override of the global default image.
   image:
 
-  # Sets the ingress class to use.
-  ingressClass: nginx
+  ingress:
+    # Sets the ingress class to use.
+    ingressClass: nginx
 
-  # Sets the DNS hosts/X.509 Certs.
-  host: kubernetes.eschercloud.com
+    annotations: {}
+
+    # Sets the DNS hosts/X.509 Certs.
+    host: kubernetes.eschercloud.com
 
   # Sets the OTLP endpoint for shipping spans.
   # otlpEndpoint: jaeger-collector.default:4318
-
-  # Handles TLS issuance.  If not specified, this will use self-signed certs.
-  # acme:
-  #   # Email address of the TLS certificate contact.
-  #   email: spjmurray@yahoo.co.uk
-  #
-  #   # Server to generate the certificate/key pair.
-  #   server: https://acme-staging-v02.api.letsencrypt.org/directory
-  #
-  #   # Cloudflare defines a DNS01 solver.
-  #   cloudflare:
-  #     # Cloudflare user ID.
-  #     email: spjmurray@yahoo.co.uk
-  #
-  #     Cloudflare API token, base64 encoded e.g. $(cat ~/my-token | base64 -w0)
-  #     apiToken:
 
   # Allow configuration of application credentials.
   applicationCredentials:

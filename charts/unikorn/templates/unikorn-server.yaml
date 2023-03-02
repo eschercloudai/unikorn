@@ -156,19 +156,7 @@ spec:
   - name: prometheus
     port: 8080
     targetPort: prometheus
-{{- if .Values.server.acme }}
-  {{- if .Values.server.acme.cloudflare }}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: unikorn-server-ingress-cloudflare-api-token
-  labels:
-    {{- include "unikorn.labels" . | nindent 4 }}
-data:
-  token: {{ .Values.server.acme.cloudflare.apiToken }}
-  {{- end }}
-{{- end }}
+{{- if (not .Values.server.ingress.annotations) }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
@@ -177,22 +165,6 @@ metadata:
   labels:
     {{- include "unikorn.labels" . | nindent 4 }}
 spec:
-{{- if .Values.server.acme }}
-  acme:
-    email: {{ .Values.server.acme.email }}
-    server: {{ .Values.server.acme.server }}
-    privateKeySecretRef:
-      name: unikorn-server-ingress-acme-key
-    solvers:
-    - dns01:
-      {{- with $solver := .Values.server.acme.cloudflare }}
-        cloudflare:
-          email: {{ $solver.email }}
-          apiTokenSecretRef:
-            name: unikorn-server-ingress-cloudflare-api-token
-            key: token
-      {{- end }}
-{{- else }}
   selfSigned: {}
 {{- end }}
 ---
@@ -203,14 +175,18 @@ metadata:
   labels:
     {{- include "unikorn.labels" . | nindent 4 }}
   annotations:
-    cert-manager.io/issuer: unikorn-server-ingress
+  {{- if .Values.server.ingress.annotations }}
+  {{ toYaml .Values.server.ingress.annotations | indent 2 }}
+  {{- else }}
+    cert-manager.io/issuer: "unikorn-server-ingress"
+  {{- end }}
 spec:
-  ingressClassName: {{ .Values.server.ingressClass }}
+  ingressClassName: {{ .Values.server.ingress.ingressClass }}
   # For development you will want to add these names to /etc/hosts for the ingress
   # endpoint address.
   tls:
   - hosts:
-    - {{ .Values.server.host }}
+    - {{ .Values.server.ingress.host }}
     secretName: unikorn-server-ingress-tls
   rules:
   # The the UI is written as a JAMstack application, so the API is accessed via
