@@ -1,0 +1,100 @@
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: cert-manager-1.10.1-1
+spec:
+  repo: https://charts.jetstack.io
+  chart: cert-manager
+  version: v1.10.1
+  release: cert-manager
+  createNamespace: true
+  parameters:
+  - name: installCRDs
+    value: "true"
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: vcluster-0.12.1-1
+spec:
+  repo: https://charts.loft.sh
+  chart: vcluster
+  version: 0.12.1
+  release: vcluster
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: cluster-api-0.1.5-1
+spec:
+  repo: https://eschercloudai.github.io/helm-cluster-api
+  chart: cluster-api
+  version: v0.1.5
+  interface: 1.0.0
+  parameters:
+  - name: cluster-api-provider-openstack.image
+    value: spjmurray/capi-openstack-controller:v0.7.0-simon1
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: cilium-1.12.4-1
+spec:
+  repo: https://helm.cilium.io
+  chart: cilium
+  version: 1.12.4
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: cluster-openstack-0.3.12-1
+spec:
+  repo: https://eschercloudai.github.io/helm-cluster-api
+  chart: cluster-api-cluster-openstack
+  version: v0.3.12
+  createNamespace: true
+  interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: openstack-cloud-provider-1.4.0-1
+spec:
+  repo: https://kubernetes.github.io/cloud-provider-openstack
+  chart: openstack-cloud-controller-manager
+  version: 1.4.0
+  createNamespace: true
+  interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: nvidia-gpu-operator-22.9.1-1
+spec:
+  repo: https://helm.ngc.nvidia.com/nvidi
+  chart: gpu-operator
+  version: v22.9.1
+  interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  # Cool story bro (Nick Jones!!)
+  name: cluster-autoscaler-0.0.0-1
+spec:
+  repo: https://github.com/yankcrime/autoscaler
+  path: charts/cluster-autoscaler
+  version: openstack-sfz
+  interface: 1.0.0
+  parameters:
+  - name: cloudProvider
+    value: clusterapi
+  - name: clusterAPIMode
+    value: kubeconfig-incluster
+  - name: extraArgs.scale-down-delay-after-add
+    value: 5m
+  - name: extraArgs.scale-down-unneeded-time
+    value: 5m
+  - name: image.tag
+    value: v1.26.1
+  interface: 1.0.0

@@ -78,6 +78,12 @@ spec:
                       type: string
                     type: array
                 type: object
+              applicationBundle:
+                default: kubernetes-cluster-1.0.0
+                description: 'ApplicationBundle defines the applications used to create
+                  the cluster. Change this to a new bundle to start an upgrade. TODO:
+                  delete the default.'
+                type: string
               controlPlane:
                 description: ControlPlane defines the control plane topology.
                 properties:

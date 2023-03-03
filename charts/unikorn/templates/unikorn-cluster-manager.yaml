@@ -33,6 +33,15 @@ rules:
   - kubernetesclusters/status
   verbs:
   - update
+# Get application bundles
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - helmapplications
+  - applicationbundles
+  verbs:
+  - list
+  - watch
 # ArgoCD integration.
 - apiGroups:
   - argoproj.io
@@ -50,7 +59,6 @@ rules:
   - ""
   resources:
   - secrets
-  - services
   verbs:
   - list
   - watch

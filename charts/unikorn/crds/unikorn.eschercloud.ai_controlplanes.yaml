@@ -50,6 +50,12 @@ spec:
           spec:
             description: ControlPlaneSpec defines any control plane specific options.
             properties:
+              applicationBundle:
+                default: control-plane-1.0.0
+                description: 'ApplicationBundle defines the applications used to create
+                  the control plane. Change this to a new bundle to start an upgrade.
+                  TODO: delete the default.'
+                type: string
               timeout:
                 default: 10m
                 description: Timeout defines how long a control plane is allowed to

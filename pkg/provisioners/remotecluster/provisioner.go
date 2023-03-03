@@ -38,29 +38,9 @@ const (
 	namespace = "argocd"
 )
 
-// Generator is an sbstraction around the sources of remote
-// clusters e.g. a cluster API or vcluster Kubernetes instance.
-type Generator interface {
-	// Name is a unique name for the remote cluster provider. This,
-	// and labels, must be able to be procedurally generated in order to
-	// delete the remote by name, when the Server() is unavailable e.g
-	// derived from a deleted resource.
-	Name() string
-
-	// Labels define a set of strings that combine with the
-	// name to yield a unique remote cluster name.
-	Labels() []string
-
-	// Server is the URL for the remote cluster endpoint.
-	Server(ctx context.Context) (string, error)
-
-	// Config returns the client configuration (aka parsed Kubeconfig.)
-	Config(ctx context.Context) (*clientcmdapi.Config, error)
-}
-
 // GenerateName combines the generator's name and labels to form a unique
 // remote cluster name.
-func GenerateName(generator Generator) string {
+func GenerateName(generator provisioners.RemoteCluster) string {
 	name := generator.Name()
 
 	if len(generator.Labels()) != 0 {
@@ -71,7 +51,7 @@ func GenerateName(generator Generator) string {
 }
 
 // GetClient gets a client from the remote generator.
-func GetClient(ctx context.Context, generator Generator) (client.Client, error) {
+func GetClient(ctx context.Context, generator provisioners.RemoteCluster) (client.Client, error) {
 	getter := func() (*clientcmdapi.Config, error) {
 		return generator.Config(ctx)
 	}
@@ -91,11 +71,11 @@ type Provisioner struct {
 	client client.Client
 
 	// generator provides a method to derive cluster names and configuration.
-	generator Generator
+	generator provisioners.RemoteCluster
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, generator Generator) *Provisioner {
+func New(client client.Client, generator provisioners.RemoteCluster) *Provisioner {
 	return &Provisioner{
 		client:    client,
 		generator: generator,
@@ -104,6 +84,16 @@ func New(client client.Client, generator Generator) *Provisioner {
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
+
+// OnRemote implements the Provision interface.
+func (p *Provisioner) OnRemote(_ provisioners.RemoteCluster) provisioners.Provisioner {
+	return p
+}
+
+// InNamespace implements the Provision interface.
+func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
+	return p
+}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {

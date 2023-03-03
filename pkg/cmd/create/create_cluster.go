@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cmd/aliases"
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
@@ -78,6 +78,9 @@ type createClusterOptions struct {
 
 	// name is the name of the cluster.
 	name string
+
+	// applicationBundle is the version to provision.
+	applicationBundle string
 
 	// cloud indicates the clouds.yaml key to use.  If only one exists it
 	// will default to that, otherwise it's a required parameter.
@@ -152,6 +155,9 @@ type createClusterOptions struct {
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	o.controlPlaneFlags.AddFlags(f, cmd)
+
+	// Unikorn options.
+	flags.RequiredStringVarWithCompletion(cmd, &o.applicationBundle, "application-bundle", "", "Application bundle, defining component versions, to deploy", flags.CompleteApplicationBundle(f, unikornv1.ApplicationBundleResourceKindKubernetesCluster))
 
 	// Openstack configuration options.
 	flags.RequiredStringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)
@@ -259,17 +265,17 @@ func (o *createClusterOptions) run() error {
 		return err
 	}
 
-	allowedPrefixes := make([]unikornv1alpha1.IPv4Prefix, len(o.allowedPrefixes.IPNetworks))
+	allowedPrefixes := make([]unikornv1.IPv4Prefix, len(o.allowedPrefixes.IPNetworks))
 
 	for i, prefix := range o.allowedPrefixes.IPNetworks {
-		allowedPrefixes[i] = unikornv1alpha1.IPv4Prefix{
+		allowedPrefixes[i] = unikornv1.IPv4Prefix{
 			IPNet: prefix,
 		}
 	}
 
-	version := unikornv1alpha1.SemanticVersion(o.version.Semver)
+	version := unikornv1.SemanticVersion(o.version.Semver)
 
-	cluster := &unikornv1alpha1.KubernetesCluster{
+	cluster := &unikornv1.KubernetesCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.name,
 			Labels: map[string]string{
@@ -278,8 +284,9 @@ func (o *createClusterOptions) run() error {
 				constants.ControlPlaneLabel: o.controlPlaneFlags.ControlPlane,
 			},
 		},
-		Spec: unikornv1alpha1.KubernetesClusterSpec{
-			Openstack: &unikornv1alpha1.KubernetesClusterOpenstackSpec{
+		Spec: unikornv1.KubernetesClusterSpec{
+			ApplicationBundle: &o.applicationBundle,
+			Openstack: &unikornv1.KubernetesClusterOpenstackSpec{
 				CACert:              &o.caCert,
 				CloudConfig:         &o.clouds,
 				Cloud:               &o.cloud,
@@ -288,18 +295,18 @@ func (o *createClusterOptions) run() error {
 				SSHKeyName:          &o.sshKeyName,
 				ExternalNetworkID:   &o.externalNetworkID,
 			},
-			Network: &unikornv1alpha1.KubernetesClusterNetworkSpec{
-				NodeNetwork:    &unikornv1alpha1.IPv4Prefix{IPNet: o.nodeNetwork},
-				PodNetwork:     &unikornv1alpha1.IPv4Prefix{IPNet: o.podNetwork},
-				ServiceNetwork: &unikornv1alpha1.IPv4Prefix{IPNet: o.serviceNetwork},
-				DNSNameservers: unikornv1alpha1.IPv4AddressSliceFromIPSlice(o.dnsNameservers),
+			Network: &unikornv1.KubernetesClusterNetworkSpec{
+				NodeNetwork:    &unikornv1.IPv4Prefix{IPNet: o.nodeNetwork},
+				PodNetwork:     &unikornv1.IPv4Prefix{IPNet: o.podNetwork},
+				ServiceNetwork: &unikornv1.IPv4Prefix{IPNet: o.serviceNetwork},
+				DNSNameservers: unikornv1.IPv4AddressSliceFromIPSlice(o.dnsNameservers),
 			},
-			API: &unikornv1alpha1.KubernetesClusterAPISpec{
+			API: &unikornv1.KubernetesClusterAPISpec{
 				SubjectAlternativeNames: o.SANs,
 				AllowedPrefixes:         allowedPrefixes,
 			},
-			ControlPlane: &unikornv1alpha1.KubernetesClusterControlPlaneSpec{
-				MachineGeneric: unikornv1alpha1.MachineGeneric{
+			ControlPlane: &unikornv1.KubernetesClusterControlPlaneSpec{
+				MachineGeneric: unikornv1.MachineGeneric{
 					Version:  &version,
 					Image:    &o.image,
 					Flavor:   &o.flavor,
@@ -307,14 +314,14 @@ func (o *createClusterOptions) run() error {
 					DiskSize: o.diskSize.Quantity,
 				},
 			},
-			WorkloadPools: &unikornv1alpha1.KubernetesClusterWorkloadPoolsSpec{
+			WorkloadPools: &unikornv1.KubernetesClusterWorkloadPoolsSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						constants.KubernetesClusterLabel: o.name,
 					},
 				},
 			},
-			Features: &unikornv1alpha1.KubernetesClusterFeaturesSpec{
+			Features: &unikornv1.KubernetesClusterFeaturesSpec{
 				Autoscaling: &o.autoscaling,
 			},
 		},
@@ -324,7 +331,7 @@ func (o *createClusterOptions) run() error {
 		return err
 	}
 
-	fmt.Printf("%s.%s/%s created\n", unikornv1alpha1.KubernetesClusterResource, unikornv1alpha1.GroupName, o.name)
+	fmt.Printf("%s.%s/%s created\n", unikornv1.KubernetesClusterResource, unikornv1.GroupName, o.name)
 
 	return nil
 }

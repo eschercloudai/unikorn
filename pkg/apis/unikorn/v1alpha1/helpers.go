@@ -177,6 +177,15 @@ func (c *ControlPlane) ResourceLabels() (labels.Set, error) {
 	return labels, nil
 }
 
+func (c *ControlPlane) ApplicationBundleName() string {
+	// TODO: DELETE ME
+	if c.Spec.ApplicationBundle == nil {
+		return "control-plane-1.0.0"
+	}
+
+	return *c.Spec.ApplicationBundle
+}
+
 // LookupCondition scans the status conditions for an existing condition whose type
 // matches.  Returns the array index, or -1 if it doesn't exist.
 func (c *KubernetesCluster) LookupCondition(t KubernetesClusterConditionType) (*KubernetesClusterCondition, error) {
@@ -249,6 +258,15 @@ func (c *KubernetesCluster) ResourceLabels() (labels.Set, error) {
 	return labels, nil
 }
 
+func (c *KubernetesCluster) ApplicationBundleName() string {
+	// TODO: DELETE ME
+	if c.Spec.ApplicationBundle == nil {
+		return "kubernetes-cluster-1.0.0"
+	}
+
+	return *c.Spec.ApplicationBundle
+}
+
 // AutoscalingEnabled indicates whether cluster autoscaling is enabled for the cluster.
 func (c *KubernetesCluster) AutoscalingEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.Autoscaling != nil && *c.Spec.Features.Autoscaling
@@ -306,4 +324,14 @@ func (l KubernetesClusterList) Less(i, j int) bool {
 
 func (l KubernetesClusterList) Swap(i, j int) {
 	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
+}
+
+func (b *ApplicationBundle) GetApplication(name string) *ApplicationBundleApplication {
+	for i := range b.Spec.Applications {
+		if *b.Spec.Applications[i].Name == name {
+			return &b.Spec.Applications[i]
+		}
+	}
+
+	return nil
 }

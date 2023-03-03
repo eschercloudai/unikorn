@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,9 +58,34 @@ func getClient(f cmdutil.Factory) (unikorn.Interface, error) {
 	return client, nil
 }
 
+// CompleteApplicationBundle provides tab completion for application bundles.
+func CompleteApplicationBundle(f cmdutil.Factory, kind unikornv1.ApplicationBundleResourceKind) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		client, err := getClient(f)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		applicationBundles, err := client.UnikornV1alpha1().ApplicationBundles("unikorn").List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		var matches []string
+
+		for _, b := range applicationBundles.Items {
+			if *b.Spec.Kind == kind {
+				matches = append(matches, b.Name)
+			}
+		}
+
+		return matches, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // CompleteProject provides tab completion for the specified resource type.
 func CompleteProject(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return computil.ResourceNameCompletionFunc(f, unikornv1alpha1.ProjectResource)
+	return computil.ResourceNameCompletionFunc(f, unikornv1.ProjectResource)
 }
 
 // ProjectFlags are required flags for a project scoped resource.

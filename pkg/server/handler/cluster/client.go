@@ -22,7 +22,7 @@ import (
 	"sort"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/vcluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"

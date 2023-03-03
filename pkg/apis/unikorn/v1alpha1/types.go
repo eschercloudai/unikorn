@@ -273,6 +273,11 @@ type ControlPlaneSpec struct {
 	// a timeout is triggerd and the request aborts.
 	// +kubebuilder:default="10m"
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+	// ApplicationBundle defines the applications used to create the control plane.
+	// Change this to a new bundle to start an upgrade.
+	// TODO: delete the default.
+	// +kubebuilder:default=control-plane-1.0.0
+	ApplicationBundle *string `json:"applicationBundle,omitempty"`
 }
 
 // ControlPlaneStatus defines the status of the project.
@@ -505,6 +510,11 @@ type KubernetesClusterSpec struct {
 	WorkloadPools *KubernetesClusterWorkloadPoolsSpec `json:"workloadPools"`
 	// Features defines add-on features that can be enabled for the cluster.
 	Features *KubernetesClusterFeaturesSpec `json:"features,omitempty"`
+	// ApplicationBundle defines the applications used to create the cluster.
+	// Change this to a new bundle to start an upgrade.
+	// TODO: delete the default.
+	// +kubebuilder:default=kubernetes-cluster-1.0.0
+	ApplicationBundle *string `json:"applicationBundle,omitempty"`
 }
 
 type KubernetesClusterOpenstackSpec struct {
@@ -646,3 +656,145 @@ type KubernetesClusterCondition struct {
 	// Human-readable message indicating details about last transition.
 	Message string `json:"message"`
 }
+
+// HelmApplicationList defines a list of Helm applications.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type HelmApplicationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []HelmApplication `json:"items"`
+}
+
+// HelmApplication defines a Helm application.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:scope=Cluster,categories=all;unikorn
+// +kubebuilder:printcolumn:name="repo",type="string",JSONPath=".spec.repo"
+// +kubebuilder:printcolumn:name="chart",type="string",JSONPath=".spec.chart"
+// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.version"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+type HelmApplication struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              HelmApplicationSpec   `json:"spec"`
+	Status            HelmApplicationStatus `json:"status,omitempty"`
+}
+
+type HelmApplicationSpec struct {
+	// Repo is either a Helm chart repository, or git repository.
+	Repo *string `json:"repo"`
+	// Chart is the chart name in the repository.
+	Chart *string `json:"chart,omitempty"`
+	// Path is the path if the repo is a git repo.
+	Path *string `json:"path,omitempty"`
+	// Version is the chart version, or a branch when a path is provided.
+	Version *string `json:"version"`
+	// Release is the explicit release name for when chart resource names are dynamic.
+	// Typically we need predicatable names for things that are going to be remote
+	// clusters to derive endpoints or Kubernetes configurations.
+	Release *string `json:"release,omitempty"`
+	// Parameters is a set of static --set parameters to pass to the chart.
+	Parameters []HelmApplicationSpecParameter `json:"parameters,omitempty"`
+	// CreateNamespace indicates whether the chart requires a namespace to be
+	// created by the tooling, rather than the chart itself.
+	CreateNamespace *bool `json:"createNamespace,omitempty"`
+	// Interface is the name of a Unikorn function that configures the application.
+	// In particular it's used when reading values from a custom resource and mapping
+	// them to Helm values.  This allows us to version Helm interfaces in the context
+	// of "do we need to do something differently", without having to come up with a
+	// generalized solution that purely exists as Kubernetes resource specifications.
+	// For example, building a Openstack Cloud Provider configuration from a clouds.yaml
+	// is going to be bloody tricky without some proper code to handle it.
+	Interface *string `json:"interface,omitempty"`
+}
+
+type HelmApplicationSpecParameter struct {
+	// Name is the name of the parameter.
+	Name *string `json:"name"`
+	// Value is the value of the parameter.
+	Value *string `json:"value"`
+}
+
+type HelmApplicationStatus struct{}
+
+// ApplicationBundleList defines a list of application bundles.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type ApplicationBundleList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ApplicationBundle `json:"items"`
+}
+
+// ApplicationBundle defines a bundle of applications related with a particular custom
+// resource e.g. a ControlPlane has vcluster, cert-manager and cluster-api applications
+// associated with it.  This forms the backbone of upgrades by allowing bundles to be
+// switched out in control planes etc.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:scope=Cluster,categories=all;unikorn
+// +kubebuilder:printcolumn:name="kind",type="string",JSONPath=".spec.kind"
+// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.version"
+// +kubebuilder:printcolumn:name="preview",type="string",JSONPath=".spec.preview"
+// +kubebuilder:printcolumn:name="end of life",type="string",JSONPath=".spec.endOfLife"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+type ApplicationBundle struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              ApplicationBundleSpec   `json:"spec"`
+	Status            ApplicationBundleStatus `json:"status,omitempty"`
+}
+
+type ApplicationBundleSpec struct {
+	// Kind is the resource type the bundle can be used with.
+	// +kubebuilder:validation:Enum=ControlPlane;KubernetesCluster
+	Kind *ApplicationBundleResourceKind `json:"kind"`
+	// Version is a semantic version of the bundle, must be unique.
+	Version *string `json:"version"`
+	// Preview indicates that this bundle is a preview and should not be
+	// used by default.
+	Preview *bool `json:"preview,omitempty"`
+	// EndOfLife marks when this bundle should not be advertised any more
+	// by Unikorn server.  It also provides a hint that users should upgrade
+	// ahead of the deadline, or that a forced upgrade should be triggered.
+	EndOfLife *metav1.Time `json:"endOfLife,omitempty"`
+	// Applications is a list of application references for the bundle.
+	// I've left this nullable so we can trigger reconciles for resources
+	// that don't have applications e.g. projects.
+	Applications []ApplicationBundleApplication `json:"applications,omitempty"`
+}
+
+// ApplicationBundleResourceKind defines the custom resource a bundle is associated with.
+type ApplicationBundleResourceKind string
+
+const (
+	// ApplicationBundleResourceKindControlPlane defines this bundle is for control planes.
+	ApplicationBundleResourceKindControlPlane ApplicationBundleResourceKind = "ControlPlane"
+	// ApplicationBundleResourceKindKubernetesCluster defines this bundle is for kubernetes clusters.
+	ApplicationBundleResourceKindKubernetesCluster ApplicationBundleResourceKind = "KubernetesCluster"
+)
+
+type ApplicationBundleApplication struct {
+	// Name is the name of the application.  This must match what is encoded into
+	// Unikorn's application management engine.
+	Name *string `json:"name"`
+	// Reference is a reference to the application definition.
+	Reference *ApplicationReference `json:"reference"`
+}
+
+type ApplicationReference struct {
+	// Kind is the kind of resource we are referencing.
+	// +kubebuilder:validation:Enum=HelmApplication
+	Kind *ApplicationReferenceKind `json:"kind"`
+	// Name is the name of the resource we are referencing.
+	Name *string `json:"name"`
+}
+
+// ApplicationReferenceKind defines the application kind we wish to reference.
+type ApplicationReferenceKind string
+
+const (
+	// ApplicationReferenceKindHelm references a helm application.
+	ApplicationReferenceKindHelm ApplicationReferenceKind = "HelmApplication"
+)
+
+type ApplicationBundleStatus struct{}
