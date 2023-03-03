@@ -22,6 +22,7 @@ spec:
   version: 0.12.1
   release: vcluster
 ---
+# This version (0.7.0) had an availability zone scheduling bug.
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
@@ -34,6 +35,16 @@ spec:
   parameters:
   - name: cluster-api-provider-openstack.image
     value: spjmurray/capi-openstack-controller:v0.7.0-simon1
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: cluster-api-0.1.6-1
+spec:
+  repo: https://eschercloudai.github.io/helm-cluster-api
+  chart: cluster-api
+  version: v0.1.6
+  interface: 1.0.0
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
@@ -71,7 +82,7 @@ kind: HelmApplication
 metadata:
   name: nvidia-gpu-operator-22.9.1-1
 spec:
-  repo: https://helm.ngc.nvidia.com/nvidi
+  repo: https://helm.ngc.nvidia.com/nvidia
   chart: gpu-operator
   version: v22.9.1
   interface: 1.0.0
