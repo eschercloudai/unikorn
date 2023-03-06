@@ -113,13 +113,18 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 
 	// Provision the remote cluster, then once that's configured, install
 	// the CNI and cloud provider in parallel.
+	// NOTE: that nvidia is installed after the CNI and OCP controllers.
+	// This application depends on the CNI to actually deploy, so while you
+	// can do this in parallel and it'll work, when you deprovision you can
+	// get stuck with the CNI gone, and the nvidia stuff needing the CNI to
+	// uninstall properly.
 	provisioner := serial.New("cluster add-ons",
 		remotecluster.New(p.client, remote),
 		concurrent.New("cluster add-ons",
 			cilium.New(p.client, p.cluster, p.ciliumApplication).OnRemote(remote),
 			openstackcloudprovider.New(p.client, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote),
-			nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote),
 		),
+		nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote),
 	)
 
 	return provisioner, nil
