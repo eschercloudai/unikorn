@@ -192,7 +192,7 @@ spec:
   # The the UI is written as a JAMstack application, so the API is accessed via
   # the same host to avoid CORS, and therefore uses routing to hit the correct
   # service.
-  - host: {{ .Values.server.host }}
+  - host: {{ .Values.server.ingress.host }}
     http:
       paths:
       - path: /api

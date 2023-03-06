@@ -46,7 +46,14 @@ server:
     # Sets the ingress class to use.
     ingressClass: nginx
 
-    annotations: {}
+    # A map of explicit annotations to add to the ingress.  By default, when not
+    # specified, the chart will create an issuer and add in an annotation to generate
+    # self signed TLS secret with cert-manager.  For real life deployments, you will
+    # want something like the following e.g. a shared cluster issuer, and external-dns
+    # to define the DNS address via DDNS and keep the IP address in sync.
+    # annotations:
+    #   external-dns.alpha.kubernetes.io/hostname=kubernetes.eschercloud.com
+    #   cert-manager.io/issuer: my-cluster-issuer
 
     # Sets the DNS hosts/X.509 Certs.
     host: kubernetes.eschercloud.com
