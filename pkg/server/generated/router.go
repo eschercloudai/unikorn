@@ -15,6 +15,12 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (GET /api/v1/applicationBundles/cluster)
+	GetApiV1ApplicationBundlesCluster(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/applicationBundles/controlPlane)
+	GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, r *http.Request)
+
 	// (POST /api/v1/auth/tokens/password)
 	PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Request)
 
@@ -102,6 +108,40 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetApiV1ApplicationBundlesCluster operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ApplicationBundlesCluster(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{""})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1ApplicationBundlesCluster(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetApiV1ApplicationBundlesControlPlane operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{""})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1ApplicationBundlesControlPlane(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // PostApiV1AuthTokensPassword operation middleware
 func (siw *ServerInterfaceWrapper) PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Request) {
@@ -815,6 +855,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/applicationBundles/cluster", wrapper.GetApiV1ApplicationBundlesCluster)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/applicationBundles/controlPlane", wrapper.GetApiV1ApplicationBundlesControlPlane)
+	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/auth/tokens/password", wrapper.PostApiV1AuthTokensPassword)
 	})

@@ -25,6 +25,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/cluster"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
@@ -155,7 +156,7 @@ func (h *Handler) GetApiV1Controlplanes(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) PostApiV1Controlplanes(w http.ResponseWriter, r *http.Request) {
-	request := &generated.CreateControlPlane{}
+	request := &generated.ControlPlane{}
 
 	if err := util.ReadJSONBody(r, request); err != nil {
 		errors.HandleError(w, r, err)
@@ -256,6 +257,28 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubeco
 
 	h.setUncacheable(w)
 	util.WriteOctetStreamResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, r *http.Request) {
+	result, err := applicationbundle.NewClient(h.client).ListControlPlane(r.Context())
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setCacheable(w)
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) GetApiV1ApplicationBundlesCluster(w http.ResponseWriter, r *http.Request) {
+	result, err := applicationbundle.NewClient(h.client).ListCluster(r.Context())
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setCacheable(w)
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
 func (h *Handler) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {

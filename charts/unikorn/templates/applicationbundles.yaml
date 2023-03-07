@@ -25,7 +25,8 @@ metadata:
   name: control-plane-1.0.1
 spec:
   kind: ControlPlane
-  version: 1.0.0
+  version: 1.0.1
+  preview: true
   applications:
   - name: vcluster
     reference:

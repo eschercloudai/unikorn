@@ -257,6 +257,7 @@ type ControlPlaneList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="bundle",type="string",JSONPath=".spec.applicationBundle"
 // +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -480,6 +481,7 @@ type KubernetesClusterList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="bundle",type="string",JSONPath=".spec.applicationBundle"
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.controlPlane.version"
 // +kubebuilder:printcolumn:name="image",type="string",JSONPath=".spec.controlPlane.image"
 // +kubebuilder:printcolumn:name="flavor",type="string",JSONPath=".spec.controlPlane.flavor"
