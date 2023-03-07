@@ -177,14 +177,15 @@ func convertStatus(in *unikornv1.KubernetesCluster) *generated.KubernetesResourc
 // convert converts from a custom resource into the API definition.
 func convert(in *unikornv1.KubernetesCluster) *generated.KubernetesCluster {
 	out := &generated.KubernetesCluster{
-		Name:          in.Name,
-		Openstack:     convertOpenstack(in),
-		Network:       convertNetwork(in),
-		Api:           convertAPI(in),
-		ControlPlane:  convertMachine(&in.Spec.ControlPlane.MachineGeneric),
-		WorkloadPools: convertWorkloadPools(in),
-		Features:      convertFeatures(in),
-		Status:        convertStatus(in),
+		Name:              in.Name,
+		ApplicationBundle: *in.Spec.ApplicationBundle,
+		Openstack:         convertOpenstack(in),
+		Network:           convertNetwork(in),
+		Api:               convertAPI(in),
+		ControlPlane:      convertMachine(&in.Spec.ControlPlane.MachineGeneric),
+		WorkloadPools:     convertWorkloadPools(in),
+		Features:          convertFeatures(in),
+		Status:            convertStatus(in),
 	}
 
 	return out
@@ -505,12 +506,13 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 			},
 		},
 		Spec: unikornv1.KubernetesClusterSpec{
-			Openstack:     openstack,
-			Network:       network,
-			API:           api,
-			ControlPlane:  kubernetesCcontrolPlane,
-			WorkloadPools: kubernetesWorkloadPools,
-			Features:      createFeatures(options),
+			ApplicationBundle: &options.ApplicationBundle,
+			Openstack:         openstack,
+			Network:           network,
+			API:               api,
+			ControlPlane:      kubernetesCcontrolPlane,
+			WorkloadPools:     kubernetesWorkloadPools,
+			Features:          createFeatures(options),
 		},
 	}
 

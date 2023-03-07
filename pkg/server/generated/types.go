@@ -70,6 +70,9 @@ type KubernetesCluster struct {
 	// Api Kubernetes API settings.
 	Api *KubernetesClusterAPI `json:"api,omitempty"`
 
+	// ApplicationBundle The application bundle (versioning information) for the cluster.
+	ApplicationBundle string `json:"applicationBundle"`
+
 	// ControlPlane A Kubernetes cluster machine.
 	ControlPlane OpenstackMachinePool `json:"controlPlane"`
 
