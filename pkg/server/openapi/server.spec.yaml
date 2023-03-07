@@ -326,6 +326,40 @@ paths:
           $ref: '#/components/responses/notFoundResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/applicationBundles/controlPlane:
+    description: Unikorn control plane application bundle services.
+    get:
+      description: |-
+        Lists global application bundles for control planes.  This is
+        used to present a choice of versions for provisioning.
+      security:
+      - oauth2Authentication: []
+      responses:
+        '200':
+          $ref: '#/components/responses/applicationBundleResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/applicationBundles/cluster:
+    description: Unikorn cluster application bundle services.
+    get:
+      description: |-
+        Lists global application bundles for clusters.  This is
+        used to present a choice of versions for provisioning.
+      security:
+      - oauth2Authentication: []
+      responses:
+        '200':
+          $ref: '#/components/responses/applicationBundleResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/projects:
     description: OpenStack identity project services.
     get:
@@ -616,21 +650,21 @@ components:
       properties:
         status:
           $ref: '#/components/schemas/kubernetesResourceStatus'
-    createControlPlane:
-      description: Unikorn control plane creation parameters.
-      type: object
-      required:
-      - name
-      properties:
-        name:
-          description: The name of the resource.
-          type: string
     controlPlane:
       description: A Unikorn control plane.
       type: object
+      required:
+      - name
+      - applicationBundle
       properties:
         status:
           $ref: '#/components/schemas/kubernetesResourceStatus'
+        name:
+          description: The name of the resource.
+          type: string
+        applicationBundle:
+          description: The application bundle (versioning information) for the control plane.
+          type: string
     controlPlanes:
       description: A list of Unikorn control planes.
       type: array
@@ -821,6 +855,31 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/kubernetesCluster'
+    applicationBundle:
+      descrpition: A bundle of applications.
+      type: object
+      required:
+      - name
+      - version
+      properties:
+        name:
+          description: The resource name.
+          type: string
+        version:
+          description: The bundle version.
+          type: string
+        preview:
+          description: Whether the bundle is in preview.
+          type: boolean
+        endOfLife:
+          description: When the bundle is end-of-life.
+          type: string
+          format: date-time
+    applicationBundles:
+      description: A list of application bundles.
+      type: array
+      items:
+        $ref: '#/components/schemas/applicationBundle'
     openstackProject:
       description: An Openstack project.
       type: object
@@ -1005,7 +1064,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/createControlPlane'
+            $ref: '#/components/schemas/controlPlane'
     createKubernetesClusterRequest:
       description: Unikorn Kubernetes cluster parameters.
       required: true
@@ -1089,6 +1148,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/kubernetesClusters'
+    applicationBundleResponse:
+      description: A list of application bundles.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/applicationBundles'
     openstackProjectsResponse:
       description: A list of Openstack projects.
       content:

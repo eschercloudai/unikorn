@@ -326,6 +326,23 @@ func (l KubernetesClusterList) Swap(i, j int) {
 	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
 }
 
+// Ensure type is sortable for stable deterministic output.
+var _ sort.Interface = &ApplicationBundleList{}
+
+func (l ApplicationBundleList) Len() int {
+	return len(l.Items)
+}
+
+func (l ApplicationBundleList) Less(i, j int) bool {
+	// TODO: while this works now, it won't unless we parse and compare as
+	// a semantic version.
+	return strings.Compare(*l.Items[i].Spec.Version, *l.Items[j].Spec.Version) == -1
+}
+
+func (l ApplicationBundleList) Swap(i, j int) {
+	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
+}
+
 func (b *ApplicationBundle) GetApplication(name string) *ApplicationBundleApplication {
 	for i := range b.Spec.Applications {
 		if *b.Spec.Applications[i].Name == name {

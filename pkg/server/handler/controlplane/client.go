@@ -118,6 +118,8 @@ func convert(in *unikornv1.ControlPlane) *generated.ControlPlane {
 			CreationTime: in.CreationTimestamp.Time,
 			Status:       "Unknown",
 		},
+		Name:              in.Name,
+		ApplicationBundle: *in.Spec.ApplicationBundle,
 	}
 
 	if in.DeletionTimestamp != nil {
@@ -191,7 +193,7 @@ func (c *Client) Get(ctx context.Context, name generated.ControlPlaneNameParamet
 }
 
 // Create creates the implicit control plane indentified by the JTW claims.
-func (c *Client) Create(ctx context.Context, request *generated.CreateControlPlane) error {
+func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) error {
 	project, err := project.NewClient(c.client).Metadata(ctx)
 	if err != nil {
 		return err
@@ -210,6 +212,9 @@ func (c *Client) Create(ctx context.Context, request *generated.CreateControlPla
 				constants.VersionLabel: constants.Version,
 				constants.ProjectLabel: project.Name,
 			},
+		},
+		Spec: unikornv1.ControlPlaneSpec{
+			ApplicationBundle: &request.ApplicationBundle,
 		},
 	}
 

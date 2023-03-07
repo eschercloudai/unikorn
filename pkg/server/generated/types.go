@@ -26,6 +26,24 @@ const (
 	UnsupportedResponseType Oauth2ErrorError = "unsupported_response_type"
 )
 
+// ApplicationBundle defines model for applicationBundle.
+type ApplicationBundle struct {
+	// EndOfLife When the bundle is end-of-life.
+	EndOfLife *time.Time `json:"endOfLife,omitempty"`
+
+	// Name The resource name.
+	Name string `json:"name"`
+
+	// Preview Whether the bundle is in preview.
+	Preview *bool `json:"preview,omitempty"`
+
+	// Version The bundle version.
+	Version string `json:"version"`
+}
+
+// ApplicationBundles A list of application bundles.
+type ApplicationBundles = []ApplicationBundle
+
 // ApplicationCredentialOptions Openstack application credential create options.
 type ApplicationCredentialOptions struct {
 	// Name Application credential name.
@@ -34,18 +52,18 @@ type ApplicationCredentialOptions struct {
 
 // ControlPlane A Unikorn control plane.
 type ControlPlane struct {
+	// ApplicationBundle The application bundle (versioning information) for the control plane.
+	ApplicationBundle string `json:"applicationBundle"`
+
+	// Name The name of the resource.
+	Name string `json:"name"`
+
 	// Status A Kubernetes resource status.
 	Status *KubernetesResourceStatus `json:"status,omitempty"`
 }
 
 // ControlPlanes A list of Unikorn control planes.
 type ControlPlanes = []ControlPlane
-
-// CreateControlPlane Unikorn control plane creation parameters.
-type CreateControlPlane struct {
-	// Name The name of the resource.
-	Name string `json:"name"`
-}
 
 // KubernetesCluster Unikorn Kubernetes cluster creation parameters.
 type KubernetesCluster struct {
@@ -352,6 +370,9 @@ type ClusterNameParameter = StringParameter
 // ControlPlaneNameParameter A basic string parameter.
 type ControlPlaneNameParameter = StringParameter
 
+// ApplicationBundleResponse A list of application bundles.
+type ApplicationBundleResponse = ApplicationBundles
+
 // BadRequestResponse Generic error message.
 type BadRequestResponse = Oauth2Error
 
@@ -409,8 +430,8 @@ type UnauthorizedResponse = Oauth2Error
 // ApplicationCredentialRequest Openstack application credential create options.
 type ApplicationCredentialRequest = ApplicationCredentialOptions
 
-// CreateControlPlaneRequest Unikorn control plane creation parameters.
-type CreateControlPlaneRequest = CreateControlPlane
+// CreateControlPlaneRequest A Unikorn control plane.
+type CreateControlPlaneRequest = ControlPlane
 
 // CreateKubernetesClusterRequest Unikorn Kubernetes cluster creation parameters.
 type CreateKubernetesClusterRequest = KubernetesCluster
@@ -422,7 +443,7 @@ type TokenScopeRequest = TokenScope
 type PostApiV1AuthTokensTokenJSONRequestBody = TokenScope
 
 // PostApiV1ControlplanesJSONRequestBody defines body for PostApiV1Controlplanes for application/json ContentType.
-type PostApiV1ControlplanesJSONRequestBody = CreateControlPlane
+type PostApiV1ControlplanesJSONRequestBody = ControlPlane
 
 // PostApiV1ControlplanesControlPlaneNameClustersJSONRequestBody defines body for PostApiV1ControlplanesControlPlaneNameClusters for application/json ContentType.
 type PostApiV1ControlplanesControlPlaneNameClustersJSONRequestBody = KubernetesCluster

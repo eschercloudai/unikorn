@@ -32,6 +32,13 @@ rules:
   - watch
   - patch
   - delete
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - applicationbundles
+  verbs:
+  - list
+  - watch
 # Get secrets, ugh, for kubeconfigs.
 - apiGroups:
   - ""
