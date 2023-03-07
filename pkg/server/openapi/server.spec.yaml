@@ -828,6 +828,7 @@ components:
       type: object
       required:
       - name
+      - applicationBundle
       - openstack
       - network
       - controlPlane
@@ -835,6 +836,9 @@ components:
       properties:
         name:
           description: Cluster name.
+          type: string
+        applicationBundle:
+          description: The application bundle (versioning information) for the cluster.
           type: string
         openstack:
           $ref: '#/components/schemas/kubernetesClusterOpenstack'
