@@ -111,9 +111,7 @@ func (w *bufferingResponseWriter) StatusCode() int {
 func (v *OpenAPIValidator) validateRequest(r *http.Request, authContext *authorizationContext) (*openapi3filter.ResponseValidationInput, error) {
 	tracer := otel.GetTracerProvider().Tracer(constants.Application)
 
-	ctx, span := tracer.Start(r.Context(), "openapi request validation",
-		trace.WithSpanKind(trace.SpanKindInternal),
-	)
+	ctx, span := tracer.Start(r.Context(), "openapi request validation", trace.WithSpanKind(trace.SpanKindInternal))
 	defer span.End()
 
 	route, params, err := v.openapi.findRoute(r)
@@ -122,9 +120,7 @@ func (v *OpenAPIValidator) validateRequest(r *http.Request, authContext *authori
 	}
 
 	authorizationFunc := func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
-		_, span := tracer.Start(ctx, "authentication",
-			trace.WithSpanKind(trace.SpanKindInternal),
-		)
+		_, span := tracer.Start(ctx, "authentication", trace.WithSpanKind(trace.SpanKindInternal))
 		defer span.End()
 
 		err := v.authorizer.authorizeScheme(authContext, input.RequestValidationInput.Request, input.SecurityScheme, input.Scopes)
@@ -185,13 +181,7 @@ func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	responseValidationInput, err := v.validateRequest(r, authContext)
 	if err != nil {
-		if authContext.err != nil {
-			errors.HandleError(w, r, authContext.err)
-
-			return
-		}
-
-		errors.OAuth2InvalidRequest("request invalid").WithError(err).Write(w, r)
+		errors.HandleError(w, r, err)
 
 		return
 	}
