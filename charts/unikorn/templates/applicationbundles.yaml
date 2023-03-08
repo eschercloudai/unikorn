@@ -94,7 +94,11 @@ spec:
   - name: openstack-plugin-cinder-csi
     reference:
       kind: HelmApplication
-      name: openstack-plugin-cinder-csi-1.5.0-1
+      name: openstack-plugin-cinder-csi-2.3.0-1
+  - name: metrics-server
+    reference:
+      kind: HelmApplication
+      name: metrics-server-3.8.4-1
   - name: cluster-autoscaler
     reference:
       kind: HelmApplication
