@@ -66,7 +66,6 @@ spec:
   createNamespace: true
   interface: 1.0.0
 ---
-# Kubernetes 1.25
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
@@ -78,11 +77,10 @@ spec:
   createNamespace: true
   interface: 1.0.0
 ---
-# Kuebernetes 1.26
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: openstack-plugin-cinder-csi-1.5.0-1
+  name: openstack-plugin-cinder-csi-2.3.0-1
 spec:
   repo: https://kubernetes.github.io/cloud-provider-openstack
   chart: openstack-cinder-csi
@@ -95,6 +93,18 @@ spec:
     value: 'true'
   - name: secret.name
     value: cloud-config
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: metrics-server-3.8.4-1
+spec:
+  repo: https://kubernetes-sigs.github.io/metrics-server
+  chart: metrics-server
+  version: 3.8.4
+  parameters:
+  - name: args[0]
+    value: --kubelet-insecure-tls
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
