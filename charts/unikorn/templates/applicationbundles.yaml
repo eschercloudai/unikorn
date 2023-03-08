@@ -106,4 +106,4 @@ spec:
   - name: nvidia-gpu-operator
     reference:
       kind: HelmApplication
-      name: nvidia-gpu-operator-22.9.1-1
+      name: nvidia-gpu-operator-22.9.2-1
