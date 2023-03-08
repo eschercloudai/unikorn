@@ -610,7 +610,7 @@ components:
               type: string
           additionalProperties: false
     token:
-      desctiption: Authentication token result.
+      description: Authentication token result.
       type: object
       required:
       - token
@@ -860,7 +860,7 @@ components:
       items:
         $ref: '#/components/schemas/kubernetesCluster'
     applicationBundle:
-      descrpition: A bundle of applications.
+      description: A bundle of applications.
       type: object
       required:
       - name
@@ -988,7 +988,7 @@ components:
           description: The flavor name.
           type: string
         cpus:
-          descritpion: The number of CPUs.
+          description: The number of CPUs.
           type: integer
         memory:
           description: The amount of memory in GiB.
@@ -1215,8 +1215,8 @@ components:
       description: Operation requires OAuth2 bearer token authentication.
       type: oauth2
       flows:
-        implicit:
+        authorizationCode:
           authorizationUrl: https://kubernetes.eschercloud.com/api/v1/tokens/password"
-          tokenURL: https://kubernetes.eschercloud.com/api/v1/tokens/token"
+          tokenUrl: https://kubernetes.eschercloud.com/api/v1/tokens/token"
           scopes:
             project: Token is scoped to an OpenStack project
