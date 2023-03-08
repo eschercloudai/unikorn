@@ -26,6 +26,8 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/managers/options"
 	"github.com/eschercloudai/unikorn/pkg/managers/project"
 
+	klog "k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -41,7 +43,10 @@ func main() {
 
 	pflag.Parse()
 
-	log.SetLogger(zap.New(zap.UseFlagOptions(zapOptions)))
+	logr := zap.New(zap.UseFlagOptions(zapOptions))
+
+	log.SetLogger(logr)
+	klog.SetLogger(logr)
 
 	logger := log.Log.WithName("main")
 
