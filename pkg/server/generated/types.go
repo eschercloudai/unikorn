@@ -26,7 +26,7 @@ const (
 	UnsupportedResponseType Oauth2ErrorError = "unsupported_response_type"
 )
 
-// ApplicationBundle defines model for applicationBundle.
+// ApplicationBundle A bundle of applications.
 type ApplicationBundle struct {
 	// EndOfLife When the bundle is end-of-life.
 	EndOfLife *time.Time `json:"endOfLife,omitempty"`
@@ -241,6 +241,7 @@ type OpenstackExternalNetworks = []OpenstackExternalNetwork
 
 // OpenstackFlavor An Openstack flavor.
 type OpenstackFlavor struct {
+	// Cpus The number of CPUs.
 	Cpus int `json:"cpus"`
 
 	// Gpus The number of GPUs, if not set there are none.
@@ -346,7 +347,7 @@ type Project struct {
 // StringParameter A basic string parameter.
 type StringParameter = string
 
-// Token defines model for token.
+// Token Authentication token result.
 type Token struct {
 	// Email The user's email address.
 	Email string `json:"email"`
@@ -424,7 +425,7 @@ type OpenstackProjectsResponse = OpenstackProjects
 // ProjectResponse A Unikorn project.
 type ProjectResponse = Project
 
-// TokenResponse defines model for tokenResponse.
+// TokenResponse Authentication token result.
 type TokenResponse = Token
 
 // UnauthorizedResponse Generic error message.

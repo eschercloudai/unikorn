@@ -192,7 +192,7 @@ lint: $(GENDIR)
 
 # Validate the server OpenAPI schema is legit.
 .PHONY: validate
-validate:
+validate: $(SRVGENDIR)
 	go run ./hack/validate_openapi
 
 # Perform license checking.
