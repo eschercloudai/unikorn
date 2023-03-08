@@ -210,5 +210,9 @@ func HandleError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
+	log := log.FromContext(r.Context())
+
+	log.Error(err, "unhandled error")
+
 	OAuth2ServerError("unhandled error").Write(w, r)
 }

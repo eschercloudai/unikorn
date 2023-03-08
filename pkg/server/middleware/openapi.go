@@ -144,7 +144,7 @@ func (v *OpenAPIValidator) validateRequest(r *http.Request, authContext *authori
 
 	if err := openapi3filter.ValidateRequest(ctx, requestValidationInput); err != nil {
 		if authContext.err != nil {
-			return nil, err
+			return nil, authContext.err
 		}
 
 		return nil, errors.OAuth2InvalidRequest("request invalid").WithError(err)

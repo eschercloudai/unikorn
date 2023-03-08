@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 
@@ -41,6 +42,18 @@ type unbundleItem struct {
 	r **unikornv1.HelmApplication
 	// name is the resource name in the bundle.
 	name string
+	// optional is an optional item, this is typically used
+	// when adding packages/features to upstream bundles.
+	optional bool
+}
+
+// UnbundlerOption allows idiomatic updates to new applications.
+type UnbundlerOption func(*unbundleItem)
+
+// Optional can be applied to an application to indicate that handling
+// of it is conditional.
+func Optional(i *unbundleItem) {
+	i.optional = true
 }
 
 type Unbundler struct {
@@ -59,8 +72,17 @@ func NewUnbundler(o BundledType, kind unikornv1.ApplicationBundleResourceKind) *
 	}
 }
 
-func (u *Unbundler) AddApplication(r **unikornv1.HelmApplication, name string) {
-	u.items = append(u.items, unbundleItem{r: r, name: name})
+func (u *Unbundler) AddApplication(r **unikornv1.HelmApplication, name string, options ...UnbundlerOption) {
+	item := unbundleItem{
+		r:    r,
+		name: name,
+	}
+
+	for _, o := range options {
+		o(&item)
+	}
+
+	u.items = append(u.items, item)
 }
 
 func (u *Unbundler) Unbundle(ctx context.Context, c client.Client) error {
@@ -81,7 +103,11 @@ func (u *Unbundler) Unbundle(ctx context.Context, c client.Client) error {
 	for _, item := range u.items {
 		applicationReference := bundle.GetApplication(item.name)
 		if applicationReference == nil {
-			return ErrApplicationMissing
+			if item.optional {
+				continue
+			}
+
+			return fmt.Errorf("%w: %s", ErrApplicationMissing, item.name)
 		}
 
 		key := client.ObjectKey{

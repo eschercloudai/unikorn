@@ -162,6 +162,9 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 			"loadBalancer": map[string]interface{}{
 				"floating-network-id": *p.cluster.Spec.Openstack.ExternalNetworkID,
 			},
+			"blockStorage": map[string]interface{}{
+				"ignore-volume-az": true,
+			},
 		},
 		"tolerations": []interface{}{
 			map[string]interface{}{

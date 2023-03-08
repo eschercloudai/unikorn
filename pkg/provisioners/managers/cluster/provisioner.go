@@ -28,6 +28,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nvidiagpuoperator"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackcloudprovider"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackplugincindercsi"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
@@ -47,11 +48,12 @@ type Provisioner struct {
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1.KubernetesCluster
 
-	clusterOpenstackApplication       *unikornv1.HelmApplication
-	ciliumApplication                 *unikornv1.HelmApplication
-	openstackCloudProviderApplication *unikornv1.HelmApplication
-	nvidiaGPUOperatorApplication      *unikornv1.HelmApplication
-	clusterAutoscalerApplication      *unikornv1.HelmApplication
+	clusterOpenstackApplication         *unikornv1.HelmApplication
+	ciliumApplication                   *unikornv1.HelmApplication
+	openstackCloudProviderApplication   *unikornv1.HelmApplication
+	openstackPluginCinderCSIApplication *unikornv1.HelmApplication
+	nvidiaGPUOperatorApplication        *unikornv1.HelmApplication
+	clusterAutoscalerApplication        *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
@@ -66,6 +68,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	unbundler.AddApplication(&provisioner.clusterOpenstackApplication, "cluster-openstack")
 	unbundler.AddApplication(&provisioner.ciliumApplication, "cilium")
 	unbundler.AddApplication(&provisioner.openstackCloudProviderApplication, "openstack-cloud-provider")
+	unbundler.AddApplication(&provisioner.openstackPluginCinderCSIApplication, "openstack-plugin-cinder-csi", util.Optional)
 	unbundler.AddApplication(&provisioner.nvidiaGPUOperatorApplication, "nvidia-gpu-operator")
 	unbundler.AddApplication(&provisioner.clusterAutoscalerApplication, "cluster-autoscaler")
 
@@ -123,6 +126,14 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 		concurrent.New("cluster add-ons",
 			cilium.New(p.client, p.cluster, p.ciliumApplication).OnRemote(remote),
 			openstackcloudprovider.New(p.client, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote),
+			conditional.New("openstack-plugin-cinder-csi",
+				// TODO: this is temporary until all clusters are running
+				// it, then it becomes mandatory.
+				func() bool {
+					return p.openstackPluginCinderCSIApplication != nil
+				},
+				openstackplugincindercsi.New(p.client, p.cluster, p.openstackPluginCinderCSIApplication).OnRemote(remote),
+			),
 		),
 		nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote),
 	)
