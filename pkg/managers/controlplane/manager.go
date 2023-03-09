@@ -17,73 +17,34 @@ limitations under the License.
 package controlplane
 
 import (
-	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/managers/options"
+	"github.com/eschercloudai/unikorn/pkg/managers/common"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
-
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const (
-	identity = "unikorn-control-plane-manager"
-)
+// Factory provides methods that can build a type specific controller.
+type Factory struct{}
 
-func Run(o *options.Options) error {
-	// Create a scheme and ensure it knows about Kubernetes and Unikorn
-	// resource types.
-	scheme := runtime.NewScheme()
+var _ common.ControllerFactory = &Factory{}
 
-	if err := kubernetesscheme.AddToScheme(scheme); err != nil {
+// Reconciler returns a new reconciler instance.
+func (*Factory) Reconciler(manager manager.Manager) reconcile.Reconciler {
+	return &reconciler{
+		client: manager.GetClient(),
+	}
+}
+
+// RegisterWatches adds any watches that would trigger a reconcile.
+func (*Factory) RegisterWatches(controller controller.Controller) error {
+	if err := controller.Watch(&source.Kind{Type: &unikornv1alpha1.ControlPlane{}}, &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
 		return err
 	}
 
-	if err := unikornscheme.AddToScheme(scheme); err != nil {
-		return err
-	}
-
-	// Create a manager with leadership election to prevent split brain
-	// problems, and set the scheme so it gets propagated to the client.
-	config, err := config.GetConfig()
-	if err != nil {
-		return err
-	}
-
-	options := manager.Options{
-		Scheme:           scheme,
-		LeaderElection:   true,
-		LeaderElectionID: identity,
-	}
-
-	manager, err := manager.New(config, options)
-	if err != nil {
-		return err
-	}
-
-	// Create a controller that responds to our ControlPlane objects.
-	controllerOptions := controller.Options{
-		Reconciler: &reconciler{
-			client: manager.GetClient(),
-		},
-		MaxConcurrentReconciles: o.MaxConcurrentReconciles,
-	}
-
-	c, err := controller.New(identity, manager, controllerOptions)
-	if err != nil {
-		return err
-	}
-
-	if err := c.Watch(&source.Kind{Type: &unikornv1alpha1.ControlPlane{}}, &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
-		return err
-	}
-
-	return manager.Start(signals.SetupSignalHandler())
+	return nil
 }

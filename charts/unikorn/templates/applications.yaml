@@ -15,6 +15,20 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
+  name: cert-manager-1.11.0-1
+spec:
+  repo: https://charts.jetstack.io
+  chart: cert-manager
+  version: v1.11.0
+  release: cert-manager
+  createNamespace: true
+  parameters:
+  - name: installCRDs
+    value: "true"
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
   name: vcluster-0.12.1-1
 spec:
   repo: https://charts.loft.sh
