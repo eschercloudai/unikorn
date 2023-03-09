@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 )
 
 var (
@@ -71,4 +72,9 @@ const (
 
 	// NvidiaGPUType is used to indicate the GPU type for cluster-autoscaler.
 	NvidiaGPUType = "nvidia.com/gpu"
+
+	// DefaultYieldTimeout allows N seconds for a provisioner to do its thing
+	// and report a healthy status before yielding and giving someone else
+	// a go.
+	DefaultYieldTimeout = 10 * time.Second
 )

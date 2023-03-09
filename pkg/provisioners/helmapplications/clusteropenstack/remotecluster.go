@@ -20,13 +20,15 @@ import (
 	"context"
 
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/util/retry"
+	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type RemoteClusterGenerator struct {
@@ -84,6 +86,8 @@ func (g *RemoteClusterGenerator) Server(ctx context.Context) (string, error) {
 
 // Config implements the remotecluster.Generator interface.
 func (g *RemoteClusterGenerator) Config(ctx context.Context) (*clientcmdapi.Config, error) {
+	log := log.FromContext(ctx)
+
 	secret := &corev1.Secret{}
 
 	secretKey := client.ObjectKey{
@@ -92,11 +96,13 @@ func (g *RemoteClusterGenerator) Config(ctx context.Context) (*clientcmdapi.Conf
 	}
 
 	// Retry getting the secret until it exists.
-	getSecret := func() error {
-		return g.client.Get(ctx, secretKey, secret)
-	}
+	if err := g.client.Get(ctx, secretKey, secret); err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("kubernetes cluster kubeconfig does not exist, yielding")
 
-	if err := retry.Forever().DoWithContext(ctx, getSecret); err != nil {
+			return nil, provisionererrors.ErrYield
+		}
+
 		return nil, err
 	}
 

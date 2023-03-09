@@ -373,8 +373,10 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	// TODO: this application is special in that everything it creates is a
 	// CRD, so as far as Argo is concerned, everything is healthy and the
 	// check passes instantly, rather than waiting for the CAPI controllers
-	// to do something.  We kinda fudge it due to the concurrent deployment
-	// of the CNI and cloud controller add-ons blocking.
+	// to do something.  What happens is the task that provisions the Argo
+	// remote cluster will yield, and second time around this will be in
+	// the Progressing state.  If we had a job for the Helm chart that ran
+	// until CAPI did something, that would add in the correct semantics.
 	if err := p.getProvisioner().Provision(ctx); err != nil {
 		return err
 	}

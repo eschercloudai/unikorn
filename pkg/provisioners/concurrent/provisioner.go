@@ -61,12 +61,25 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.Info("provisioning concurrency group", "group", p.name)
 
-	group, gctx := errgroup.WithContext(ctx)
+	group := &errgroup.Group{}
 
 	for i := range p.provisioners {
 		provisioner := p.provisioners[i]
 
-		group.Go(func() error { return provisioner.Provision(gctx) })
+		callback := func() error {
+			// As errgroup only saves the first error, we may lose some
+			// logging information, so do this here when waiting on child
+			// tasks.
+			if err := provisioner.Provision(ctx); err != nil {
+				log.Info("concurrency group member exited with error", "error", err)
+
+				return err
+			}
+
+			return nil
+		}
+
+		group.Go(callback)
 	}
 
 	if err := group.Wait(); err != nil {
@@ -84,12 +97,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning concurrency group", "group", p.name)
 
-	group, gctx := errgroup.WithContext(ctx)
+	group := &errgroup.Group{}
 
 	for i := range p.provisioners {
 		provisioner := p.provisioners[i]
 
-		group.Go(func() error { return provisioner.Deprovision(gctx) })
+		group.Go(func() error { return provisioner.Deprovision(ctx) })
 	}
 
 	if err := group.Wait(); err != nil {

@@ -80,7 +80,12 @@ func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
 	for {
 		select {
 		case <-c.Done():
-			return fmt.Errorf("%s: %w", c.Err().Error(), rerr)
+			// NOTE: we wrap the context error here, knowing it's a timeout
+			// is more important than the last callback error, because of
+			// reconcile yielding code.  If this becomes a problem, we may
+			// need to define our own "expired" error type, that can wrap
+			// the underlying error.
+			return fmt.Errorf("%w: %s", c.Err(), rerr)
 		case <-t.C:
 			if rerr = f(); rerr != nil {
 				break

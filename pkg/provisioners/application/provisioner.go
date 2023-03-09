@@ -23,6 +23,7 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/readiness"
 
@@ -408,12 +409,15 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		}
 	}
 
-	log.Info("waiting for application to become healthy", "application", p.name)
+	log.Info("checking application health", "application", p.name)
 
-	applicationHealthy := readiness.NewApplicationHealthy(p.client, resource)
+	// NOTE: This isn't necessarily accurate, take CAPI clusters for instance,
+	// that's just a bunch of CRs, and they are instantly healthy until
+	// CAPI/CAPO take note and start making status updates...
+	if err := readiness.NewApplicationHealthy(p.client, resource).Check(ctx); err != nil {
+		log.Info("application not healthy, yielding", "application", p.name)
 
-	if err := readiness.NewRetry(applicationHealthy).Check(ctx); err != nil {
-		return err
+		return provisionererrors.ErrYield
 	}
 
 	log.Info("application provisioned", "application", p.name)

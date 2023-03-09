@@ -8,7 +8,7 @@ on:
 env:
   GO_VERSION: 1.19.1
 jobs:
-  License:
+  Static:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -17,9 +17,13 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
+    - name: Touch
+      run: make touch
     - name: License Checker
       run: make license
-  Lint:
+    - name: Validate OpenAPI Schema
+      run: make touch validate
+  Runtime:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -30,30 +34,12 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
     - name: Install Helm
       uses: azure/setup-helm@v3
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Touch
+      run: make touch
     - name: Golang CI/Helm Lint
-      run: make touch lint
-  Validate:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Setup Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    - name: Validate OpenAPI Schema
-      run: make touch validate
-  Build:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Setup Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    - name: Build All
-      run: make touch all
+      run: make lint
     - name: Build Images
       run: make images
     - name: Generated Code Checked In
