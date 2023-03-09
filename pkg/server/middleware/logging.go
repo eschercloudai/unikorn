@@ -106,6 +106,9 @@ func (*LoggingSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 		attributes = append(attributes, string(attribute.Key), attribute.Value.Emit())
 	}
 
+	status := s.Status()
+	attributes = append(attributes, "status.code", status.Code.String())
+
 	log.Log.Info("request completed", attributes...)
 }
 
@@ -162,6 +165,7 @@ func Logger() func(next http.Handler) http.Handler {
 
 			// Extract HTTP response information for logging purposes.
 			span.SetStatus(httpconv.ServerStatus(writer.StatusCode()))
+			span.SetAttributes(semconv.HTTPStatusCode(writer.StatusCode()))
 			span.SetAttributes(httpconv.ResponseHeader(writer.Header())...)
 		})
 	}
