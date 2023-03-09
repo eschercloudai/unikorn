@@ -133,6 +133,16 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
+  name: nvidia-gpu-operator-22.9.2-1
+spec:
+  repo: https://helm.ngc.nvidia.com/nvidia
+  chart: gpu-operator
+  version: v22.9.2
+  interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
   # Cool story bro (Nick Jones!!)
   name: cluster-autoscaler-0.0.0-1
 spec:
