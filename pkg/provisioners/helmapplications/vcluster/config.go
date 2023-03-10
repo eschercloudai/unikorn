@@ -21,11 +21,11 @@ import (
 	"errors"
 	"io"
 	"os"
-	"time"
 
-	"github.com/eschercloudai/unikorn/pkg/util/retry"
+	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -33,6 +33,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -101,8 +102,16 @@ func (c *ControllerRuntimeClient) Kubeconfig(ctx context.Context, namespace stri
 
 // GetSecret provides an implementation specific way to get a secret.
 func (c *ControllerRuntimeClient) GetSecret(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
+	log := log.FromContext(ctx)
+
 	secret := &corev1.Secret{}
 	if err := c.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, secret); err != nil {
+		if kerrors.IsNotFound(err) {
+			log.Info("vitual cluster kubeconfig does not exist, yielding")
+
+			return nil, provisionererrors.ErrYield
+		}
+
 		return nil, err
 	}
 
@@ -173,55 +182,40 @@ var _ ConfigGetter = &Client{}
 // performs a retry until the provided context expires.  It also acknowledges that load
 // balancer services may take a while to get a public IP.
 func getClientConfig(ctx context.Context, getter ConfigGetter, namespace string, external bool) (*clientcmdapi.Config, error) {
-	var config *clientcmdapi.Config
-
-	callback := func() error {
-		secret, err := getter.GetSecret(ctx, namespace, "vc-"+vclusterName)
-		if err != nil {
-			return err
-		}
-
-		// Acquire the kubeconfig and hack it so that the server points to the
-		// LoadBalancer endpoint.
-		configBytes, ok := secret.Data["config"]
-		if !ok {
-			return ErrConfigDataMissing
-		}
-
-		configStruct, err := clientcmd.NewClientConfigFromBytes(configBytes)
-		if err != nil {
-			return err
-		}
-
-		configRaw, err := configStruct.RawConfig()
-		if err != nil {
-			return err
-		}
-
-		host := "https://vcluster." + namespace + ":443"
-
-		// You are responsible for setting up a port-forward in order to get access
-		// to this instance, then the host API becomes the only attack surface to
-		// worry about.
-		if external {
-			host = "https://localhost:8443"
-		}
-
-		configRaw.Clusters["my-vcluster"].Server = host
-
-		config = &configRaw
-
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-
-	if err := retry.Forever().DoWithContext(ctx, callback); err != nil {
+	secret, err := getter.GetSecret(ctx, namespace, "vc-"+vclusterName)
+	if err != nil {
 		return nil, err
 	}
 
-	return config, nil
+	// Acquire the kubeconfig and hack it so that the server points to the
+	// LoadBalancer endpoint.
+	configBytes, ok := secret.Data["config"]
+	if !ok {
+		return nil, ErrConfigDataMissing
+	}
+
+	configStruct, err := clientcmd.NewClientConfigFromBytes(configBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := configStruct.RawConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	host := "https://vcluster." + namespace + ":443"
+
+	// You are responsible for setting up a port-forward in order to get access
+	// to this instance, then the host API becomes the only attack surface to
+	// worry about.
+	if external {
+		host = "https://localhost:8443"
+	}
+
+	config.Clusters["my-vcluster"].Server = host
+
+	return &config, nil
 }
 
 // getKubeconfig returns a kubeconfig string, sadly client-go doesn't let you

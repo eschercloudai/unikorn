@@ -23,7 +23,7 @@ import (
 	argocdclient "github.com/eschercloudai/unikorn/pkg/argocd/client"
 	argocdcluster "github.com/eschercloudai/unikorn/pkg/argocd/cluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/util/retry"
+	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -108,30 +108,24 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	server, err := p.generator.Server(ctx)
+	if err != nil {
+		return err
+	}
+
+	config, err := p.generator.Config(ctx)
+	if err != nil {
+		return err
+	}
+
 	// Retry adding the cluster until ArgoCD deems it's ready, it'll 500 until that
 	// condition is met.  This allows the provisioner to be used to initialize remotes
 	// in parallel with them coming up as some providers require add-ons to be installed
 	// concurrently before a readiness check will succeed.
-	upsertCluster := func() error {
-		server, err := p.generator.Server(ctx)
-		if err != nil {
-			return err
-		}
+	if err := argocdcluster.Upsert(ctx, argocd, name, server, config); err != nil {
+		log.Info("remote cluster not ready, yielding", "remotecluster", name)
 
-		config, err := p.generator.Config(ctx)
-		if err != nil {
-			return err
-		}
-
-		if err := argocdcluster.Upsert(ctx, argocd, name, server, config); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	if err := retry.Forever().DoWithContext(ctx, upsertCluster); err != nil {
-		return err
+		return provisionererrors.ErrYield
 	}
 
 	log.Info("remote cluster provisioned", "remotecluster", name)

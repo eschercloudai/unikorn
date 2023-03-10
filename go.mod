@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/deepmap/oapi-codegen v1.12.4
-	github.com/eschercloudai/argocd-client-go v0.0.0-20221208104342-581c85485ec5
+	github.com/eschercloudai/argocd-client-go v0.0.0-20230310111928-80edec6b0b46
 	github.com/getkin/kin-openapi v0.114.0
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-logr/logr v1.2.3

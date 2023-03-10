@@ -90,6 +90,8 @@ github.com/envoyproxy/go-control-plane v0.9.10-0.20210907150352-cf90f659a021/go.
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/eschercloudai/argocd-client-go v0.0.0-20221208104342-581c85485ec5 h1:hEa4j7WHD6Sy/XYsW70vm39vDSGGJaoh4LzfKcWca34=
 github.com/eschercloudai/argocd-client-go v0.0.0-20221208104342-581c85485ec5/go.mod h1:nFOYyzot8oprUZS1DyPiIN9/2/sJTnU3VD5A3Hf7Vqg=
+github.com/eschercloudai/argocd-client-go v0.0.0-20230310111928-80edec6b0b46 h1:T0d6XFaRzGEUvy7ge2ggzepBe+4NirDukDA1bK7+t9A=
+github.com/eschercloudai/argocd-client-go v0.0.0-20230310111928-80edec6b0b46/go.mod h1:nFOYyzot8oprUZS1DyPiIN9/2/sJTnU3VD5A3Hf7Vqg=
 github.com/evanphx/json-patch v0.5.2/go.mod h1:ZWS5hhDbVDyob71nXKNL0+PWn6ToqBHMikGIFbs31qQ=
 github.com/evanphx/json-patch v5.6.0+incompatible h1:jBYDEEiFBPxA0v50tFdvOzQQTCvpL6mnFh5mB2/l16U=
 github.com/evanphx/json-patch v5.6.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=

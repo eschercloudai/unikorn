@@ -24,6 +24,7 @@ import (
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/controlplane"
 
 	corev1 "k8s.io/api/core/v1"
@@ -106,6 +107,17 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	// Provision the control plane.
 	if err := provisioner.Provision(provisionContext); err != nil {
+		// If the provisioner has voluntarily yielded, requeue it and look at
+		// it later to allow others to use the worker, or indeed pickup delete
+		// requests, updates... probably not a great idea :D
+		// NOTE: DO NOT do what CAPI do and not-specify a wait period, it will
+		// suffer from an exponential back-off and kill performance.
+		if errors.Is(err, provisionererrors.ErrYield) {
+			log.Info("reconcile yielding")
+
+			return reconcile.Result{RequeueAfter: constants.DefaultYieldTimeout}, nil
+		}
+
 		if err := r.handleReconcileError(ctx, object, err); err != nil {
 			return reconcile.Result{}, err
 		}
