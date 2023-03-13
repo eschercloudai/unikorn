@@ -64,12 +64,24 @@ func (w *loggingResponseWriter) StatusCode() int {
 	return w.code
 }
 
-// logValuesFromSpanContext gets a generic set of key/value pairs from a span for logging.
+// logValuesFromSpanContext gets a generic set of key/value pairs from a span context for logging.
 func logValuesFromSpanContext(s trace.SpanContext) []interface{} {
 	return []interface{}{
 		"span.id", s.SpanID().String(),
 		"trace.id", s.TraceID().String(),
 	}
+}
+
+// logValuesFromSpan gets a generic set of key/value pairs from a span for logging.
+func logValuesFromSpan(s sdktrace.ReadOnlySpan) []interface{} {
+	values := logValuesFromSpanContext(s.SpanContext())
+	values = append(values, "span.name", s.Name())
+
+	for _, attribute := range s.Attributes() {
+		values = append(values, string(attribute.Key), attribute.Value.Emit())
+	}
+
+	return values
 }
 
 // LoggingSpanProcessor is a OpenTelemetry span processor that logs to standard out
@@ -85,13 +97,9 @@ func (*LoggingSpanProcessor) OnStart(ctx context.Context, s sdktrace.ReadWriteSp
 		return
 	}
 
-	attributes := logValuesFromSpanContext(s.SpanContext())
+	values := logValuesFromSpan(s)
 
-	for _, attribute := range s.Attributes() {
-		attributes = append(attributes, string(attribute.Key), attribute.Value.Emit())
-	}
-
-	log.Log.Info("request started", attributes...)
+	log.Log.Info("request started", values...)
 }
 
 func (*LoggingSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
@@ -100,16 +108,10 @@ func (*LoggingSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 		return
 	}
 
-	attributes := logValuesFromSpanContext(s.SpanContext())
+	values := logValuesFromSpan(s)
+	values = append(values, "status.code", s.Status().Code.String())
 
-	for _, attribute := range s.Attributes() {
-		attributes = append(attributes, string(attribute.Key), attribute.Value.Emit())
-	}
-
-	status := s.Status()
-	attributes = append(attributes, "status.code", status.Code.String())
-
-	log.Log.Info("request completed", attributes...)
+	log.Log.Info("request completed", values...)
 }
 
 func (*LoggingSpanProcessor) Shutdown(ctx context.Context) error {
@@ -139,8 +141,11 @@ func Logger() func(next http.Handler) http.Handler {
 			attributes = append(attributes, semconv.ServiceVersion(constants.Version))
 
 			// Extract information from the HTTP request for logging purposes.
+			safeHeader := r.Header.Clone()
+			safeHeader.Del("Authorization")
+
 			attributes = append(attributes, httpconv.ServerRequest("", r)...)
-			attributes = append(attributes, httpconv.RequestHeader(r.Header)...)
+			attributes = append(attributes, httpconv.RequestHeader(safeHeader)...)
 
 			tracer := otel.GetTracerProvider().Tracer(constants.Application)
 

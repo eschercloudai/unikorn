@@ -215,7 +215,7 @@ spec:
   source:
     path: charts/unikorn
     repoURL: git@github.com:eschercloudai/unikorn
-    targetRevision: 0.3.18
+    targetRevision: 0.3.19
     helm:
       parameters:
       - name: dockerConfig
