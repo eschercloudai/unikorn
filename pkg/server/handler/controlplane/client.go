@@ -24,6 +24,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
 
 	corev1 "k8s.io/api/core/v1"
@@ -111,7 +112,12 @@ func (c *Client) Metadata(ctx context.Context, name string) (*Meta, error) {
 }
 
 // convert converts from Kubernetes into OpenAPI types.
-func convert(in *unikornv1.ControlPlane) *generated.ControlPlane {
+func (c *Client) convert(ctx context.Context, in *unikornv1.ControlPlane) (*generated.ControlPlane, error) {
+	bundle, err := applicationbundle.NewClient(c.client).Get(ctx, *in.Spec.ApplicationBundle)
+	if err != nil {
+		return nil, err
+	}
+
 	out := &generated.ControlPlane{
 		Status: &generated.KubernetesResourceStatus{
 			Name:         in.Name,
@@ -119,7 +125,7 @@ func convert(in *unikornv1.ControlPlane) *generated.ControlPlane {
 			Status:       "Unknown",
 		},
 		Name:              in.Name,
-		ApplicationBundle: *in.Spec.ApplicationBundle,
+		ApplicationBundle: *bundle,
 	}
 
 	if in.DeletionTimestamp != nil {
@@ -130,24 +136,36 @@ func convert(in *unikornv1.ControlPlane) *generated.ControlPlane {
 		out.Status.Status = string(condition.Reason)
 	}
 
-	return out
+	return out, nil
 }
 
 // convertList converts from Kubernetes into OpenAPI types.
-func convertList(in *unikornv1.ControlPlaneList) []*generated.ControlPlane {
+func (c *Client) convertList(ctx context.Context, in *unikornv1.ControlPlaneList) ([]*generated.ControlPlane, error) {
 	out := make([]*generated.ControlPlane, len(in.Items))
 
 	for i := range in.Items {
-		out[i] = convert(&in.Items[i])
+		item, err := c.convert(ctx, &in.Items[i])
+		if err != nil {
+			return nil, err
+		}
+
+		out[i] = item
 	}
 
-	return out
+	return out, nil
 }
 
 // List returns all control planes owned by the implicit control plane.
 func (c *Client) List(ctx context.Context) ([]*generated.ControlPlane, error) {
 	project, err := project.NewClient(c.client).Metadata(ctx)
 	if err != nil {
+		// If the project hasn't been created, then this will 404, which is
+		// kinda confusing, as the project isn't in the path, so return an empty
+		// array.
+		if errors.IsHTTPNotFound(err) {
+			return []*generated.ControlPlane{}, nil
+		}
+
 		return nil, err
 	}
 
@@ -159,7 +177,12 @@ func (c *Client) List(ctx context.Context) ([]*generated.ControlPlane, error) {
 
 	sort.Stable(result)
 
-	return convertList(result), nil
+	out, err := c.convertList(ctx, result)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 // get returns the implicit control plane identified by the JWT claims.
@@ -189,7 +212,12 @@ func (c *Client) Get(ctx context.Context, name generated.ControlPlaneNameParamet
 		return nil, err
 	}
 
-	return convert(result), nil
+	out, err := c.convert(ctx, result)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 // Create creates the implicit control plane indentified by the JTW claims.
@@ -214,7 +242,7 @@ func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) er
 			},
 		},
 		Spec: unikornv1.ControlPlaneSpec{
-			ApplicationBundle: &request.ApplicationBundle,
+			ApplicationBundle: &request.ApplicationBundle.Name,
 		},
 	}
 
