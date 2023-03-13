@@ -85,6 +85,18 @@ func (c *Client) listByKind(ctx context.Context, kind unikornv1.ApplicationBundl
 	return convertList(resultByKind), nil
 }
 
+// TODO: while not exposed, it doesn't check the kind yet, which could be seen as
+// an escalation of sorts.
+func (c *Client) Get(ctx context.Context, name string) (*generated.ApplicationBundle, error) {
+	result := &unikornv1.ApplicationBundle{}
+
+	if err := c.client.Get(ctx, client.ObjectKey{Name: name}, result); err != nil {
+		return nil, errors.HTTPNotFound()
+	}
+
+	return convert(result), nil
+}
+
 func (c *Client) ListControlPlane(ctx context.Context) ([]*generated.ApplicationBundle, error) {
 	return c.listByKind(ctx, unikornv1.ApplicationBundleResourceKindControlPlane)
 }

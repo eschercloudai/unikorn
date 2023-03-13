@@ -71,7 +71,12 @@ func (c *Client) List(ctx context.Context, controlPlaneName generated.ControlPla
 
 	sort.Stable(result)
 
-	return convertList(result), nil
+	out, err := c.convertList(ctx, result)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 // Get returns the implicit cluster identified by the JWT claims.
@@ -91,7 +96,12 @@ func (c *Client) Get(ctx context.Context, controlPlaneName generated.ControlPlan
 		return nil, errors.OAuth2ServerError("unable to get cluster").WithError(err)
 	}
 
-	return convert(result), nil
+	out, err := c.convert(ctx, result)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 // GetKubeconfig returns the kubernetes configuation associated with a cluster.

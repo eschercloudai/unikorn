@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/util"
@@ -175,10 +177,15 @@ func convertStatus(in *unikornv1.KubernetesCluster) *generated.KubernetesResourc
 }
 
 // convert converts from a custom resource into the API definition.
-func convert(in *unikornv1.KubernetesCluster) *generated.KubernetesCluster {
+func (c *Client) convert(ctx context.Context, in *unikornv1.KubernetesCluster) (*generated.KubernetesCluster, error) {
+	bundle, err := applicationbundle.NewClient(c.client).Get(ctx, *in.Spec.ApplicationBundle)
+	if err != nil {
+		return nil, err
+	}
+
 	out := &generated.KubernetesCluster{
 		Name:              in.Name,
-		ApplicationBundle: *in.Spec.ApplicationBundle,
+		ApplicationBundle: *bundle,
 		Openstack:         convertOpenstack(in),
 		Network:           convertNetwork(in),
 		Api:               convertAPI(in),
@@ -188,18 +195,23 @@ func convert(in *unikornv1.KubernetesCluster) *generated.KubernetesCluster {
 		Status:            convertStatus(in),
 	}
 
-	return out
+	return out, nil
 }
 
 // uconvertList converts from a custom resource list into the API definition.
-func convertList(in *unikornv1.KubernetesClusterList) []*generated.KubernetesCluster {
+func (c *Client) convertList(ctx context.Context, in *unikornv1.KubernetesClusterList) ([]*generated.KubernetesCluster, error) {
 	out := make([]*generated.KubernetesCluster, len(in.Items))
 
 	for i := range in.Items {
-		out[i] = convert(&in.Items[i])
+		item, err := c.convert(ctx, &in.Items[i])
+		if err != nil {
+			return nil, err
+		}
+
+		out[i] = item
 	}
 
-	return out
+	return out, nil
 }
 
 // createClientConfig creates an Openstack client configuration from the API.
@@ -506,7 +518,7 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 			},
 		},
 		Spec: unikornv1.KubernetesClusterSpec{
-			ApplicationBundle: &options.ApplicationBundle,
+			ApplicationBundle: &options.ApplicationBundle.Name,
 			Openstack:         openstack,
 			Network:           network,
 			API:               api,

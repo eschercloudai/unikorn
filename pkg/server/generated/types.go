@@ -52,8 +52,8 @@ type ApplicationCredentialOptions struct {
 
 // ControlPlane A Unikorn control plane.
 type ControlPlane struct {
-	// ApplicationBundle The application bundle (versioning information) for the control plane.
-	ApplicationBundle string `json:"applicationBundle"`
+	// ApplicationBundle A bundle of applications.
+	ApplicationBundle ApplicationBundle `json:"applicationBundle"`
 
 	// Name The name of the resource.
 	Name string `json:"name"`
@@ -70,8 +70,8 @@ type KubernetesCluster struct {
 	// Api Kubernetes API settings.
 	Api *KubernetesClusterAPI `json:"api,omitempty"`
 
-	// ApplicationBundle The application bundle (versioning information) for the cluster.
-	ApplicationBundle string `json:"applicationBundle"`
+	// ApplicationBundle A bundle of applications.
+	ApplicationBundle ApplicationBundle `json:"applicationBundle"`
 
 	// ControlPlane A Kubernetes cluster machine.
 	ControlPlane OpenstackMachinePool `json:"controlPlane"`

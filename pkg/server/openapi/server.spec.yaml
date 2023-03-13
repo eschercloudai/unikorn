@@ -663,8 +663,7 @@ components:
           description: The name of the resource.
           type: string
         applicationBundle:
-          description: The application bundle (versioning information) for the control plane.
-          type: string
+          $ref: '#/components/schemas/applicationBundle'
     controlPlanes:
       description: A list of Unikorn control planes.
       type: array
@@ -838,8 +837,7 @@ components:
           description: Cluster name.
           type: string
         applicationBundle:
-          description: The application bundle (versioning information) for the cluster.
-          type: string
+          $ref: '#/components/schemas/applicationBundle'
         openstack:
           $ref: '#/components/schemas/kubernetesClusterOpenstack'
         network:
