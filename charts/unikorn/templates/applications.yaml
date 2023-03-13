@@ -135,10 +135,13 @@ kind: HelmApplication
 metadata:
   name: nvidia-gpu-operator-22.9.2-1
 spec:
-  repo: https://helm.ngc.nvidia.com/nvidia
   chart: gpu-operator
-  version: v22.9.2
   interface: 1.0.0
+  repo: https://helm.ngc.nvidia.com/nvidia
+  version: v22.9.2
+  parameters:
+  - name: validator.plugin
+    value: "null"
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
