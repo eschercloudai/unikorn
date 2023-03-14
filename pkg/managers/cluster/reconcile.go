@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/cluster"
@@ -47,7 +47,7 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	// See if the resource exists or not, if not it's been deleted, but do nothing
 	// as cascading deletes will handle the cleanup.
-	object := &unikornv1alpha1.KubernetesCluster{}
+	object := &unikornv1.KubernetesCluster{}
 	if err := r.client.Get(ctx, request.NamespacedName, object); err != nil {
 		if kerrors.IsNotFound(err) {
 			log.Info("resource deleted")
@@ -134,8 +134,9 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 // handleReconcileFirstVisit checks to see if the Available condition is present in the
 // status, if not we assume it's the first time we've seen this an set the condition to
 // Provisioning.
-func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, kubernetesCluster *unikornv1alpha1.KubernetesCluster) error {
-	if _, err := kubernetesCluster.LookupCondition(unikornv1alpha1.KubernetesClusterConditionAvailable); err != nil {
+func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, kubernetesCluster *unikornv1.KubernetesCluster) error {
+	condition, err := kubernetesCluster.LookupCondition(unikornv1.KubernetesClusterConditionAvailable)
+	if err != nil {
 		kubernetesCluster.Finalizers = []string{
 			constants.Finalizer,
 		}
@@ -144,19 +145,31 @@ func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, kubernetesCl
 			return err
 		}
 
-		kubernetesCluster.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.KubernetesClusterConditionReasonProvisioning, "Provisioning of kubernetes cluster has started")
+		kubernetesCluster.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1.KubernetesClusterConditionReasonProvisioning, "Provisioning kubernetes cluster")
 
 		if err := r.client.Status().Update(ctx, kubernetesCluster); err != nil {
 			return err
 		}
+
+		return nil
+	}
+
+	if condition.Reason == unikornv1.KubernetesClusterConditionReasonProvisioned {
+		kubernetesCluster.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1.KubernetesClusterConditionReasonUpdating, "Updating control plane")
+
+		if err := r.client.Status().Update(ctx, kubernetesCluster); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	return nil
 }
 
 // handleReconcileDeprovision indicates the deprovision request has been picked up.
-func (r *reconciler) handleReconcileDeprovision(ctx context.Context, kubernetesCluster *unikornv1alpha1.KubernetesCluster) error {
-	if ok := kubernetesCluster.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.KubernetesClusterConditionReasonDeprovisioning, "Kubernetes cluster is being deprovisioned"); ok {
+func (r *reconciler) handleReconcileDeprovision(ctx context.Context, kubernetesCluster *unikornv1.KubernetesCluster) error {
+	if ok := kubernetesCluster.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1.KubernetesClusterConditionReasonDeprovisioning, "Kubernetes cluster is being deprovisioned"); ok {
 		if err := r.client.Status().Update(ctx, kubernetesCluster); err != nil {
 			return err
 		}
@@ -167,8 +180,8 @@ func (r *reconciler) handleReconcileDeprovision(ctx context.Context, kubernetesC
 
 // handleReconcileComplete indicates that the reconcile is complete and the control
 // plane is ready to be used.
-func (r *reconciler) handleReconcileComplete(ctx context.Context, kubernetesCluster *unikornv1alpha1.KubernetesCluster) error {
-	if ok := kubernetesCluster.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1alpha1.KubernetesClusterConditionReasonProvisioned, "Provisioning of kubernetes cluster has completed"); ok {
+func (r *reconciler) handleReconcileComplete(ctx context.Context, kubernetesCluster *unikornv1.KubernetesCluster) error {
+	if ok := kubernetesCluster.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1.KubernetesClusterConditionReasonProvisioned, "Provisioning of kubernetes cluster has completed"); ok {
 		if err := r.client.Status().Update(ctx, kubernetesCluster); err != nil {
 			return err
 		}
@@ -179,20 +192,20 @@ func (r *reconciler) handleReconcileComplete(ctx context.Context, kubernetesClus
 
 // handleReconcileError inspects the error type that halted the provisioning and reports
 // this as a ppropriate in the status.
-func (r *reconciler) handleReconcileError(ctx context.Context, kubernetesCluster *unikornv1alpha1.KubernetesCluster, err error) error {
-	var reason unikornv1alpha1.KubernetesClusterConditionReason
+func (r *reconciler) handleReconcileError(ctx context.Context, kubernetesCluster *unikornv1.KubernetesCluster, err error) error {
+	var reason unikornv1.KubernetesClusterConditionReason
 
 	var message string
 
 	switch {
 	case errors.Is(err, context.Canceled):
-		reason = unikornv1alpha1.KubernetesClusterConditionReasonCanceled
+		reason = unikornv1.KubernetesClusterConditionReasonCanceled
 		message = "Provisioning aborted due to controller shudown"
 	case errors.Is(err, context.DeadlineExceeded):
-		reason = unikornv1alpha1.KubernetesClusterConditionReasonTimedout
+		reason = unikornv1.KubernetesClusterConditionReasonTimedout
 		message = fmt.Sprintf("Provisioning aborted due to a timeout: %v", err)
 	default:
-		reason = unikornv1alpha1.KubernetesClusterConditionReasonErrored
+		reason = unikornv1.KubernetesClusterConditionReasonErrored
 		message = fmt.Sprintf("Provisioning failed due to an error: %v", err)
 	}
 

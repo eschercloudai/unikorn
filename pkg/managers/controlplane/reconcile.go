@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/controlplane"
@@ -47,7 +47,7 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	// See if the resource exists or not, if not it's been deleted, but do nothing
 	// as cascading deletes will handle the cleanup.
-	object := &unikornv1alpha1.ControlPlane{}
+	object := &unikornv1.ControlPlane{}
 	if err := r.client.Get(ctx, request.NamespacedName, object); err != nil {
 		if kerrors.IsNotFound(err) {
 			log.Info("resource deleted")
@@ -135,8 +135,9 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 // handleReconcileFirstVisit checks to see if the Available condition is present in the
 // status, if not we assume it's the first time we've seen this an set the condition to
 // Provisioning.
-func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, controlPlane *unikornv1alpha1.ControlPlane) error {
-	if _, err := controlPlane.LookupCondition(unikornv1alpha1.ControlPlaneConditionAvailable); err != nil {
+func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, controlPlane *unikornv1.ControlPlane) error {
+	condition, err := controlPlane.LookupCondition(unikornv1.ControlPlaneConditionAvailable)
+	if err != nil {
 		controlPlane.Finalizers = []string{
 			constants.Finalizer,
 		}
@@ -145,19 +146,31 @@ func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, controlPlane
 			return err
 		}
 
-		controlPlane.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.ControlPlaneConditionReasonProvisioning, "Provisioning of control plane has started")
+		controlPlane.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1.ControlPlaneConditionReasonProvisioning, "Provisioning control plane")
 
 		if err := r.client.Status().Update(ctx, controlPlane); err != nil {
 			return err
 		}
+
+		return nil
+	}
+
+	if condition.Reason == unikornv1.ControlPlaneConditionReasonProvisioned {
+		controlPlane.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1.ControlPlaneConditionReasonUpdating, "Updating control plane")
+
+		if err := r.client.Status().Update(ctx, controlPlane); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	return nil
 }
 
 // handleReconcileDeprovision indicates the deprovision request has been picked up.
-func (r *reconciler) handleReconcileDeprovision(ctx context.Context, controlPlane *unikornv1alpha1.ControlPlane) error {
-	if ok := controlPlane.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.ControlPlaneConditionReasonDeprovisioning, "Control plane is being deprovisioned"); ok {
+func (r *reconciler) handleReconcileDeprovision(ctx context.Context, controlPlane *unikornv1.ControlPlane) error {
+	if ok := controlPlane.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1.ControlPlaneConditionReasonDeprovisioning, "Control plane is being deprovisioned"); ok {
 		if err := r.client.Status().Update(ctx, controlPlane); err != nil {
 			return err
 		}
@@ -168,8 +181,8 @@ func (r *reconciler) handleReconcileDeprovision(ctx context.Context, controlPlan
 
 // handleReconcileComplete indicates that the reconcile is complete and the control
 // plane is ready to be used.
-func (r *reconciler) handleReconcileComplete(ctx context.Context, controlPlane *unikornv1alpha1.ControlPlane) error {
-	if ok := controlPlane.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1alpha1.ControlPlaneConditionReasonProvisioned, "Provisioning of control plane has completed"); ok {
+func (r *reconciler) handleReconcileComplete(ctx context.Context, controlPlane *unikornv1.ControlPlane) error {
+	if ok := controlPlane.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1.ControlPlaneConditionReasonProvisioned, "Provisioning of control plane has completed"); ok {
 		if err := r.client.Status().Update(ctx, controlPlane); err != nil {
 			return err
 		}
@@ -180,20 +193,20 @@ func (r *reconciler) handleReconcileComplete(ctx context.Context, controlPlane *
 
 // handleReconcileError inspects the error type that halted the provisioning and reports
 // this as a ppropriate in the status.
-func (r *reconciler) handleReconcileError(ctx context.Context, controlPlane *unikornv1alpha1.ControlPlane, err error) error {
-	var reason unikornv1alpha1.ControlPlaneConditionReason
+func (r *reconciler) handleReconcileError(ctx context.Context, controlPlane *unikornv1.ControlPlane, err error) error {
+	var reason unikornv1.ControlPlaneConditionReason
 
 	var message string
 
 	switch {
 	case errors.Is(err, context.Canceled):
-		reason = unikornv1alpha1.ControlPlaneConditionReasonCanceled
+		reason = unikornv1.ControlPlaneConditionReasonCanceled
 		message = "Provisioning aborted due to controller shudown"
 	case errors.Is(err, context.DeadlineExceeded):
-		reason = unikornv1alpha1.ControlPlaneConditionReasonTimedout
+		reason = unikornv1.ControlPlaneConditionReasonTimedout
 		message = fmt.Sprintf("Provisioning aborted due to a timeout: %v", err)
 	default:
-		reason = unikornv1alpha1.ControlPlaneConditionReasonErrored
+		reason = unikornv1.ControlPlaneConditionReasonErrored
 		message = fmt.Sprintf("Provisioning failed due to an error: %v", err)
 	}
 

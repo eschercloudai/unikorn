@@ -130,7 +130,7 @@ paths:
       - oauth2Authentication:
         - project
       requestBody:
-        $ref: "#/components/requestBodies/createControlPlaneRequest"
+        $ref: '#/components/requestBodies/createControlPlaneRequest'
       responses:
         '202':
           $ref: '#/components/responses/acceptedResponse'
@@ -172,10 +172,10 @@ paths:
       - oauth2Authentication:
         - project
       requestBody:
-        $ref: "#/components/requestBodies/nullRequest"
+        $ref: '#/components/requestBodies/createControlPlaneRequest'
       responses:
-        '200':
-          $ref: '#/components/responses/nullResponse'
+        '202':
+          $ref: '#/components/responses/acceptedResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -230,7 +230,7 @@ paths:
       - oauth2Authentication:
         - project
       requestBody:
-        $ref: "#/components/requestBodies/createKubernetesClusterRequest"
+        $ref: '#/components/requestBodies/createKubernetesClusterRequest'
       responses:
         '202':
           $ref: '#/components/responses/acceptedResponse'
@@ -275,10 +275,10 @@ paths:
       - oauth2Authentication:
         - project
       requestBody:
-        $ref: "#/components/requestBodies/nullRequest"
+        $ref: '#/components/requestBodies/createKubernetesClusterRequest'
       responses:
-        '200':
-          $ref: '#/components/responses/nullResponse'
+        '202':
+          $ref: '#/components/responses/acceptedResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':

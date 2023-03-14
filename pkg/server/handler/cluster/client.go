@@ -79,21 +79,31 @@ func (c *Client) List(ctx context.Context, controlPlaneName generated.ControlPla
 	return out, nil
 }
 
-// Get returns the implicit cluster identified by the JWT claims.
+// get returns the cluster.
+func (c *Client) get(ctx context.Context, namespace, name string) (*unikornv1.KubernetesCluster, error) {
+	result := &unikornv1.KubernetesCluster{}
+
+	if err := c.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, result); err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, errors.HTTPNotFound()
+		}
+
+		return nil, errors.OAuth2ServerError("unable to get cluster").WithError(err)
+	}
+
+	return result, nil
+}
+
+// Get returns the cluster.
 func (c *Client) Get(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, name generated.ClusterNameParameter) (*generated.KubernetesCluster, error) {
 	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &unikornv1.KubernetesCluster{}
-
-	if err := c.client.Get(ctx, client.ObjectKey{Namespace: controlPlane.Namespace, Name: name}, result); err != nil {
-		if kerrors.IsNotFound(err) {
-			return nil, errors.HTTPNotFound()
-		}
-
-		return nil, errors.OAuth2ServerError("unable to get cluster").WithError(err)
+	result, err := c.get(ctx, controlPlane.Namespace, name)
+	if err != nil {
+		return nil, err
 	}
 
 	out, err := c.convert(ctx, result)
@@ -193,6 +203,39 @@ func (c *Client) Delete(ctx context.Context, controlPlaneName generated.ControlP
 		}
 
 		return errors.OAuth2ServerError("failed to delete cluster").WithError(err)
+	}
+
+	return nil
+}
+
+// Update implements read/modify/write for the cluster.
+func (c *Client) Update(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, name generated.ClusterNameParameter, request *generated.KubernetesCluster) error {
+	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
+	if err != nil {
+		return err
+	}
+
+	if !controlPlane.Active {
+		return errors.OAuth2InvalidRequest("control plane is not active")
+	}
+
+	resource, err := c.get(ctx, controlPlane.Namespace, name)
+	if err != nil {
+		return err
+	}
+
+	required, err := c.createCluster(controlPlane, request)
+	if err != nil {
+		return err
+	}
+
+	// Experience has taught me that modifying caches by accident is a bad thing
+	// so be extra safe and deep copy the existing resource.
+	temp := resource.DeepCopy()
+	temp.Spec = required.Spec
+
+	if err := c.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
+		return errors.OAuth2ServerError("failed to patch cluster").WithError(err)
 	}
 
 	return nil
