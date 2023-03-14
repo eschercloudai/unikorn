@@ -306,7 +306,7 @@ const (
 
 // ControlPlaneConditionReason defines the possible reasons of a control plane
 // condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored;Deprovisioning
+// +kubebuilder:validation:Enum=Provisioning;Updating;Provisioned;Canceled;Timedout;Errored;Deprovisioning
 type ControlPlaneConditionReason string
 
 const (
@@ -314,6 +314,9 @@ const (
 	// to indicate that a resource has been seen, it has no pre-existing condition
 	// and we assume it's being provisioned for the first time.
 	ControlPlaneConditionReasonProvisioning ControlPlaneConditionReason = "Provisioning"
+	// ControlPlaneConditionReasonUpdating is used when a non-provisioning
+	// reconcile is running.
+	ControlPlaneConditionReasonUpdating ControlPlaneConditionReason = "Updating"
 	// ControlPlaneConditionReasonProvisioned is used for the Available condition
 	// to mean that the control plane is ready to be used.
 	ControlPlaneConditionReasonProvisioned ControlPlaneConditionReason = "Provisioned"
@@ -619,7 +622,7 @@ const (
 
 // KubernetesClusterConditionReason defines the possible reasons of a cluster
 // condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored;Deprovisioning
+// +kubebuilder:validation:Enum=Provisioning;Updating;Provisioned;Canceled;Timedout;Errored;Deprovisioning
 type KubernetesClusterConditionReason string
 
 const (
@@ -627,6 +630,9 @@ const (
 	// to indicate that a resource has been seen, it has no pre-existing condition
 	// and we assume it's being provisioned for the first time.
 	KubernetesClusterConditionReasonProvisioning KubernetesClusterConditionReason = "Provisioning"
+	// KubernetesClusterConditionReasonUpdating is used when a non-provisioning
+	// reconcile is running.
+	KubernetesClusterConditionReasonUpdating KubernetesClusterConditionReason = "Updating"
 	// KubernetesClusterConditionReasonProvisioned is used for the Available condition
 	// to mean that the control plane is ready to be used.
 	KubernetesClusterConditionReasonProvisioned KubernetesClusterConditionReason = "Provisioned"

@@ -155,7 +155,7 @@ func (c *Client) convertList(ctx context.Context, in *unikornv1.ControlPlaneList
 	return out, nil
 }
 
-// List returns all control planes owned by the implicit control plane.
+// List returns all control planes.
 func (c *Client) List(ctx context.Context) ([]*generated.ControlPlane, error) {
 	project, err := project.NewClient(c.client).Metadata(ctx)
 	if err != nil {
@@ -185,7 +185,7 @@ func (c *Client) List(ctx context.Context) ([]*generated.ControlPlane, error) {
 	return out, nil
 }
 
-// get returns the implicit control plane identified by the JWT claims.
+// get returns the control plane.
 func (c *Client) get(ctx context.Context, namespace, name string) (*unikornv1.ControlPlane, error) {
 	result := &unikornv1.ControlPlane{}
 
@@ -200,7 +200,7 @@ func (c *Client) get(ctx context.Context, namespace, name string) (*unikornv1.Co
 	return result, nil
 }
 
-// Get returns the implicit control plane identified by the JWT claims.
+// Get returns the control plane.
 func (c *Client) Get(ctx context.Context, name generated.ControlPlaneNameParameter) (*generated.ControlPlane, error) {
 	project, err := project.NewClient(c.client).Metadata(ctx)
 	if err != nil {
@@ -220,17 +220,8 @@ func (c *Client) Get(ctx context.Context, name generated.ControlPlaneNameParamet
 	return out, nil
 }
 
-// Create creates the implicit control plane indentified by the JTW claims.
-func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) error {
-	project, err := project.NewClient(c.client).Metadata(ctx)
-	if err != nil {
-		return err
-	}
-
-	if !project.Active {
-		return errors.OAuth2InvalidRequest("project is not active")
-	}
-
+// createControlPlane is a common function to create a Kubernetes type from an API one.
+func createControlPlane(project *project.Meta, request *generated.ControlPlane) *unikornv1.ControlPlane {
 	// TODO: common with CLI tools.
 	controlPlane := &unikornv1.ControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
@@ -246,6 +237,22 @@ func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) er
 		},
 	}
 
+	return controlPlane
+}
+
+// Create creates a control plane.
+func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) error {
+	project, err := project.NewClient(c.client).Metadata(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !project.Active {
+		return errors.OAuth2InvalidRequest("project is not active")
+	}
+
+	controlPlane := createControlPlane(project, request)
+
 	if err := c.client.Create(ctx, controlPlane); err != nil {
 		// TODO: we can do a cached lookup to save the API traffic.
 		if kerrors.IsAlreadyExists(err) {
@@ -258,7 +265,7 @@ func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) er
 	return nil
 }
 
-// Delete deletes the implicit control plane indentified by the JTW claims.
+// Delete deletes the control plane.
 func (c *Client) Delete(ctx context.Context, name generated.ControlPlaneNameParameter) error {
 	project, err := project.NewClient(c.client).Metadata(ctx)
 	if err != nil {
@@ -282,6 +289,36 @@ func (c *Client) Delete(ctx context.Context, name generated.ControlPlaneNamePara
 		}
 
 		return errors.OAuth2ServerError("failed to delete control plane").WithError(err)
+	}
+
+	return nil
+}
+
+// Update implements read/modify/write for the control plane.
+func (c *Client) Update(ctx context.Context, name generated.ControlPlaneNameParameter, request *generated.ControlPlane) error {
+	project, err := project.NewClient(c.client).Metadata(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !project.Active {
+		return errors.OAuth2InvalidRequest("project is not active")
+	}
+
+	resource, err := c.get(ctx, project.Namespace, name)
+	if err != nil {
+		return err
+	}
+
+	required := createControlPlane(project, request)
+
+	// Experience has taught me that modifying caches by accident is a bad thing
+	// so be extra safe and deep copy the existing resource.
+	temp := resource.DeepCopy()
+	temp.Spec = required.Spec
+
+	if err := c.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
+		return errors.OAuth2ServerError("failed to patch control plane").WithError(err)
 	}
 
 	return nil

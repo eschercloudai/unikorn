@@ -435,6 +435,7 @@ spec:
                         last transition.
                       enum:
                       - Provisioning
+                      - Updating
                       - Provisioned
                       - Canceled
                       - Timedout

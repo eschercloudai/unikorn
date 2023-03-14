@@ -194,6 +194,20 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r
 }
 
 func (h *Handler) PutApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
+	request := &generated.ControlPlane{}
+
+	if err := util.ReadJSONBody(r, request); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	if err := controlplane.NewClient(h.client).Update(r.Context(), controlPlaneName, request); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setUncacheable(w)
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
@@ -246,6 +260,20 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterName(w htt
 }
 
 func (h *Handler) PutApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
+	request := &generated.KubernetesCluster{}
+
+	if err := util.ReadJSONBody(r, request); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	if err := cluster.NewClient(h.client, r, h.authenticator).Update(r.Context(), controlPlaneName, clusterName, request); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setUncacheable(w)
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubeconfig(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
