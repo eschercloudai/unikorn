@@ -234,6 +234,10 @@ func (c *Client) Update(ctx context.Context, controlPlaneName generated.ControlP
 	temp := resource.DeepCopy()
 	temp.Spec = required.Spec
 
+	temp.Spec.Openstack.CACert = resource.Spec.Openstack.CACert
+	temp.Spec.Openstack.Cloud = resource.Spec.Openstack.Cloud
+	temp.Spec.Openstack.CloudConfig = resource.Spec.Openstack.CloudConfig
+
 	if err := c.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
 		return errors.OAuth2ServerError("failed to patch cluster").WithError(err)
 	}
