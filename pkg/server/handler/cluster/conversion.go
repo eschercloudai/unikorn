@@ -38,13 +38,21 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const (
+	// It's not easy to extract this from the Kubernetes API, so
+	// give out a value, so we can submit the cluster via the REST API.
+	applicationCredentialSentinel = "unknown"
+)
+
 // convertOpenstack converts from a custom resource into the API definition.
 func convertOpenstack(in *unikornv1.KubernetesCluster) generated.KubernetesClusterOpenstack {
 	openstack := generated.KubernetesClusterOpenstack{
-		ComputeAvailabilityZone: *in.Spec.Openstack.FailureDomain,
-		VolumeAvailabilityZone:  *in.Spec.Openstack.VolumeFailureDomain,
-		ExternalNetworkID:       *in.Spec.Openstack.ExternalNetworkID,
-		SshKeyName:              in.Spec.Openstack.SSHKeyName,
+		ApplicationCredentialID:     applicationCredentialSentinel,
+		ApplicationCredentialSecret: applicationCredentialSentinel,
+		ComputeAvailabilityZone:     *in.Spec.Openstack.FailureDomain,
+		VolumeAvailabilityZone:      *in.Spec.Openstack.VolumeFailureDomain,
+		ExternalNetworkID:           *in.Spec.Openstack.ExternalNetworkID,
+		SshKeyName:                  in.Spec.Openstack.SSHKeyName,
 	}
 
 	return openstack
@@ -224,8 +232,8 @@ func (c *Client) createClientConfig(options *generated.KubernetesCluster) ([]byt
 				AuthType: clientconfig.AuthV3ApplicationCredential,
 				AuthInfo: &clientconfig.AuthInfo{
 					AuthURL:                     c.authenticator.Endpoint(),
-					ApplicationCredentialID:     *options.Openstack.ApplicationCredentialID,
-					ApplicationCredentialSecret: *options.Openstack.ApplicationCredentialSecret,
+					ApplicationCredentialID:     options.Openstack.ApplicationCredentialID,
+					ApplicationCredentialSecret: options.Openstack.ApplicationCredentialSecret,
 				},
 			},
 		},
@@ -241,23 +249,28 @@ func (c *Client) createClientConfig(options *generated.KubernetesCluster) ([]byt
 
 // createOpenstack creates the Openstack configuration part of a cluster.
 func (c *Client) createOpenstack(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterOpenstackSpec, error) {
-	ca, err := util.GetURLCACertificate(c.authenticator.Endpoint())
-	if err != nil {
-		return nil, errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
-	}
-
-	clientConfig, cloud, err := c.createClientConfig(options)
-	if err != nil {
-		return nil, err
-	}
-
 	openstack := &unikornv1.KubernetesClusterOpenstackSpec{
-		CACert:              &ca,
-		CloudConfig:         &clientConfig,
-		Cloud:               &cloud,
 		FailureDomain:       &options.Openstack.ComputeAvailabilityZone,
 		VolumeFailureDomain: &options.Openstack.VolumeAvailabilityZone,
 		ExternalNetworkID:   &options.Openstack.ExternalNetworkID,
+	}
+
+	// TODO: ignore this jazz when doing a read, we don't want to expose
+	// app cred secrets.
+	if options.Openstack.ApplicationCredentialID != applicationCredentialSentinel {
+		ca, err := util.GetURLCACertificate(c.authenticator.Endpoint())
+		if err != nil {
+			return nil, errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
+		}
+
+		clientConfig, cloud, err := c.createClientConfig(options)
+		if err != nil {
+			return nil, err
+		}
+
+		openstack.CACert = &ca
+		openstack.CloudConfig = &clientConfig
+		openstack.Cloud = &cloud
 	}
 
 	if options.Openstack.SshKeyName != nil {

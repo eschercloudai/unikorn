@@ -137,10 +137,10 @@ type KubernetesClusterNetwork struct {
 // KubernetesClusterOpenstack Unikorn Kubernetes cluster creation Openstack parameters.
 type KubernetesClusterOpenstack struct {
 	// ApplicationCredentialID Application credential ID.
-	ApplicationCredentialID *string `json:"applicationCredentialID,omitempty"`
+	ApplicationCredentialID string `json:"applicationCredentialID"`
 
 	// ApplicationCredentialSecret Application credential secret.
-	ApplicationCredentialSecret *string `json:"applicationCredentialSecret,omitempty"`
+	ApplicationCredentialSecret string `json:"applicationCredentialSecret"`
 
 	// ComputeAvailabilityZone Compute availability zone for control plane, and workload pool default.
 	ComputeAvailabilityZone string `json:"computeAvailabilityZone"`

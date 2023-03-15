@@ -682,11 +682,9 @@ components:
         applicationCredentialID:
           description: Application credential ID.
           type: string
-          writeOnly: true
         applicationCredentialSecret:
           description: Application credential secret.
           type: string
-          writeOnly: true
         computeAvailabilityZone:
           description: Compute availability zone for control plane, and workload pool default.
           type: string
