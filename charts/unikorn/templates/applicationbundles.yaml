@@ -82,7 +82,7 @@ spec:
   - name: cluster-openstack
     reference:
       kind: HelmApplication
-      name: cluster-openstack-0.3.12-1
+      name: cluster-openstack-0.3.13-1
   - name: cilium
     reference:
       kind: HelmApplication
