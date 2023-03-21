@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metricsserver
+package nginxingress
 
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
@@ -27,7 +27,7 @@ import (
 
 const (
 	// applicationName is the unique name of the application.
-	applicationName = "metrics-server"
+	applicationName = "nginx-ingress"
 )
 
 type Provisioner struct{}
@@ -39,16 +39,22 @@ var _ application.ValuesGenerator = &Provisioner{}
 func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) provisioners.Provisioner {
 	p := &Provisioner{}
 
-	return application.New(client, applicationName, resource, helm).WithGenerator(p).InNamespace("kube-system")
+	return application.New(client, applicationName, resource, helm).WithGenerator(p).InNamespace("nginx-system")
 }
 
 // Generate implements the application.Generator interface.
-// This forces the server onto the control plane rather than take up a
+// This forces the ingress onto the control plane rather than take up a
 // worker node (and thus incur the ire of users).
 func (p *Provisioner) Values(version *string) (interface{}, error) {
 	values := map[string]interface{}{
-		"tolerations":  util.ControlPlaneTolerations(),
-		"nodeSelector": util.ControlPlaneNodeSelector(),
+		"controller": map[string]interface{}{
+			"tolerations":  util.ControlPlaneTolerations(),
+			"nodeSelector": util.ControlPlaneNodeSelector(),
+		},
+		"defaultBackend": map[string]interface{}{
+			"tolerations":  util.ControlPlaneTolerations(),
+			"nodeSelector": util.ControlPlaneNodeSelector(),
+		},
 	}
 
 	return values, nil

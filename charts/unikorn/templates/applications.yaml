@@ -116,6 +116,7 @@ spec:
   repo: https://kubernetes-sigs.github.io/metrics-server
   chart: metrics-server
   version: 3.8.4
+  interface: 1.0.0
   parameters:
   - name: args[0]
     value: --kubelet-insecure-tls
@@ -164,4 +165,15 @@ spec:
     value: 5m
   - name: image.tag
     value: v1.26.1
+  interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: nginx-ingress-0.16.2-1
+spec:
+  repo: https://helm.nginx.com/stable
+  chart: nginx-ingress
+  version: 0.16.2
+  createNamespace: true
   interface: 1.0.0

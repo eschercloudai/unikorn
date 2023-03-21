@@ -141,6 +141,9 @@ type createClusterOptions struct {
 	// user.
 	autoscaling bool
 
+	// ingress allows the cluster to be provisioned with an ingress controller.
+	ingress bool
+
 	// SANs allows the Kuberenetes API to generate a set of X.509 SANs
 	// in its certificate.
 	SANs []string
@@ -187,6 +190,7 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 
 	// Feature enablement.
 	cmd.Flags().BoolVar(&o.autoscaling, "enable-autoscaling", false, "Enables cluster auto-scaling. To function, you must configure autoscaling on individual workload pools.")
+	cmd.Flags().BoolVar(&o.ingress, "enable-ingress", false, "Enables an ingress controller.")
 }
 
 // complete fills in any options not does automatically by flag parsing.
@@ -323,6 +327,7 @@ func (o *createClusterOptions) run() error {
 			},
 			Features: &unikornv1.KubernetesClusterFeaturesSpec{
 				Autoscaling: &o.autoscaling,
+				Ingress:     &o.ingress,
 			},
 		},
 	}

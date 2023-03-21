@@ -272,6 +272,11 @@ func (c *KubernetesCluster) AutoscalingEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.Autoscaling != nil && *c.Spec.Features.Autoscaling
 }
 
+// IngressEnabled indicates whether an ingress controller is required.
+func (c *KubernetesCluster) IngressEnabled() bool {
+	return c.Spec.Features != nil && c.Spec.Features.Ingress != nil && *c.Spec.Features.Ingress
+}
+
 // GetName is the name passed down to Helm.
 func (w *KubernetesWorkloadPool) GetName() string {
 	if w.Spec.Name != nil {
