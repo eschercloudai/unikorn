@@ -642,6 +642,11 @@ func (in *KubernetesClusterFeaturesSpec) DeepCopyInto(out *KubernetesClusterFeat
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Ingress != nil {
+		in, out := &in.Ingress, &out.Ingress
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

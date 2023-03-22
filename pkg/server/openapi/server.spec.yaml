@@ -818,7 +818,10 @@ components:
       description: A set of optional add on features for the cluster.
       properties:
         autoscaling:
-          description: Enable auto-scaling
+          description: Enable auto-scaling.
+          type: boolean
+        ingress:
+          description: Enable an ingress controller.
           type: boolean
     kubernetesCluster:
       description: Unikorn Kubernetes cluster creation parameters.

@@ -115,8 +115,11 @@ type KubernetesClusterAutoscaling struct {
 
 // KubernetesClusterFeatures A set of optional add on features for the cluster.
 type KubernetesClusterFeatures struct {
-	// Autoscaling Enable auto-scaling
+	// Autoscaling Enable auto-scaling.
 	Autoscaling *bool `json:"autoscaling,omitempty"`
+
+	// Ingress Enable an ingress controller.
+	Ingress *bool `json:"ingress,omitempty"`
 }
 
 // KubernetesClusterNetwork A kubernetes cluster network settings.

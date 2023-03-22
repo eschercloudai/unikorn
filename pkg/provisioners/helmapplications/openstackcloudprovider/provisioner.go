@@ -25,6 +25,7 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -156,6 +157,9 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 		return nil, err
 	}
 
+	tolerations := util.ControlPlaneTolerations()
+	tolerations = append(tolerations, util.ControlPlaneInitTolerations()...)
+
 	values := map[string]interface{}{
 		"cloudConfig": map[string]interface{}{
 			"global": cloudConfigGlobal,
@@ -166,26 +170,10 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 				"ignore-volume-az": true,
 			},
 		},
-		"tolerations": []interface{}{
-			map[string]interface{}{
-				"key":    "node-role.kubernetes.io/master",
-				"effect": "NoSchedule",
-			},
-			map[string]interface{}{
-				"key":    "node-role.kubernetes.io/control-plane",
-				"effect": "NoSchedule",
-			},
-			map[string]interface{}{
-				"key":    "node.cloudprovider.kubernetes.io/uninitialized",
-				"effect": "NoSchedule",
-				"value":  "true",
-			},
-			map[string]interface{}{
-				"key":    "node.cilium.io/agent-not-ready",
-				"effect": "NoSchedule",
-				"value":  "true",
-			},
-		},
+		"tolerations": tolerations,
+		// See https://github.com/kubernetes/cloud-provider-openstack/issues/2049 for
+		// more details, and no-one doing anything about it.
+		"controllerExtraArgs": `{{list "--use-service-account-credentials=false" | toYaml}}`,
 	}
 
 	return values, nil

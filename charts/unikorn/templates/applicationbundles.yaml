@@ -99,6 +99,10 @@ spec:
     reference:
       kind: HelmApplication
       name: metrics-server-3.8.4-1
+  - name: nginx-ingress
+    reference:
+      kind: HelmApplication
+      name: nginx-ingress-0.16.2-1
   - name: cluster-autoscaler
     reference:
       kind: HelmApplication

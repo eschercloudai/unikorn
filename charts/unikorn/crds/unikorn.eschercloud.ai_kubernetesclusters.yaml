@@ -130,8 +130,11 @@ spec:
                   for the cluster.
                 properties:
                   autoscaling:
-                    description: Autoscaling , if true, provisions a cluster autoscaler
+                    description: Autoscaling, if true, provisions a cluster autoscaler
                       and allows workload pools to specify autoscaling configuration.
+                    type: boolean
+                  ingress:
+                    description: Ingress, if true, provisions an Nginx ingress controller.
                     type: boolean
                 type: object
               network:

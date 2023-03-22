@@ -570,9 +570,11 @@ type KubernetesClusterNetworkSpec struct {
 }
 
 type KubernetesClusterFeaturesSpec struct {
-	// Autoscaling , if true, provisions a cluster autoscaler
+	// Autoscaling, if true, provisions a cluster autoscaler
 	// and allows workload pools to specify autoscaling configuration.
 	Autoscaling *bool `json:"autoscaling,omitempty"`
+	// Ingress, if true, provisions an Nginx ingress controller.
+	Ingress *bool `json:"ingress,omitempty"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {

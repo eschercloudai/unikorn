@@ -27,6 +27,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterautoscaler"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/metricsserver"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nginxingress"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nvidiagpuoperator"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackcloudprovider"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackplugincindercsi"
@@ -56,6 +57,7 @@ type Provisioner struct {
 	metricsServerApplication            *unikornv1.HelmApplication
 	nvidiaGPUOperatorApplication        *unikornv1.HelmApplication
 	clusterAutoscalerApplication        *unikornv1.HelmApplication
+	nginxIngressApplication             *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
@@ -74,6 +76,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	unbundler.AddApplication(&provisioner.nvidiaGPUOperatorApplication, "nvidia-gpu-operator")
 	unbundler.AddApplication(&provisioner.clusterAutoscalerApplication, "cluster-autoscaler")
 	unbundler.AddApplication(&provisioner.metricsServerApplication, "metrics-server", util.Optional)
+	unbundler.AddApplication(&provisioner.nginxIngressApplication, "nginx-ingress", util.Optional)
 
 	if err := unbundler.Unbundle(ctx, client); err != nil {
 		return nil, err
@@ -146,6 +149,12 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 					return p.metricsServerApplication != nil
 				},
 				metricsserver.New(p.client, p.cluster, p.metricsServerApplication).OnRemote(remote),
+			),
+			conditional.New("nginx-ingress",
+				func() bool {
+					return p.nginxIngressApplication != nil && p.cluster.IngressEnabled()
+				},
+				nginxingress.New(p.client, p.cluster, p.nginxIngressApplication).OnRemote(remote),
 			),
 			nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote),
 		),
