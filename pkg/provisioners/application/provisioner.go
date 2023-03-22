@@ -449,6 +449,10 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	temp := resource.DeepCopy()
 	temp.SetFinalizers([]string{"resources-finalizer.argocd.argoproj.io"})
 
+	// Try to work around a race during deletion as per
+	// https://github.com/argoproj/argo-cd/issues/12943
+	unstructured.RemoveNestedField(temp.Object, "spec", "syncPolicy", "automated")
+
 	if err := p.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
 		return err
 	}
