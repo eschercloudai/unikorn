@@ -50,7 +50,7 @@ type Handler struct {
 }
 
 func New(client client.Client, authenticator *authorization.Authenticator, options *Options) (*Handler, error) {
-	o, err := openstack.New(authenticator)
+	o, err := openstack.New(options.openstack, authenticator)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (h *Handler) PutApiV1ControlplanesControlPlaneName(w http.ResponseWriter, r
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlaneNameClusters(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter) {
-	result, err := cluster.NewClient(h.client, r, h.authenticator).List(r.Context(), controlPlaneName)
+	result, err := cluster.NewClient(h.client, r, h.authenticator, h.openstack).List(r.Context(), controlPlaneName)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -229,7 +229,7 @@ func (h *Handler) PostApiV1ControlplanesControlPlaneNameClusters(w http.Response
 		return
 	}
 
-	if err := cluster.NewClient(h.client, r, h.authenticator).Create(r.Context(), controlPlaneName, request); err != nil {
+	if err := cluster.NewClient(h.client, r, h.authenticator, h.openstack).Create(r.Context(), controlPlaneName, request); err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
@@ -239,7 +239,7 @@ func (h *Handler) PostApiV1ControlplanesControlPlaneNameClusters(w http.Response
 }
 
 func (h *Handler) DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
-	if err := cluster.NewClient(h.client, r, h.authenticator).Delete(r.Context(), controlPlaneName, clusterName); err != nil {
+	if err := cluster.NewClient(h.client, r, h.authenticator, h.openstack).Delete(r.Context(), controlPlaneName, clusterName); err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
@@ -249,7 +249,7 @@ func (h *Handler) DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(w 
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterName(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
-	result, err := cluster.NewClient(h.client, r, h.authenticator).Get(r.Context(), controlPlaneName, clusterName)
+	result, err := cluster.NewClient(h.client, r, h.authenticator, h.openstack).Get(r.Context(), controlPlaneName, clusterName)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
@@ -267,7 +267,7 @@ func (h *Handler) PutApiV1ControlplanesControlPlaneNameClustersClusterName(w htt
 		return
 	}
 
-	if err := cluster.NewClient(h.client, r, h.authenticator).Update(r.Context(), controlPlaneName, clusterName, request); err != nil {
+	if err := cluster.NewClient(h.client, r, h.authenticator, h.openstack).Update(r.Context(), controlPlaneName, clusterName, request); err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
@@ -277,7 +277,7 @@ func (h *Handler) PutApiV1ControlplanesControlPlaneNameClustersClusterName(w htt
 }
 
 func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubeconfig(w http.ResponseWriter, r *http.Request, controlPlaneName generated.ControlPlaneNameParameter, clusterName generated.ClusterNameParameter) {
-	result, err := cluster.NewClient(h.client, r, h.authenticator).GetKubeconfig(r.Context(), controlPlaneName, clusterName)
+	result, err := cluster.NewClient(h.client, r, h.authenticator, h.openstack).GetKubeconfig(r.Context(), controlPlaneName, clusterName)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return

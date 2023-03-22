@@ -34,6 +34,8 @@ import (
 
 // Openstack provides an HTTP handler for Openstack resources.
 type Openstack struct {
+	options *Options
+
 	endpoint string
 
 	// Cache clients as that's quite expensive.
@@ -44,7 +46,7 @@ type Openstack struct {
 }
 
 // New returns a new initialized Openstack handler.
-func New(authenticator *authorization.Authenticator) (*Openstack, error) {
+func New(options *Options, authenticator *authorization.Authenticator) (*Openstack, error) {
 	identityClientCache, err := lru.New[string, *openstack.IdentityClient](1024)
 	if err != nil {
 		return nil, err
@@ -66,6 +68,7 @@ func New(authenticator *authorization.Authenticator) (*Openstack, error) {
 	}
 
 	o := &Openstack{
+		options:                 options,
 		endpoint:                authenticator.Endpoint(),
 		identityClientCache:     identityClientCache,
 		computeClientCache:      computeClientCache,
@@ -340,7 +343,7 @@ func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, erro
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
 	}
 
-	result, err := client.Images(r.Context())
+	result, err := client.Images(r.Context(), o.options.key.key)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed list images").WithError(err)
 	}

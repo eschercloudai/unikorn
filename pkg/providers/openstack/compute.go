@@ -18,6 +18,9 @@ package openstack
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strconv"
@@ -186,8 +189,50 @@ func FlavorGPUs(flavor *flavors.Flavor, extraSpecs map[string]string) (*GPUMeta,
 	return nil, false, nil
 }
 
+// verifyImage asserts the image is trustworthy for use with our goodselves.
+func verifyImage(image *images.Image, key *ecdsa.PublicKey) bool {
+	if image.Metadata == nil {
+		return false
+	}
+
+	// Legacy behaviour (for unikornctl only) that accepts images if
+	// they have Kubernetes and Nvidia driver versions.
+	if key == nil {
+		if value, ok := image.Metadata["k8s"]; !ok || value == "" {
+			return false
+		}
+
+		if value, ok := image.Metadata["gpu"]; !ok || value == "" {
+			return false
+		}
+
+		return true
+	}
+
+	// These will be digitally signed by Baski when created, so we only trust
+	// those images.
+	signatureRaw, ok := image.Metadata["digest"]
+	if !ok {
+		return false
+	}
+
+	signatureB64, ok := signatureRaw.(string)
+	if !ok {
+		return false
+	}
+
+	signature, err := base64.StdEncoding.DecodeString(signatureB64)
+	if err != nil {
+		return false
+	}
+
+	hash := sha256.Sum256([]byte(image.ID))
+
+	return ecdsa.VerifyASN1(key, hash[:], signature)
+}
+
 // Images returns a list of images.
-func (c *ComputeClient) Images(ctx context.Context) ([]images.Image, error) {
+func (c *ComputeClient) Images(ctx context.Context, key *ecdsa.PublicKey) ([]images.Image, error) {
 	tracer := otel.GetTracerProvider().Tracer(constants.Application)
 
 	_, span := tracer.Start(ctx, "/compute/v2/images", trace.WithSpanKind(trace.SpanKindClient))
@@ -211,20 +256,10 @@ func (c *ComputeClient) Images(ctx context.Context) ([]images.Image, error) {
 	// Filter out images that aren't compatible.
 	filtered := []images.Image{}
 
-	for _, image := range result {
-		// Only accept images in scope that we know conform to our requirements.
-		// TODO: we need a formal specification for this.
-		if image.Metadata == nil {
-			continue
-		}
+	for i := range result {
+		image := result[i]
 
-		// TODO: value checking shouldn't be required, but we have some duff images
-		// in the system.
-		if value, ok := image.Metadata["k8s"]; !ok || value == "" {
-			continue
-		}
-
-		if value, ok := image.Metadata["gpu"]; !ok || value == "" {
+		if !verifyImage(&image, key) {
 			continue
 		}
 
