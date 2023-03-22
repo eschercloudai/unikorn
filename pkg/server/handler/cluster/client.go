@@ -27,6 +27,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/providers/openstack"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,14 +46,17 @@ type Client struct {
 
 	// authenticator provides access to authentication services.
 	authenticator *authorization.Authenticator
+
+	openstack *openstack.Openstack
 }
 
 // NewClient returns a new client with required parameters.
-func NewClient(client client.Client, request *http.Request, authenticator *authorization.Authenticator) *Client {
+func NewClient(client client.Client, request *http.Request, authenticator *authorization.Authenticator, openstack *openstack.Openstack) *Client {
 	return &Client{
 		client:        client,
 		request:       request,
 		authenticator: authenticator,
+		openstack:     openstack,
 	}
 }
 

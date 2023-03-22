@@ -131,7 +131,7 @@ func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, 
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		results, err := client.Images(context.Background())
+		results, err := client.Images(context.Background(), nil)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

@@ -29,7 +29,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
-	"github.com/eschercloudai/unikorn/pkg/server/handler/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/util"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -352,14 +351,8 @@ func createAPI(options *generated.KubernetesCluster) (*unikornv1.KubernetesClust
 
 // createMachineGeneric creates a generic machine part of the cluster.
 func (c *Client) createMachineGeneric(m *generated.OpenstackMachinePool) (*unikornv1.MachineGeneric, *generated.OpenstackFlavor, error) {
-	// TODO: propagate client down.
-	client, err := openstack.New(c.authenticator)
-	if err != nil {
-		return nil, nil, errors.OAuth2ServerError("failed to create client").WithError(err)
-	}
-
 	// Check the image passed in is valid.
-	image, err := client.GetImage(c.request, m.ImageName)
+	image, err := c.openstack.GetImage(c.request, m.ImageName)
 	if err != nil {
 		if errors.IsHTTPNotFound(err) {
 			return nil, nil, errors.OAuth2InvalidRequest("invalid image").WithError(err)
@@ -375,7 +368,7 @@ func (c *Client) createMachineGeneric(m *generated.OpenstackMachinePool) (*uniko
 	}
 
 	// Check the flavor is valid
-	flavor, err := client.GetFlavor(c.request, m.FlavorName)
+	flavor, err := c.openstack.GetFlavor(c.request, m.FlavorName)
 	if err != nil {
 		if errors.IsHTTPNotFound(err) {
 			return nil, nil, errors.OAuth2InvalidRequest("invalid flavor").WithError(err)
