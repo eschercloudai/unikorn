@@ -2,7 +2,7 @@
 
 A badass, opinionated, deployer of souls!
 
-![Unikorn](https://raw.githubusercontent.com/eschercloudai/unikorn/docs/unikornapi.png)
+![Unikorn](https://github.com/eschercloudai/unikorn/blob/6e51f1f10b69de0f069f3a858af432894de45723/docs/unikornapi.png)
 
 ## Overview
 
