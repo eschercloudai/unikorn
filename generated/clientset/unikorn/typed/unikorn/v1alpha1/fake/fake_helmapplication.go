@@ -33,7 +33,6 @@ import (
 // FakeHelmApplications implements HelmApplicationInterface
 type FakeHelmApplications struct {
 	Fake *FakeUnikornV1alpha1
-	ns   string
 }
 
 var helmapplicationsResource = schema.GroupVersionResource{Group: "unikorn.eschercloud.ai", Version: "v1alpha1", Resource: "helmapplications"}
@@ -43,8 +42,7 @@ var helmapplicationsKind = schema.GroupVersionKind{Group: "unikorn.eschercloud.a
 // Get takes name of the helmApplication, and returns the corresponding helmApplication object, and an error if there is any.
 func (c *FakeHelmApplications) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.HelmApplication, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(helmapplicationsResource, c.ns, name), &v1alpha1.HelmApplication{})
-
+		Invokes(testing.NewRootGetAction(helmapplicationsResource, name), &v1alpha1.HelmApplication{})
 	if obj == nil {
 		return nil, err
 	}
@@ -54,8 +52,7 @@ func (c *FakeHelmApplications) Get(ctx context.Context, name string, options v1.
 // List takes label and field selectors, and returns the list of HelmApplications that match those selectors.
 func (c *FakeHelmApplications) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.HelmApplicationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(helmapplicationsResource, helmapplicationsKind, c.ns, opts), &v1alpha1.HelmApplicationList{})
-
+		Invokes(testing.NewRootListAction(helmapplicationsResource, helmapplicationsKind, opts), &v1alpha1.HelmApplicationList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -76,15 +73,13 @@ func (c *FakeHelmApplications) List(ctx context.Context, opts v1.ListOptions) (r
 // Watch returns a watch.Interface that watches the requested helmApplications.
 func (c *FakeHelmApplications) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(helmapplicationsResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(helmapplicationsResource, opts))
 }
 
 // Create takes the representation of a helmApplication and creates it.  Returns the server's representation of the helmApplication, and an error, if there is any.
 func (c *FakeHelmApplications) Create(ctx context.Context, helmApplication *v1alpha1.HelmApplication, opts v1.CreateOptions) (result *v1alpha1.HelmApplication, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(helmapplicationsResource, c.ns, helmApplication), &v1alpha1.HelmApplication{})
-
+		Invokes(testing.NewRootCreateAction(helmapplicationsResource, helmApplication), &v1alpha1.HelmApplication{})
 	if obj == nil {
 		return nil, err
 	}
@@ -94,8 +89,7 @@ func (c *FakeHelmApplications) Create(ctx context.Context, helmApplication *v1al
 // Update takes the representation of a helmApplication and updates it. Returns the server's representation of the helmApplication, and an error, if there is any.
 func (c *FakeHelmApplications) Update(ctx context.Context, helmApplication *v1alpha1.HelmApplication, opts v1.UpdateOptions) (result *v1alpha1.HelmApplication, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(helmapplicationsResource, c.ns, helmApplication), &v1alpha1.HelmApplication{})
-
+		Invokes(testing.NewRootUpdateAction(helmapplicationsResource, helmApplication), &v1alpha1.HelmApplication{})
 	if obj == nil {
 		return nil, err
 	}
@@ -106,8 +100,7 @@ func (c *FakeHelmApplications) Update(ctx context.Context, helmApplication *v1al
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeHelmApplications) UpdateStatus(ctx context.Context, helmApplication *v1alpha1.HelmApplication, opts v1.UpdateOptions) (*v1alpha1.HelmApplication, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(helmapplicationsResource, "status", c.ns, helmApplication), &v1alpha1.HelmApplication{})
-
+		Invokes(testing.NewRootUpdateSubresourceAction(helmapplicationsResource, "status", helmApplication), &v1alpha1.HelmApplication{})
 	if obj == nil {
 		return nil, err
 	}
@@ -117,14 +110,13 @@ func (c *FakeHelmApplications) UpdateStatus(ctx context.Context, helmApplication
 // Delete takes name of the helmApplication and deletes it. Returns an error if one occurs.
 func (c *FakeHelmApplications) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(helmapplicationsResource, c.ns, name, opts), &v1alpha1.HelmApplication{})
-
+		Invokes(testing.NewRootDeleteActionWithOptions(helmapplicationsResource, name, opts), &v1alpha1.HelmApplication{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeHelmApplications) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(helmapplicationsResource, c.ns, listOpts)
+	action := testing.NewRootDeleteCollectionAction(helmapplicationsResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.HelmApplicationList{})
 	return err
@@ -133,8 +125,7 @@ func (c *FakeHelmApplications) DeleteCollection(ctx context.Context, opts v1.Del
 // Patch applies the patch and returns the patched helmApplication.
 func (c *FakeHelmApplications) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.HelmApplication, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(helmapplicationsResource, c.ns, name, pt, data, subresources...), &v1alpha1.HelmApplication{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(helmapplicationsResource, name, pt, data, subresources...), &v1alpha1.HelmApplication{})
 	if obj == nil {
 		return nil, err
 	}

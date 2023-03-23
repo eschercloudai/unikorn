@@ -66,7 +66,7 @@ func CompleteApplicationBundle(f cmdutil.Factory, kind unikornv1.ApplicationBund
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		applicationBundles, err := client.UnikornV1alpha1().ApplicationBundles("unikorn").List(context.TODO(), metav1.ListOptions{})
+		applicationBundles, err := client.UnikornV1alpha1().ApplicationBundles().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
