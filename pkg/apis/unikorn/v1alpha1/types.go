@@ -677,6 +677,7 @@ type HelmApplicationList struct {
 
 // HelmApplication defines a Helm application.
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Cluster,categories=all;unikorn
 // +kubebuilder:printcolumn:name="repo",type="string",JSONPath=".spec.repo"
@@ -740,6 +741,7 @@ type ApplicationBundleList struct {
 // associated with it.  This forms the backbone of upgrades by allowing bundles to be
 // switched out in control planes etc.
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Cluster,categories=all;unikorn
 // +kubebuilder:printcolumn:name="kind",type="string",JSONPath=".spec.kind"

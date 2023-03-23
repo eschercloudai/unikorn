@@ -33,7 +33,7 @@ import (
 // HelmApplicationsGetter has a method to return a HelmApplicationInterface.
 // A group's client should implement this interface.
 type HelmApplicationsGetter interface {
-	HelmApplications(namespace string) HelmApplicationInterface
+	HelmApplications() HelmApplicationInterface
 }
 
 // HelmApplicationInterface has methods to work with HelmApplication resources.
@@ -53,14 +53,12 @@ type HelmApplicationInterface interface {
 // helmApplications implements HelmApplicationInterface
 type helmApplications struct {
 	client rest.Interface
-	ns     string
 }
 
 // newHelmApplications returns a HelmApplications
-func newHelmApplications(c *UnikornV1alpha1Client, namespace string) *helmApplications {
+func newHelmApplications(c *UnikornV1alpha1Client) *helmApplications {
 	return &helmApplications{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -68,7 +66,6 @@ func newHelmApplications(c *UnikornV1alpha1Client, namespace string) *helmApplic
 func (c *helmApplications) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.HelmApplication, err error) {
 	result = &v1alpha1.HelmApplication{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("helmapplications").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,7 +82,6 @@ func (c *helmApplications) List(ctx context.Context, opts v1.ListOptions) (resul
 	}
 	result = &v1alpha1.HelmApplicationList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("helmapplications").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -102,7 +98,6 @@ func (c *helmApplications) Watch(ctx context.Context, opts v1.ListOptions) (watc
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("helmapplications").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,7 +108,6 @@ func (c *helmApplications) Watch(ctx context.Context, opts v1.ListOptions) (watc
 func (c *helmApplications) Create(ctx context.Context, helmApplication *v1alpha1.HelmApplication, opts v1.CreateOptions) (result *v1alpha1.HelmApplication, err error) {
 	result = &v1alpha1.HelmApplication{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("helmapplications").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(helmApplication).
@@ -126,7 +120,6 @@ func (c *helmApplications) Create(ctx context.Context, helmApplication *v1alpha1
 func (c *helmApplications) Update(ctx context.Context, helmApplication *v1alpha1.HelmApplication, opts v1.UpdateOptions) (result *v1alpha1.HelmApplication, err error) {
 	result = &v1alpha1.HelmApplication{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("helmapplications").
 		Name(helmApplication.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -141,7 +134,6 @@ func (c *helmApplications) Update(ctx context.Context, helmApplication *v1alpha1
 func (c *helmApplications) UpdateStatus(ctx context.Context, helmApplication *v1alpha1.HelmApplication, opts v1.UpdateOptions) (result *v1alpha1.HelmApplication, err error) {
 	result = &v1alpha1.HelmApplication{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("helmapplications").
 		Name(helmApplication.Name).
 		SubResource("status").
@@ -155,7 +147,6 @@ func (c *helmApplications) UpdateStatus(ctx context.Context, helmApplication *v1
 // Delete takes name of the helmApplication and deletes it. Returns an error if one occurs.
 func (c *helmApplications) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("helmapplications").
 		Name(name).
 		Body(&opts).
@@ -170,7 +161,6 @@ func (c *helmApplications) DeleteCollection(ctx context.Context, opts v1.DeleteO
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("helmapplications").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -183,7 +173,6 @@ func (c *helmApplications) DeleteCollection(ctx context.Context, opts v1.DeleteO
 func (c *helmApplications) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.HelmApplication, err error) {
 	result = &v1alpha1.HelmApplication{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("helmapplications").
 		Name(name).
 		SubResource(subresources...).

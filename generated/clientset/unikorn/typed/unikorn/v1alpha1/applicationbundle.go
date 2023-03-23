@@ -33,7 +33,7 @@ import (
 // ApplicationBundlesGetter has a method to return a ApplicationBundleInterface.
 // A group's client should implement this interface.
 type ApplicationBundlesGetter interface {
-	ApplicationBundles(namespace string) ApplicationBundleInterface
+	ApplicationBundles() ApplicationBundleInterface
 }
 
 // ApplicationBundleInterface has methods to work with ApplicationBundle resources.
@@ -53,14 +53,12 @@ type ApplicationBundleInterface interface {
 // applicationBundles implements ApplicationBundleInterface
 type applicationBundles struct {
 	client rest.Interface
-	ns     string
 }
 
 // newApplicationBundles returns a ApplicationBundles
-func newApplicationBundles(c *UnikornV1alpha1Client, namespace string) *applicationBundles {
+func newApplicationBundles(c *UnikornV1alpha1Client) *applicationBundles {
 	return &applicationBundles{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -68,7 +66,6 @@ func newApplicationBundles(c *UnikornV1alpha1Client, namespace string) *applicat
 func (c *applicationBundles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ApplicationBundle, err error) {
 	result = &v1alpha1.ApplicationBundle{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,7 +82,6 @@ func (c *applicationBundles) List(ctx context.Context, opts v1.ListOptions) (res
 	}
 	result = &v1alpha1.ApplicationBundleList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -102,7 +98,6 @@ func (c *applicationBundles) Watch(ctx context.Context, opts v1.ListOptions) (wa
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,7 +108,6 @@ func (c *applicationBundles) Watch(ctx context.Context, opts v1.ListOptions) (wa
 func (c *applicationBundles) Create(ctx context.Context, applicationBundle *v1alpha1.ApplicationBundle, opts v1.CreateOptions) (result *v1alpha1.ApplicationBundle, err error) {
 	result = &v1alpha1.ApplicationBundle{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(applicationBundle).
@@ -126,7 +120,6 @@ func (c *applicationBundles) Create(ctx context.Context, applicationBundle *v1al
 func (c *applicationBundles) Update(ctx context.Context, applicationBundle *v1alpha1.ApplicationBundle, opts v1.UpdateOptions) (result *v1alpha1.ApplicationBundle, err error) {
 	result = &v1alpha1.ApplicationBundle{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		Name(applicationBundle.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -141,7 +134,6 @@ func (c *applicationBundles) Update(ctx context.Context, applicationBundle *v1al
 func (c *applicationBundles) UpdateStatus(ctx context.Context, applicationBundle *v1alpha1.ApplicationBundle, opts v1.UpdateOptions) (result *v1alpha1.ApplicationBundle, err error) {
 	result = &v1alpha1.ApplicationBundle{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		Name(applicationBundle.Name).
 		SubResource("status").
@@ -155,7 +147,6 @@ func (c *applicationBundles) UpdateStatus(ctx context.Context, applicationBundle
 // Delete takes name of the applicationBundle and deletes it. Returns an error if one occurs.
 func (c *applicationBundles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		Name(name).
 		Body(&opts).
@@ -170,7 +161,6 @@ func (c *applicationBundles) DeleteCollection(ctx context.Context, opts v1.Delet
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -183,7 +173,6 @@ func (c *applicationBundles) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *applicationBundles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ApplicationBundle, err error) {
 	result = &v1alpha1.ApplicationBundle{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("applicationbundles").
 		Name(name).
 		SubResource(subresources...).
