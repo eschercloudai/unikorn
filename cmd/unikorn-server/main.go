@@ -33,19 +33,13 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/trace"
 
-	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler"
 	"github.com/eschercloudai/unikorn/pkg/server/middleware"
+	"github.com/eschercloudai/unikorn/pkg/util/client"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-
-	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -82,52 +76,6 @@ func (o *serverOptions) addFlags(f *pflag.FlagSet) {
 	f.DurationVar(&o.readHeaderTimeout, "server-read-header-timeout", time.Second, "How long to wait for the client to send headers.")
 	f.DurationVar(&o.writeTimeout, "server-write-timeout", 10*time.Second, "How long to wait for the API to respond to the client.")
 	f.StringVar(&o.otlpEndpoint, "otlp-endpoint", "", "An optional OTLP endpoint to ship spans to.")
-}
-
-// getClient grabs a client for the entire server instance so all handers
-// share caches.
-func getClient(ctx context.Context) (client.Client, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a scheme and ensure it knows about Kubernetes and Unikorn
-	// resource types.
-	scheme := runtime.NewScheme()
-
-	if err := kubernetesscheme.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-
-	if err := unikornscheme.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-
-	cache, err := cache.New(config, cache.Options{Scheme: scheme})
-	if err != nil {
-		return nil, err
-	}
-
-	go func() {
-		_ = cache.Start(ctx)
-	}()
-
-	clientOptions := client.Options{
-		Scheme: scheme,
-	}
-
-	c, err := client.New(config, clientOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	input := client.NewDelegatingClientInput{
-		CacheReader: cache,
-		Client:      c,
-	}
-
-	return client.NewDelegatingClient(input)
 }
 
 // setupOpenTelemetry adds a span processor that will print root spans to the
@@ -191,7 +139,7 @@ func start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := getClient(ctx)
+	client, err := client.New(ctx)
 	if err != nil {
 		logger.Error(err, "failed to create client")
 

@@ -87,6 +87,10 @@ spec:
                   the cluster. Change this to a new bundle to start an upgrade. TODO:
                   delete the default.'
                 type: string
+              applicationBundleAutoUpgrade:
+                description: ApplicationBundleAutoUpgrade enables automatic upgrade
+                  of application bundles.
+                type: object
               controlPlane:
                 description: ControlPlane defines the control plane topology.
                 properties:

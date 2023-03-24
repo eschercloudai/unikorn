@@ -34,6 +34,11 @@ clusterManager:
   # Allows override of the global default image.
   image:
 
+# Monitor specific configuration.
+monitor:
+  # Allows override of the global default image.
+  image:
+
 # REST server specific configuration.
 server:
   # Temporarily block deployment until it's complete.

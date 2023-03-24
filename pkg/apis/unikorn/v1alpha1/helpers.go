@@ -348,6 +348,50 @@ func (l ApplicationBundleList) Swap(i, j int) {
 	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
 }
 
+// Get retrieves the named bundle.
+func (l ApplicationBundleList) Get(name string) *ApplicationBundle {
+	for i := range l.Items {
+		if l.Items[i].Name == name {
+			return &l.Items[i]
+		}
+	}
+
+	return nil
+}
+
+// ByKind returns a new list of bundles for a specifc kind e.g. clusters or control planes.
+func (l ApplicationBundleList) ByKind(kind ApplicationBundleResourceKind) *ApplicationBundleList {
+	result := &ApplicationBundleList{}
+
+	for _, bundle := range l.Items {
+		if *bundle.Spec.Kind == kind {
+			result.Items = append(result.Items, bundle)
+		}
+	}
+
+	return result
+}
+
+// Upgradable returns a new list of bundles that are "stable" e.g. not end of life and
+// not a preview.
+func (l ApplicationBundleList) Upgradable() *ApplicationBundleList {
+	result := &ApplicationBundleList{}
+
+	for _, bundle := range l.Items {
+		if bundle.Spec.Preview != nil && *bundle.Spec.Preview {
+			continue
+		}
+
+		if bundle.Spec.EndOfLife != nil {
+			continue
+		}
+
+		result.Items = append(result.Items, bundle)
+	}
+
+	return result
+}
+
 func (b *ApplicationBundle) GetApplication(name string) *ApplicationBundleApplication {
 	for i := range b.Spec.Applications {
 		if *b.Spec.Applications[i].Name == name {
