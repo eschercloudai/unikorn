@@ -279,6 +279,8 @@ type ControlPlaneSpec struct {
 	// TODO: delete the default.
 	// +kubebuilder:default=control-plane-1.0.0
 	ApplicationBundle *string `json:"applicationBundle,omitempty"`
+	// ApplicationBundleAutoUpgrade enables automatic upgrade of application bundles.
+	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgradeSpec `json:"applicationBundleAutoUpgrade,omitempty"`
 }
 
 // ControlPlaneStatus defines the status of the project.
@@ -520,6 +522,8 @@ type KubernetesClusterSpec struct {
 	// TODO: delete the default.
 	// +kubebuilder:default=kubernetes-cluster-1.0.0
 	ApplicationBundle *string `json:"applicationBundle,omitempty"`
+	// ApplicationBundleAutoUpgrade enables automatic upgrade of application bundles.
+	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgradeSpec `json:"applicationBundleAutoUpgrade,omitempty"`
 }
 
 type KubernetesClusterOpenstackSpec struct {
@@ -810,3 +814,6 @@ const (
 )
 
 type ApplicationBundleStatus struct{}
+
+type ApplicationBundleAutoUpgradeSpec struct {
+}

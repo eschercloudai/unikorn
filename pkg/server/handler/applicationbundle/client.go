@@ -71,18 +71,10 @@ func (c *Client) listByKind(ctx context.Context, kind unikornv1.ApplicationBundl
 		return nil, errors.OAuth2ServerError("failed to list application bundles").WithError(err)
 	}
 
-	// Sort by version.
-	sort.Stable(result)
+	resultByKind := result.ByKind(kind)
+	sort.Stable(resultByKind)
 
-	resultByKind := []unikornv1.ApplicationBundle{}
-
-	for _, r := range result.Items {
-		if *r.Spec.Kind == kind {
-			resultByKind = append(resultByKind, r)
-		}
-	}
-
-	return convertList(resultByKind), nil
+	return convertList(resultByKind.Items), nil
 }
 
 // TODO: while not exposed, it doesn't check the kind yet, which could be seen as

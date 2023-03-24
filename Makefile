@@ -15,7 +15,8 @@ CONTROLLERS = \
   unikorn-project-manager \
   unikorn-control-plane-manager \
   unikorn-cluster-manager \
-  unikorn-server
+  unikorn-server \
+  unikorn-monitor
 
 # Release will do cross compliation of all images for the 'all' target.
 # Note we aren't fucking about with docker here because that opens up a
