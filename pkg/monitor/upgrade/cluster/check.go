@@ -24,6 +24,7 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/monitor/upgrade/errors"
+	"github.com/eschercloudai/unikorn/pkg/monitor/upgrade/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -39,6 +40,7 @@ func New(client client.Client) *Checker {
 	}
 }
 
+//nolint:cyclop
 func (c *Checker) Check(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
@@ -94,7 +96,14 @@ func (c *Checker) Check(ctx context.Context) error {
 			continue
 		}
 
-		// TODO: upgrade time windows.
+		// Is it allowed to happen now?  Base it on the UID for ultimate randomness,
+		// you can cause a stampede if all the resources are called "default".
+		window := util.GenerateTimeWindow(string(resource.UID))
+		if !window.In() {
+			log.Info("not in upgrade window, ignoring", "project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Labels[constants.ControlPlaneLabel], "cluster", resource.Name, "start", window.Start, "end", window.End)
+			continue
+		}
+
 		log.Info("bundle upgrading", "project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Labels[constants.ControlPlaneLabel], "cluster", resource.Name, "from", *bundle.Spec.Version, "to", *upgradeTarget.Spec.Version)
 	}
 
