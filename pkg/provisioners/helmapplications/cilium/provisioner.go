@@ -20,6 +20,7 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -30,6 +31,36 @@ const (
 )
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) provisioners.Provisioner {
-	return application.New(client, applicationName, resource, helm).InNamespace("kube-system")
+func New(client client.Client, cluster *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) provisioners.Provisioner {
+	provisioner := &Provisioner{
+		cluster: cluster,
+	}
+
+	return application.New(client, applicationName, cluster, helm).WithGenerator(provisioner).InNamespace("kube-system")
+}
+
+type Provisioner struct {
+	cluster *unikornv1.KubernetesCluster
+}
+
+// Ensure the Provisioner interface is implemented.
+var _ application.ValuesGenerator = &Provisioner{}
+
+func (p *Provisioner) Values(_ *string) (interface{}, error) {
+	// Scale to zero support.
+	operatorValues := map[string]interface{}{
+		"nodeSelector": util.ControlPlaneNodeSelector(),
+	}
+
+	// If the cluster CP has one node, then this will fail to deploy
+	// as cilium has 2 as the default, we need to work some magic here.
+	if *p.cluster.Spec.ControlPlane.Replicas == 1 {
+		operatorValues["replicas"] = p.cluster.Spec.ControlPlane.Replicas
+	}
+
+	values := map[string]interface{}{
+		"operator": operatorValues,
+	}
+
+	return values, nil
 }

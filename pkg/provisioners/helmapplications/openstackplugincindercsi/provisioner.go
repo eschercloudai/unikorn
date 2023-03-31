@@ -22,6 +22,7 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -110,6 +111,15 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 	}
 
 	values := map[string]interface{}{
+		// Allow scale to zero.
+		"csi": map[string]interface{}{
+			"plugin": map[string]interface{}{
+				"controllerPlugin": map[string]interface{}{
+					"nodeSelector": util.ControlPlaneNodeSelector(),
+					"tolerations":  util.ControlPlaneTolerations(),
+				},
+			},
+		},
 		"storageClass": map[string]interface{}{
 			"enabled": false,
 			"custom":  strings.Join(yamls, "---\n"),

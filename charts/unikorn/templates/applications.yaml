@@ -68,6 +68,7 @@ spec:
   repo: https://helm.cilium.io
   chart: cilium
   version: 1.12.4
+  interface: 1.0.0
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
@@ -87,7 +88,7 @@ metadata:
 spec:
   repo: https://eschercloudai.github.io/helm-cluster-api
   chart: cluster-api-cluster-openstack
-  version: v0.3.13
+  version: v0.3.14
   createNamespace: true
   interface: 1.0.0
 ---
