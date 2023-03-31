@@ -42,9 +42,9 @@ func New(client client.Client) *Checker {
 
 //nolint:cyclop
 func (c *Checker) Check(ctx context.Context) error {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	log.Info("checking for control plane upgrades")
+	logger.Info("checking for control plane upgrades")
 
 	allBundles := &unikornv1.ApplicationBundleList{}
 
@@ -74,8 +74,12 @@ func (c *Checker) Check(ctx context.Context) error {
 	}
 
 	for _, resource := range resources.Items {
+		logger := logger.WithValues("project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Name)
+
+		rctx := log.IntoContext(ctx, logger)
+
 		if resource.Spec.ApplicationBundleAutoUpgrade == nil {
-			log.Info("resource auto-upgrade disabled, ignoring", "project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Name)
+			logger.Info("resource auto-upgrade disabled, ignoring")
 			continue
 		}
 
@@ -86,25 +90,30 @@ func (c *Checker) Check(ctx context.Context) error {
 
 		// If the current bundle is in preview, then don't offer to upgrade.
 		if bundle.Spec.Preview != nil && *bundle.Spec.Preview {
-			log.Info("bundle in preview, ignoring", "project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Name)
+			logger.Info("bundle in preview, ignoring")
 			continue
 		}
 
 		// If the current bundle is the best option already, we are done.
 		if bundle.Name == upgradeTarget.Name {
-			log.Info("bundle already latest, ignoring", "project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Name)
+			logger.Info("bundle already latest, ignoring")
 			continue
 		}
 
 		// Is it allowed to happen now?  Base it on the UID for ultimate randomness,
 		// you can cause a stampede if all the resources are called "default".
-		window := util.GenerateTimeWindow(string(resource.UID))
-		if !window.In() {
-			log.Info("not in upgrade window, ignoring", "project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Name, "start", window.Start, "end", window.End)
+		window := util.TimeWindowFromResource(rctx, resource)
+		if window == nil {
+			logger.Info("no time window in scope, ignoring")
 			continue
 		}
 
-		log.Info("bundle upgrading", "project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Name, "from", *bundle.Spec.Version, "to", *upgradeTarget.Spec.Version)
+		if !window.In() {
+			logger.Info("not in upgrade window, ignoring", "start", window.Start, "end", window.End)
+			continue
+		}
+
+		logger.Info("bundle upgrading", "from", *bundle.Spec.Version, "to", *upgradeTarget.Spec.Version)
 	}
 
 	return nil

@@ -186,6 +186,14 @@ func (c *ControlPlane) ApplicationBundleName() string {
 	return *c.Spec.ApplicationBundle
 }
 
+func (c ControlPlane) Entropy() []byte {
+	return []byte(c.UID)
+}
+
+func (c ControlPlane) UpgradeSpec() *ApplicationBundleAutoUpgradeSpec {
+	return c.Spec.ApplicationBundleAutoUpgrade
+}
+
 // LookupCondition scans the status conditions for an existing condition whose type
 // matches.  Returns the array index, or -1 if it doesn't exist.
 func (c *KubernetesCluster) LookupCondition(t KubernetesClusterConditionType) (*KubernetesClusterCondition, error) {
@@ -265,6 +273,14 @@ func (c *KubernetesCluster) ApplicationBundleName() string {
 	}
 
 	return *c.Spec.ApplicationBundle
+}
+
+func (c KubernetesCluster) Entropy() []byte {
+	return []byte(c.UID)
+}
+
+func (c KubernetesCluster) UpgradeSpec() *ApplicationBundleAutoUpgradeSpec {
+	return c.Spec.ApplicationBundleAutoUpgrade
 }
 
 // AutoscalingEnabled indicates whether cluster autoscaling is enabled for the cluster.
