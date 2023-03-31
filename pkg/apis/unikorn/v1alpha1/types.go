@@ -280,6 +280,10 @@ type ControlPlaneSpec struct {
 	// +kubebuilder:default=control-plane-1.0.0
 	ApplicationBundle *string `json:"applicationBundle,omitempty"`
 	// ApplicationBundleAutoUpgrade enables automatic upgrade of application bundles.
+	// When no properties are set in the specification, the platform will automatically
+	// choose an upgrade time for your resource.  This will be before a working day
+	// (Mon-Fri) and before working hours (00:00-07:00 UTC).  When any property is set
+	// the platform will select the earliest possible upgrade opportunity.
 	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgradeSpec `json:"applicationBundleAutoUpgrade,omitempty"`
 }
 
@@ -523,6 +527,10 @@ type KubernetesClusterSpec struct {
 	// +kubebuilder:default=kubernetes-cluster-1.0.0
 	ApplicationBundle *string `json:"applicationBundle,omitempty"`
 	// ApplicationBundleAutoUpgrade enables automatic upgrade of application bundles.
+	// When no properties are set in the specification, the platform will automatically
+	// choose an upgrade time for your resource.  This will be before a working day
+	// (Mon-Fri) and before working hours (00:00-07:00 UTC).  When any property is set
+	// the platform will select the earliest possible upgrade opportunity.
 	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgradeSpec `json:"applicationBundleAutoUpgrade,omitempty"`
 }
 
@@ -816,4 +824,39 @@ const (
 type ApplicationBundleStatus struct{}
 
 type ApplicationBundleAutoUpgradeSpec struct {
+	// WeekDay allows specification of upgrade time windows on individual
+	// days of the week.
+	WeekDay *ApplicationBundleAutoUpgradeWeekDaySpec `json:"weekday,omitempty"`
+}
+
+type ApplicationBundleAutoUpgradeWeekDaySpec struct {
+	// Sunday, when specified, provides an upgrade window on that day.
+	Sunday *ApplicationBundleAutoUpgradeWindowSpec `json:"sunday,omitempty"`
+	// Monday, when specified, provides an upgrade window on that day.
+	Monday *ApplicationBundleAutoUpgradeWindowSpec `json:"monday,omitempty"`
+	// Tuesday, when specified, provides an upgrade window on that day.
+	Tuesday *ApplicationBundleAutoUpgradeWindowSpec `json:"tuesday,omitempty"`
+	// Wednesday, when specified, provides an upgrade window on that day.
+	Wednesday *ApplicationBundleAutoUpgradeWindowSpec `json:"wednesday,omitempty"`
+	// Thursday, when specified, provides an upgrade window on that day.
+	Thursday *ApplicationBundleAutoUpgradeWindowSpec `json:"thursday,omitempty"`
+	// Friday, when specified, provides an upgrade window on that day.
+	Friday *ApplicationBundleAutoUpgradeWindowSpec `json:"friday,omitempty"`
+	// Saturday, when specified, provides an upgrade window on that day.
+	Saturday *ApplicationBundleAutoUpgradeWindowSpec `json:"saturday,omitempty"`
+}
+
+type ApplicationBundleAutoUpgradeWindowSpec struct {
+	// Start is the upgrade window start hour in UTC.  Upgrades will be
+	// deterministically scheduled between start and end to balance load
+	// across the platform.  Windows can span days, so start=22 and end=07
+	// will start at 22:00 on the selected day, and end 07:00 the following
+	// one.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=23
+	Start int `json:"start"`
+	// End is the upgrade window end hour in UTC.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=23
+	End int `json:"end"`
 }
