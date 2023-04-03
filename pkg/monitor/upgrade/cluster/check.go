@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -78,11 +79,6 @@ func (c *Checker) Check(ctx context.Context) error {
 
 		rctx := log.IntoContext(ctx, logger)
 
-		if resource.Spec.ApplicationBundleAutoUpgrade == nil {
-			logger.Info("resource auto-upgrade disabled, ignoring")
-			continue
-		}
-
 		bundle := allBundlesByKind.Get(resource.ApplicationBundleName())
 		if bundle == nil {
 			return fmt.Errorf("%w: %s", errors.ErrMissingBundle, *resource.Spec.ApplicationBundle)
@@ -100,13 +96,22 @@ func (c *Checker) Check(ctx context.Context) error {
 			continue
 		}
 
+		upgradable := util.UpgradeableResource(resource)
+
+		if resource.Spec.ApplicationBundleAutoUpgrade == nil {
+			if bundle.Spec.EndOfLife == nil || time.Now().Before(bundle.Spec.EndOfLife.Time) {
+				logger.Info("resource auto-upgrade disabled, ignoring")
+				continue
+			}
+
+			logger.Info("resource auto-upgrade disabled, but bundle is end of life, forcing auto-upgrade")
+
+			upgradable = util.NewForcedUpgradeResource(resource)
+		}
+
 		// Is it allowed to happen now?  Base it on the UID for ultimate randomness,
 		// you can cause a stampede if all the resources are called "default".
-		window := util.TimeWindowFromResource(rctx, resource)
-		if window == nil {
-			logger.Info("no time window in scope, ignoring")
-			continue
-		}
+		window := util.TimeWindowFromResource(rctx, upgradable)
 
 		if !window.In() {
 			logger.Info("not in upgrade window, ignoring", "start", window.Start, "end", window.End)

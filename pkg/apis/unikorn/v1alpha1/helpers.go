@@ -21,6 +21,7 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
 
@@ -416,4 +417,39 @@ func (b *ApplicationBundle) GetApplication(name string) *ApplicationBundleApplic
 	}
 
 	return nil
+}
+
+// Weekdays returns the days of the week that are set in the spec.
+func (s ApplicationBundleAutoUpgradeWeekDaySpec) Weekdays() []time.Weekday {
+	var result []time.Weekday
+
+	if s.Sunday != nil {
+		result = append(result, time.Sunday)
+	}
+
+	if s.Monday != nil {
+		result = append(result, time.Monday)
+	}
+
+	if s.Tuesday != nil {
+		result = append(result, time.Tuesday)
+	}
+
+	if s.Wednesday != nil {
+		result = append(result, time.Wednesday)
+	}
+
+	if s.Thursday != nil {
+		result = append(result, time.Thursday)
+	}
+
+	if s.Friday != nil {
+		result = append(result, time.Friday)
+	}
+
+	if s.Saturday != nil {
+		result = append(result, time.Saturday)
+	}
+
+	return result
 }

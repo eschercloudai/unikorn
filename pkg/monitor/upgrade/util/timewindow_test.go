@@ -163,6 +163,42 @@ func logStats(t *testing.T, freqs map[int]int) {
 	t.Log("mean", mean, "stddev", stddev, fmt.Sprintf("(%f%%)", stddev*100/mean))
 }
 
+func validToday(t *testing.T, window *util.TimeWindow) bool {
+	t.Helper()
+
+	now := time.Now()
+
+	curr := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 1, 0, time.UTC)
+
+	for i := 0; i < 24; i++ {
+		if curr.After(window.Start) && curr.Before(window.End) {
+			return true
+		}
+
+		curr = curr.Add(time.Hour)
+	}
+
+	return false
+}
+
+func validYesterday(t *testing.T, window *util.TimeWindow) bool {
+	t.Helper()
+
+	now := time.Now()
+
+	curr := time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 1, 0, time.UTC)
+
+	for i := 0; i < 24; i++ {
+		if curr.After(window.Start) && curr.Before(window.End) {
+			return true
+		}
+
+		curr = curr.Add(time.Hour)
+	}
+
+	return false
+}
+
 // TestGenerateTimeWindow ensures time window generation spits out times when
 // we expect it to.
 func TestGenerateTimeWindow(t *testing.T) {
@@ -227,23 +263,8 @@ func TestWeekday(t *testing.T) {
 	upgrader := newWeekDayUpgrader(now.Weekday(), now.Hour(), now.Hour()+2)
 	window := util.TimeWindowFromResource(ctx, upgrader)
 
-	if window == nil {
-		t.Fatal("no time window returned")
-	}
-}
-
-// TestWeekdayWrongDay tests that an upgrade window is not returned when now
-// is in a different day.
-func TestWeekdayWrongDay(t *testing.T) {
-	t.Parallel()
-
-	ctx := testContext(t)
-	now := time.Now().UTC()
-	upgrader := newWeekDayUpgrader(now.Weekday()+1, now.Hour(), now.Hour()+2)
-	window := util.TimeWindowFromResource(ctx, upgrader)
-
-	if window != nil {
-		t.Fatal("time window returned")
+	if !validToday(t, window) {
+		t.Fatal("not valid at any point today")
 	}
 }
 
@@ -257,7 +278,7 @@ func TestWeekdayOverflow(t *testing.T) {
 	upgrader := newWeekDayUpgrader(now.Weekday()-1, now.Hour()+3, now.Hour()+2)
 	window := util.TimeWindowFromResource(ctx, upgrader)
 
-	if window == nil {
-		t.Fatal("no time window returned")
+	if !validToday(t, window) && !validYesterday(t, window) {
+		t.Fatal("not valid at any point today")
 	}
 }

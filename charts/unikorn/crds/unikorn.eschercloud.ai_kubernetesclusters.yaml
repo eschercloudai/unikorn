@@ -93,11 +93,13 @@ spec:
                   the platform will automatically choose an upgrade time for your
                   resource.  This will be before a working day (Mon-Fri) and before
                   working hours (00:00-07:00 UTC).  When any property is set the platform
-                  will select the earliest possible upgrade opportunity.
+                  will follow the rules for the upgrade method.
                 properties:
                   weekday:
                     description: WeekDay allows specification of upgrade time windows
-                      on individual days of the week.
+                      on individual days of the week.  The platform will select a
+                      random  upgrade slot within the specified time windows in order
+                      to load balance and mitigate against defects.
                     properties:
                       friday:
                         description: Friday, when specified, provides an upgrade window
@@ -105,6 +107,8 @@ spec:
                         properties:
                           end:
                             description: End is the upgrade window end hour in UTC.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                           start:
                             description: Start is the upgrade window start hour in
@@ -113,6 +117,8 @@ spec:
                               can span days, so start=22 and end=07 will start at
                               22:00 on the selected day, and end 07:00 the following
                               one.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                         required:
                         - end
@@ -124,6 +130,8 @@ spec:
                         properties:
                           end:
                             description: End is the upgrade window end hour in UTC.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                           start:
                             description: Start is the upgrade window start hour in
@@ -132,17 +140,21 @@ spec:
                               can span days, so start=22 and end=07 will start at
                               22:00 on the selected day, and end 07:00 the following
                               one.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                         required:
                         - end
                         - start
                         type: object
                       saturday:
-                        description: Staurday, when specified, provides an upgrade
+                        description: Saturday, when specified, provides an upgrade
                           window on that day.
                         properties:
                           end:
                             description: End is the upgrade window end hour in UTC.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                           start:
                             description: Start is the upgrade window start hour in
@@ -151,6 +163,8 @@ spec:
                               can span days, so start=22 and end=07 will start at
                               22:00 on the selected day, and end 07:00 the following
                               one.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                         required:
                         - end
@@ -162,6 +176,8 @@ spec:
                         properties:
                           end:
                             description: End is the upgrade window end hour in UTC.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                           start:
                             description: Start is the upgrade window start hour in
@@ -170,6 +186,8 @@ spec:
                               can span days, so start=22 and end=07 will start at
                               22:00 on the selected day, and end 07:00 the following
                               one.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                         required:
                         - end
@@ -181,6 +199,8 @@ spec:
                         properties:
                           end:
                             description: End is the upgrade window end hour in UTC.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                           start:
                             description: Start is the upgrade window start hour in
@@ -189,6 +209,8 @@ spec:
                               can span days, so start=22 and end=07 will start at
                               22:00 on the selected day, and end 07:00 the following
                               one.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                         required:
                         - end
@@ -200,6 +222,8 @@ spec:
                         properties:
                           end:
                             description: End is the upgrade window end hour in UTC.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                           start:
                             description: Start is the upgrade window start hour in
@@ -208,6 +232,8 @@ spec:
                               can span days, so start=22 and end=07 will start at
                               22:00 on the selected day, and end 07:00 the following
                               one.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                         required:
                         - end
@@ -219,6 +245,8 @@ spec:
                         properties:
                           end:
                             description: End is the upgrade window end hour in UTC.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                           start:
                             description: Start is the upgrade window start hour in
@@ -227,6 +255,8 @@ spec:
                               can span days, so start=22 and end=07 will start at
                               22:00 on the selected day, and end 07:00 the following
                               one.
+                            maximum: 23
+                            minimum: 0
                             type: integer
                         required:
                         - end
