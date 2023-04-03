@@ -283,7 +283,7 @@ type ControlPlaneSpec struct {
 	// When no properties are set in the specification, the platform will automatically
 	// choose an upgrade time for your resource.  This will be before a working day
 	// (Mon-Fri) and before working hours (00:00-07:00 UTC).  When any property is set
-	// the platform will select the earliest possible upgrade opportunity.
+	// the platform will follow the rules for the upgrade method.
 	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgradeSpec `json:"applicationBundleAutoUpgrade,omitempty"`
 }
 
@@ -530,7 +530,7 @@ type KubernetesClusterSpec struct {
 	// When no properties are set in the specification, the platform will automatically
 	// choose an upgrade time for your resource.  This will be before a working day
 	// (Mon-Fri) and before working hours (00:00-07:00 UTC).  When any property is set
-	// the platform will select the earliest possible upgrade opportunity.
+	// the platform will follow the rules for the upgrade method.
 	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgradeSpec `json:"applicationBundleAutoUpgrade,omitempty"`
 }
 
@@ -825,7 +825,9 @@ type ApplicationBundleStatus struct{}
 
 type ApplicationBundleAutoUpgradeSpec struct {
 	// WeekDay allows specification of upgrade time windows on individual
-	// days of the week.
+	// days of the week.  The platform will select a random  upgrade
+	// slot within the specified time windows in order to load balance and
+	// mitigate against defects.
 	WeekDay *ApplicationBundleAutoUpgradeWeekDaySpec `json:"weekday,omitempty"`
 }
 

@@ -36,6 +36,24 @@ type UpgradeableResource interface {
 	UpgradeSpec() *unikornv1.ApplicationBundleAutoUpgradeSpec
 }
 
+// forcedUpgradeResource wraps an existing resource that didn't opt in
+// to upgrades, but implicitly adds auto upgrade.
+type forcedUpgradeResource struct {
+	r UpgradeableResource
+}
+
+func NewForcedUpgradeResource(r UpgradeableResource) UpgradeableResource {
+	return &forcedUpgradeResource{r: r}
+}
+
+func (r *forcedUpgradeResource) Entropy() []byte {
+	return r.r.Entropy()
+}
+
+func (r *forcedUpgradeResource) UpgradeSpec() *unikornv1.ApplicationBundleAutoUpgradeSpec {
+	return &unikornv1.ApplicationBundleAutoUpgradeSpec{}
+}
+
 type TimeWindow struct {
 	Start time.Time
 	End   time.Time
@@ -53,87 +71,39 @@ func (t *TimeWindow) In() bool {
 }
 
 // GenerateTimeWindow returns a one hour time window in which to trigger a
-// resource upgrade.  It's based on hashing to get a fairly uniform
-// distribution over time, so as to avoid everything getting done at
-// once... and the consequences when stuff goes wrong!
+// resource upgrade.
 func autoTimeWindow(ctx context.Context, r UpgradeableResource) *TimeWindow {
 	log := log.FromContext(ctx)
 
 	log.Info("auto generating time window")
 
-	sum := sha256.Sum256(r.Entropy())
-
-	// So, counter to what's intuative (at the weekend), allow this to
-	// run Monday-Friday, so we're in normal working hours to
-	// fix any problems.  Go's Weekday type is zero indexed starting on
-	// Sunday.
-	dayOfTheWeek := (int(sum[0]) % 5) + 1
-
-	// Then stagger upgrades between 00:00 and 7:00 UTC, that
-	// gets most things out of the way before 8:00 CET (+01:00),
-	// or 08:00/09:00 respectively when BST/CEST kicks in.
-	hourOfTheDay := int(sum[1]) % 7
-
-	now := time.Now()
-
-	// Now here's where things get kinda complex... start by rounding down
-	// the current time to the previous/current Sunday, then add on our selected day.
-	// Golang's weekdays are indexed from zero, and if it ends up negative, the library
-	// will do the right thing.
-	day := now.Day() - int(now.Weekday()) + dayOfTheWeek
-
-	// Problematically, as with all things time related, it's not constant, in the
-	// sense that days may miss an hour, or have the same hour twice.  But, what the
-	// hell it'll upgrade next week, right?
-	start := time.Date(now.Year(), now.Month(), day, hourOfTheDay, 0, 0, 0, time.UTC)
-
-	return &TimeWindow{Start: start, End: start.Add(time.Hour)}
-}
-
-func timeWindowFromWeekDayWindow(ctx context.Context, r UpgradeableResource, basis time.Time, window *unikornv1.ApplicationBundleAutoUpgradeWindowSpec) *TimeWindow {
-	if window == nil {
-		return nil
+	// Run upgrades Monday-Friday, from 00:00 to 07:00, so we'll be in the
+	// office shortly after anything goes wrong.  7AM gives us enough leeway
+	// to get stuff done before 9AM CEST.
+	config := &unikornv1.ApplicationBundleAutoUpgradeWeekDaySpec{
+		Monday: &unikornv1.ApplicationBundleAutoUpgradeWindowSpec{
+			Start: 0,
+			End:   7,
+		},
+		Tuesday: &unikornv1.ApplicationBundleAutoUpgradeWindowSpec{
+			Start: 0,
+			End:   7,
+		},
+		Wednesday: &unikornv1.ApplicationBundleAutoUpgradeWindowSpec{
+			Start: 0,
+			End:   7,
+		},
+		Thursday: &unikornv1.ApplicationBundleAutoUpgradeWindowSpec{
+			Start: 0,
+			End:   7,
+		},
+		Friday: &unikornv1.ApplicationBundleAutoUpgradeWindowSpec{
+			Start: 0,
+			End:   7,
+		},
 	}
 
-	log := log.FromContext(ctx)
-
-	windowStart := time.Date(basis.Year(), basis.Month(), basis.Day(), window.Start, 0, 0, 0, time.UTC)
-
-	// If the end time is before the start time, we're wrapping into the next day.
-	// If it's equal, assume it covers the full 24 hour period, and not nothing.
-	endDay := basis.Day()
-	if window.End <= window.Start {
-		endDay++
-	}
-
-	windowEnd := time.Date(basis.Year(), basis.Month(), endDay, window.End, 0, 0, 0, time.UTC)
-
-	log.Info("considering window", "start", windowStart, "end", windowEnd)
-
-	// If we're not in the window, crack on.  If we are however, select a hour window
-	// based on entropy for load balancing purposes.
-	tw := &TimeWindow{Start: windowStart, End: windowEnd}
-	if !tw.In() {
-		log.Info("ouside window, ignoring")
-
-		return nil
-	}
-
-	// Determine the window size in hours...
-	windowLength := window.End - window.Start
-	if windowLength <= 0 {
-		windowLength += 24
-	}
-
-	// ... select a deterministic hour within that window...
-	sum := sha256.Sum256(r.Entropy())
-
-	windowHour := int(sum[0]) % windowLength
-
-	// Then finally return an hour window to run the upgrade in.
-	start := windowStart.Add(time.Hour * time.Duration(windowHour))
-
-	return &TimeWindow{Start: start, End: start.Add(time.Hour)}
+	return weekDayTimeWindow(ctx, r, config)
 }
 
 func weekDayTimeWindow(ctx context.Context, r UpgradeableResource, weekday *unikornv1.ApplicationBundleAutoUpgradeWeekDaySpec) *TimeWindow {
@@ -141,49 +111,49 @@ func weekDayTimeWindow(ctx context.Context, r UpgradeableResource, weekday *unik
 
 	log.Info("using day of the week time window")
 
+	// We pick one day out of the provided ones, this reduces upgrade traffic
+	// and load balances it across all the provided days.
+	sum := sha256.Sum256(r.Entropy())
+
+	available := weekday.Weekdays()
+	selected := available[int(sum[0])%len(available)]
+
+	// window is the selected day's window.
+	var window *unikornv1.ApplicationBundleAutoUpgradeWindowSpec
+
+	switch selected {
+	case time.Sunday:
+		window = weekday.Sunday
+	case time.Monday:
+		window = weekday.Monday
+	case time.Tuesday:
+		window = weekday.Tuesday
+	case time.Wednesday:
+		window = weekday.Wednesday
+	case time.Thursday:
+		window = weekday.Thursday
+	case time.Friday:
+		window = weekday.Friday
+	case time.Saturday:
+		window = weekday.Saturday
+	}
+
+	// Select a random hour from the time window and use that to perform the
+	// upgrade, again for load balancing and support reasons as stated.
+	windowLength := window.End - window.Start
+	if windowLength <= 0 {
+		windowLength += 24
+	}
+
+	windowHour := int(sum[1]) % windowLength
+
+	log.Info("selected window", "available", available, "selected", selected, "window_start", window.Start, "window_end", window.End, "selected_start", window.Start+windowHour)
+
 	now := time.Now()
 
-	// prev is the previous day's window, as that can overflow into today
-	// e.g. from 22:00-07:00.
-	var prev *unikornv1.ApplicationBundleAutoUpgradeWindowSpec
+	start := time.Date(now.Year(), now.Month(), now.Day()-int(now.Weekday())+int(selected), window.Start+windowHour, 0, 0, 0, time.UTC)
 
-	// curr is the current day's window.
-	var curr *unikornv1.ApplicationBundleAutoUpgradeWindowSpec
-
-	switch now.Weekday() {
-	case time.Sunday:
-		prev = weekday.Saturday
-		curr = weekday.Sunday
-	case time.Monday:
-		prev = weekday.Sunday
-		curr = weekday.Monday
-	case time.Tuesday:
-		prev = weekday.Monday
-		curr = weekday.Tuesday
-	case time.Wednesday:
-		prev = weekday.Tuesday
-		curr = weekday.Wednesday
-	case time.Thursday:
-		prev = weekday.Wednesday
-		curr = weekday.Thursday
-	case time.Friday:
-		prev = weekday.Thursday
-		curr = weekday.Friday
-	case time.Saturday:
-		prev = weekday.Friday
-		curr = weekday.Saturday
-	}
-
-	// Check yesterday's window, as it may still be active...
-	if prev != nil {
-		yesterday := now.Add(-time.Hour * 24)
-
-		if window := timeWindowFromWeekDayWindow(ctx, r, yesterday, prev); window != nil {
-			return window
-		}
-	}
-
-	return timeWindowFromWeekDayWindow(ctx, r, now, curr)
+	return &TimeWindow{Start: start, End: start.Add(time.Hour)}
 }
 
 func TimeWindowFromResource(ctx context.Context, r UpgradeableResource) *TimeWindow {

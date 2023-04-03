@@ -43,7 +43,7 @@ jobs:
     - name: Golang CI/Helm Lint
       run: make lint
     - name: Build Images
-      run: make images
+      run: make charts/unikorn/crds images
     - name: Generated Code Checked In
       run: '[[ -z $(git status --porcelain) ]]'
     - name: Unit Test
