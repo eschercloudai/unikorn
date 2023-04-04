@@ -28,6 +28,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/common"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 	"github.com/eschercloudai/unikorn/pkg/util"
 
@@ -192,15 +193,16 @@ func (c *Client) convert(ctx context.Context, in *unikornv1.KubernetesCluster) (
 	}
 
 	out := &generated.KubernetesCluster{
-		Name:              in.Name,
-		ApplicationBundle: *bundle,
-		Openstack:         convertOpenstack(in),
-		Network:           convertNetwork(in),
-		Api:               convertAPI(in),
-		ControlPlane:      convertMachine(&in.Spec.ControlPlane.MachineGeneric),
-		WorkloadPools:     convertWorkloadPools(in),
-		Features:          convertFeatures(in),
-		Status:            convertStatus(in),
+		Name:                         in.Name,
+		ApplicationBundle:            *bundle,
+		ApplicationBundleAutoUpgrade: common.ConvertApplicationBundleAutoUpgrade(in.Spec.ApplicationBundleAutoUpgrade),
+		Openstack:                    convertOpenstack(in),
+		Network:                      convertNetwork(in),
+		Api:                          convertAPI(in),
+		ControlPlane:                 convertMachine(&in.Spec.ControlPlane.MachineGeneric),
+		WorkloadPools:                convertWorkloadPools(in),
+		Features:                     convertFeatures(in),
+		Status:                       convertStatus(in),
 	}
 
 	return out, nil
@@ -526,13 +528,14 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 			},
 		},
 		Spec: unikornv1.KubernetesClusterSpec{
-			ApplicationBundle: &options.ApplicationBundle.Name,
-			Openstack:         openstack,
-			Network:           network,
-			API:               api,
-			ControlPlane:      kubernetesCcontrolPlane,
-			WorkloadPools:     kubernetesWorkloadPools,
-			Features:          createFeatures(options),
+			ApplicationBundle:            &options.ApplicationBundle.Name,
+			ApplicationBundleAutoUpgrade: common.CreateApplicationBundleAutoUpgrade(options.ApplicationBundleAutoUpgrade),
+			Openstack:                    openstack,
+			Network:                      network,
+			API:                          api,
+			ControlPlane:                 kubernetesCcontrolPlane,
+			WorkloadPools:                kubernetesWorkloadPools,
+			Features:                     createFeatures(options),
 		},
 	}
 
