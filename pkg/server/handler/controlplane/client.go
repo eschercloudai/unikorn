@@ -25,6 +25,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/common"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
 
 	corev1 "k8s.io/api/core/v1"
@@ -124,8 +125,9 @@ func (c *Client) convert(ctx context.Context, in *unikornv1.ControlPlane) (*gene
 			CreationTime: in.CreationTimestamp.Time,
 			Status:       "Unknown",
 		},
-		Name:              in.Name,
-		ApplicationBundle: *bundle,
+		Name:                         in.Name,
+		ApplicationBundle:            *bundle,
+		ApplicationBundleAutoUpgrade: common.ConvertApplicationBundleAutoUpgrade(in.Spec.ApplicationBundleAutoUpgrade),
 	}
 
 	if in.DeletionTimestamp != nil {
@@ -233,7 +235,8 @@ func createControlPlane(project *project.Meta, request *generated.ControlPlane) 
 			},
 		},
 		Spec: unikornv1.ControlPlaneSpec{
-			ApplicationBundle: &request.ApplicationBundle.Name,
+			ApplicationBundle:            &request.ApplicationBundle.Name,
+			ApplicationBundleAutoUpgrade: common.CreateApplicationBundleAutoUpgrade(request.ApplicationBundleAutoUpgrade),
 		},
 	}
 

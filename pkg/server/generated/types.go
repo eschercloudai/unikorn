@@ -41,6 +41,12 @@ type ApplicationBundle struct {
 	Version string `json:"version"`
 }
 
+// ApplicationBundleAutoUpgrade When specified enables auto upgrade of application bundles.
+type ApplicationBundleAutoUpgrade struct {
+	// DaysOfWeek Days of the week and time windows that permit operations to be performed in.
+	DaysOfWeek *AutoUpgradeDaysOfWeek `json:"daysOfWeek,omitempty"`
+}
+
 // ApplicationBundles A list of application bundles.
 type ApplicationBundles = []ApplicationBundle
 
@@ -50,10 +56,37 @@ type ApplicationCredentialOptions struct {
 	Name string `json:"name"`
 }
 
+// AutoUpgradeDaysOfWeek Days of the week and time windows that permit operations to be performed in.
+type AutoUpgradeDaysOfWeek struct {
+	// Friday A time window that wraps into the next day if required.
+	Friday *TimeWindow `json:"friday,omitempty"`
+
+	// Monday A time window that wraps into the next day if required.
+	Monday *TimeWindow `json:"monday,omitempty"`
+
+	// Saturday A time window that wraps into the next day if required.
+	Saturday *TimeWindow `json:"saturday,omitempty"`
+
+	// Sunday A time window that wraps into the next day if required.
+	Sunday *TimeWindow `json:"sunday,omitempty"`
+
+	// Thursday A time window that wraps into the next day if required.
+	Thursday *TimeWindow `json:"thursday,omitempty"`
+
+	// Tuesday A time window that wraps into the next day if required.
+	Tuesday *TimeWindow `json:"tuesday,omitempty"`
+
+	// Wednesday A time window that wraps into the next day if required.
+	Wednesday *TimeWindow `json:"wednesday,omitempty"`
+}
+
 // ControlPlane A Unikorn control plane.
 type ControlPlane struct {
 	// ApplicationBundle A bundle of applications.
 	ApplicationBundle ApplicationBundle `json:"applicationBundle"`
+
+	// ApplicationBundleAutoUpgrade When specified enables auto upgrade of application bundles.
+	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgrade `json:"applicationBundleAutoUpgrade,omitempty"`
 
 	// Name The name of the resource.
 	Name string `json:"name"`
@@ -65,6 +98,9 @@ type ControlPlane struct {
 // ControlPlanes A list of Unikorn control planes.
 type ControlPlanes = []ControlPlane
 
+// Hour An hour of the day in UTC.
+type Hour = int
+
 // KubernetesCluster Unikorn Kubernetes cluster creation parameters.
 type KubernetesCluster struct {
 	// Api Kubernetes API settings.
@@ -72,6 +108,9 @@ type KubernetesCluster struct {
 
 	// ApplicationBundle A bundle of applications.
 	ApplicationBundle ApplicationBundle `json:"applicationBundle"`
+
+	// ApplicationBundleAutoUpgrade When specified enables auto upgrade of application bundles.
+	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgrade `json:"applicationBundleAutoUpgrade,omitempty"`
 
 	// ControlPlane A Kubernetes cluster machine.
 	ControlPlane OpenstackMachinePool `json:"controlPlane"`
@@ -349,6 +388,15 @@ type Project struct {
 
 // StringParameter A basic string parameter.
 type StringParameter = string
+
+// TimeWindow A time window that wraps into the next day if required.
+type TimeWindow struct {
+	// End An hour of the day in UTC.
+	End Hour `json:"end"`
+
+	// Start An hour of the day in UTC.
+	Start Hour `json:"start"`
+}
 
 // Token Authentication token result.
 type Token struct {

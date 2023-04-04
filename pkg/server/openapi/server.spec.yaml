@@ -664,6 +664,8 @@ components:
           type: string
         applicationBundle:
           $ref: '#/components/schemas/applicationBundle'
+        applicationBundleAutoUpgrade:
+          $ref: '#/components/schemas/applicationBundleAutoUpgrade'
     controlPlanes:
       description: A list of Unikorn control planes.
       type: array
@@ -839,6 +841,8 @@ components:
           type: string
         applicationBundle:
           $ref: '#/components/schemas/applicationBundle'
+        applicationBundleAutoUpgrade:
+          $ref: '#/components/schemas/applicationBundleAutoUpgrade'
         openstack:
           $ref: '#/components/schemas/kubernetesClusterOpenstack'
         network:
@@ -883,6 +887,46 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/applicationBundle'
+    applicationBundleAutoUpgrade:
+      description: When specified enables auto upgrade of application bundles.
+      type: object
+      properties:
+        daysOfWeek:
+          $ref: '#/components/schemas/autoUpgradeDaysOfWeek'
+    autoUpgradeDaysOfWeek:
+      description: Days of the week and time windows that permit operations to be performed in.
+      type: object
+      properties:
+        sunday:
+          $ref: '#/components/schemas/timeWindow'
+        monday:
+          $ref: '#/components/schemas/timeWindow'
+        tuesday:
+          $ref: '#/components/schemas/timeWindow'
+        wednesday:
+          $ref: '#/components/schemas/timeWindow'
+        thursday:
+          $ref: '#/components/schemas/timeWindow'
+        friday:
+          $ref: '#/components/schemas/timeWindow'
+        saturday:
+          $ref: '#/components/schemas/timeWindow'
+    timeWindow:
+      description: A time window that wraps into the next day if required.
+      type: object
+      required:
+      - start
+      - end
+      properties:
+        start:
+          $ref: '#/components/schemas/hour'
+        end:
+          $ref: '#/components/schemas/hour'
+    hour:
+      description: An hour of the day in UTC.
+      type: integer
+      minimum: 0
+      maximum: 23
     openstackProject:
       description: An Openstack project.
       type: object
