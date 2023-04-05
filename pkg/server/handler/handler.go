@@ -294,7 +294,7 @@ func (h *Handler) GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, 
 		return
 	}
 
-	h.setCacheable(w)
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -305,7 +305,7 @@ func (h *Handler) GetApiV1ApplicationBundlesCluster(w http.ResponseWriter, r *ht
 		return
 	}
 
-	h.setCacheable(w)
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -409,7 +409,7 @@ func (h *Handler) GetApiV1ProvidersOpenstackKeyPairs(w http.ResponseWriter, r *h
 		return
 	}
 
-	h.setCacheable(w)
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
@@ -420,6 +420,6 @@ func (h *Handler) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *h
 		return
 	}
 
-	h.setCacheable(w)
+	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
