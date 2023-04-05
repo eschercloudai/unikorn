@@ -5,7 +5,7 @@ metadata:
 spec:
   kind: ControlPlane
   version: 1.0.0
-  endOfLife: 2022-04-01T00:00:00Z
+  endOfLife: 2022-05-01T00:00:00Z
   applications:
   - name: vcluster
     reference:
@@ -48,7 +48,7 @@ metadata:
 spec:
   kind: KubernetesCluster
   version: 1.0.0
-  endOfLife: 2022-04-01T00:00:00Z
+  endOfLife: 2022-05-01T00:00:00Z
   applications:
   - name: cluster-openstack
     reference:
