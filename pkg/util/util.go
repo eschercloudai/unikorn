@@ -115,3 +115,16 @@ func GetURLCACertificate(host string) ([]byte, error) {
 
 	return pem.EncodeToMemory(pemBlock), nil
 }
+
+// Filter is a generic filter function that returns a new filtered slice.
+func Filter[T any](l []T, callback func(T) bool) []T {
+	var r []T
+
+	for _, i := range l {
+		if callback(i) {
+			r = append(r, i)
+		}
+	}
+
+	return r
+}

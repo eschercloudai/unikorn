@@ -18,7 +18,7 @@ package openstack
 
 import (
 	"net/http"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
@@ -30,6 +30,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/util"
 )
 
 // Openstack provides an HTTP handler for Openstack resources.
@@ -280,13 +281,20 @@ func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, er
 		return nil, errors.OAuth2ServerError("failed list flavors").WithError(err)
 	}
 
-	flavors := generated.OpenstackFlavors{}
-	lock := &sync.Mutex{}
+	// Get rid of baremetal flavors.
+	// TODO: reject based on an expression of some kind?
+	result = util.Filter(result, func(f flavors.Flavor) bool {
+		return !strings.Contains(f.Name, "baremetal")
+	})
+
+	flavors := make(generated.OpenstackFlavors, len(result))
 
 	// Openstack sucks at this, so we need to fan out and run concurrently.
+	// Be careful to preserve the order here.
 	group, gctx := errgroup.WithContext(r.Context())
 
 	for i := range result {
+		index := i
 		f := &result[i]
 
 		group.Go(func() error {
@@ -295,20 +303,12 @@ func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, er
 				return errors.OAuth2ServerError("failed list flavor extra specs").WithError(err)
 			}
 
-			// Filter out baremetal nodes.
-			if _, ok := extraSpecs["resources:CUSTOM_BAREMETAL"]; ok {
-				return nil
-			}
-
 			flavor, err := convertFlavor(f, extraSpecs)
 			if err != nil {
 				return err
 			}
 
-			lock.Lock()
-			defer lock.Unlock()
-
-			flavors = append(flavors, *flavor)
+			flavors[index] = *flavor
 
 			return nil
 		})

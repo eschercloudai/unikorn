@@ -89,7 +89,7 @@ func (c *ComputeClient) Flavors(ctx context.Context) ([]flavors.Flavor, error) {
 	_, span := tracer.Start(ctx, "/compute/v2/flavors", trace.WithSpanKind(trace.SpanKindClient))
 	defer span.End()
 
-	page, err := flavors.ListDetail(c.client, &flavors.ListOpts{}).AllPages()
+	page, err := flavors.ListDetail(c.client, &flavors.ListOpts{SortKey: "name"}).AllPages()
 	if err != nil {
 		return nil, err
 	}
