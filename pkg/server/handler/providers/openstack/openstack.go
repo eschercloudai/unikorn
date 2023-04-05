@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -270,6 +271,45 @@ func convertFlavor(flavor *flavors.Flavor, extraSpecs map[string]string) (*gener
 	return f, nil
 }
 
+type flavorSortWrapper struct {
+	f generated.OpenstackFlavors
+}
+
+func (w flavorSortWrapper) Len() int {
+	return len(w.f)
+}
+
+func (w flavorSortWrapper) Less(i, j int) bool {
+	// Sort by GPUs, we want these to have precedence, we are selling GPUs
+	// after all.
+	if w.f[i].Gpus != nil {
+		if w.f[j].Gpus == nil {
+			return true
+		}
+
+		// Those with the smallest number of GPUs go first, we want to
+		// prevent over provisioning.
+		if *w.f[i].Gpus < *w.f[j].Gpus {
+			return true
+		}
+	}
+
+	if w.f[j].Gpus != nil && w.f[i].Gpus == nil {
+		return false
+	}
+
+	// If the GPUs are the same, sort by CPUs.
+	if w.f[i].Cpus < w.f[j].Cpus {
+		return true
+	}
+
+	return false
+}
+
+func (w flavorSortWrapper) Swap(i, j int) {
+	w.f[i], w.f[j] = w.f[j], w.f[i]
+}
+
 func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
@@ -318,7 +358,13 @@ func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, er
 		return nil, err
 	}
 
-	return flavors, nil
+	w := flavorSortWrapper{
+		f: flavors,
+	}
+
+	sort.Stable(w)
+
+	return w.f, nil
 }
 
 // GetFlavor does a list and find, while inefficient, it does do image filtering.
