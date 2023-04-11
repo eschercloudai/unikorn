@@ -111,3 +111,45 @@ spec:
     reference:
       kind: HelmApplication
       name: nvidia-gpu-operator-22.9.2-1
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: ApplicationBundle
+metadata:
+  name: kubernetes-cluster-1.2.0
+spec:
+  kind: KubernetesCluster
+  version: 1.2.0
+  preview: true
+  applications:
+  - name: cluster-openstack
+    reference:
+      kind: HelmApplication
+      name: cluster-openstack-0.3.13-1
+  - name: cilium
+    reference:
+      kind: HelmApplication
+      name: cilium-1.12.4-1
+  - name: openstack-cloud-provider
+    reference:
+      kind: HelmApplication
+      name: openstack-cloud-provider-1.4.0-1
+  - name: openstack-plugin-cinder-csi
+    reference:
+      kind: HelmApplication
+      name: openstack-plugin-cinder-csi-2.3.0-1
+  - name: metrics-server
+    reference:
+      kind: HelmApplication
+      name: metrics-server-3.8.4-1
+  - name: nginx-ingress
+    reference:
+      kind: HelmApplication
+      name: nginx-ingress-0.16.2-1
+  - name: cluster-autoscaler
+    reference:
+      kind: HelmApplication
+      name: cluster-autoscaler-0.0.0-1
+  - name: nvidia-gpu-operator
+    reference:
+      kind: HelmApplication
+      name: nvidia-gpu-operator-23.3.1-1

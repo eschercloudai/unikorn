@@ -159,6 +159,21 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
+  name: nvidia-gpu-operator-23.3.1-1
+spec:
+  chart: gpu-operator
+  interface: 1.0.0
+  repo: https://helm.ngc.nvidia.com/nvidia
+  version: v23.3.1
+  parameters:
+  - name: validator.plugin.env[0].name
+    value: "WITH_WORKLOAD"
+  - name: validator.plugin.env[0].value
+    value: "false"
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
   # Cool story bro (Nick Jones!!)
   name: cluster-autoscaler-0.0.0-1
 spec:
