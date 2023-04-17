@@ -98,9 +98,14 @@ func getManager() (manager.Manager, error) {
 
 // getController returns a generic controller.
 func getController(o *options.Options, manager manager.Manager, f ControllerFactory) (controller.Controller, error) {
+	// This prevents a single bad reconcile from affecting all the rest by
+	// boning the whole container.
+	recoverPanic := true
+
 	controllerOptions := controller.Options{
 		Reconciler:              f.Reconciler(manager),
 		MaxConcurrentReconciles: o.MaxConcurrentReconciles,
+		RecoverPanic:            &recoverPanic,
 	}
 
 	c, err := controller.New(constants.Application, manager, controllerOptions)
