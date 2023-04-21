@@ -28,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -66,11 +67,27 @@ func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
 	return p
 }
 
+func (p *Provisioner) namespaceSelector() (labels.Set, error) {
+	labels, err := p.project.ResourceLabels()
+	if err != nil {
+		return nil, err
+	}
+
+	labels[constants.KindLabel] = constants.KindLabelValueProject
+
+	return labels, nil
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
+	labels, err := p.namespaceSelector()
+	if err != nil {
+		return err
+	}
+
 	// Namespace exists, leave it alone.
-	_, err := util.GetResourceNamespace(ctx, p.client, constants.ProjectLabel, p.project.Name)
-	if err == nil {
+	// TODO: race: the status update may have failed, so we need to reset it.
+	if _, err = util.GetResourceNamespace(ctx, p.client, labels); err == nil {
 		return nil
 	}
 
@@ -83,9 +100,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "project-",
-			Labels: map[string]string{
-				constants.ProjectLabel: p.project.Name,
-			},
+			Labels:       labels,
 		},
 	}
 
@@ -95,17 +110,18 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	p.project.Status.Namespace = namespace.Name
 
-	if err := p.client.Status().Update(ctx, p.project); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
+	labels, err := p.namespaceSelector()
+	if err != nil {
+		return err
+	}
+
 	// Get the project's namespace.
-	namespace, err := util.GetResourceNamespace(ctx, p.client, constants.ProjectLabel, p.project.Name)
+	namespace, err := util.GetResourceNamespace(ctx, p.client, labels)
 	if err != nil {
 		// Already dead.
 		if errors.Is(err, util.ErrNamespaceLookup) {

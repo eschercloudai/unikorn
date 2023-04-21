@@ -35,6 +35,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -94,11 +95,27 @@ func New(ctx context.Context, client client.Client, controlPlane *unikornv1.Cont
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+func (p *Provisioner) namespaceSelector() (labels.Set, error) {
+	labels, err := p.controlPlane.ResourceLabels()
+	if err != nil {
+		return nil, err
+	}
+
+	labels[constants.KindLabel] = constants.KindLabelValueControlPlane
+
+	return labels, nil
+}
+
 // provisionNamespace creates a namespace for the control plane so that clusters
 // contained within have their own namespace and won't clash with others in the
 // same project.
 func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace, error) {
-	namespace, err := util.GetResourceNamespace(ctx, p.client, constants.ControlPlaneLabel, p.controlPlane.Name)
+	labels, err := p.namespaceSelector()
+	if err != nil {
+		return nil, err
+	}
+
+	namespace, err := util.GetResourceNamespace(ctx, p.client, labels)
 	if err == nil {
 		return namespace, nil
 	}
@@ -112,9 +129,7 @@ func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace
 	namespace = &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "controlplane-",
-			Labels: map[string]string{
-				constants.ControlPlaneLabel: p.controlPlane.Name,
-			},
+			Labels:       labels,
 		},
 	}
 
@@ -196,6 +211,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	p.controlPlane.Status.Namespace = namespace.Name
+
 	log.Info("control plane provisioned")
 
 	return nil
@@ -203,7 +220,12 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	namespace, err := util.GetResourceNamespace(ctx, p.client, constants.ControlPlaneLabel, p.controlPlane.Name)
+	labels, err := p.namespaceSelector()
+	if err != nil {
+		return err
+	}
+
+	namespace, err := util.GetResourceNamespace(ctx, p.client, labels)
 	if err != nil {
 		// Already dead.
 		if errors.Is(err, util.ErrNamespaceLookup) {
