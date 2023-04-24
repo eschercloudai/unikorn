@@ -115,3 +115,10 @@ func (*Factory) RegisterWatches(controller controller.Controller) error {
 
 	return nil
 }
+
+// Upgrade can perform metadata upgrades of all versioned resources on restart/upgrade
+// of the controller.  This must not affect the spec in any way as it causes split brain
+// and potential fail.
+func (*Factory) Upgrade(c client.Client) error {
+	return nil
+}

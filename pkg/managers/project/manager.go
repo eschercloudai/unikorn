@@ -17,9 +17,16 @@ limitations under the License.
 package project
 
 import (
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/managers/common"
+	"context"
 
+	"golang.org/x/mod/semver"
+
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/managers/common"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -42,7 +49,68 @@ func (*Factory) Reconciler(manager manager.Manager) reconcile.Reconciler {
 
 // RegisterWatches adds any watches that would trigger a reconcile.
 func (*Factory) RegisterWatches(controller controller.Controller) error {
-	if err := controller.Watch(&source.Kind{Type: &unikornv1alpha1.Project{}}, &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
+	if err := controller.Watch(&source.Kind{Type: &unikornv1.Project{}}, &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Upgrade can perform metadata upgrades of all versioned resources on restart/upgrade
+// of the controller.  This must not affect the spec in any way as it causes split brain
+// and potential fail.
+func (*Factory) Upgrade(c client.Client) error {
+	ctx := context.TODO()
+
+	resources := &unikornv1.ProjectList{}
+
+	if err := c.List(ctx, resources, &client.ListOptions{}); err != nil {
+		return err
+	}
+
+	for i := range resources.Items {
+		if err := upgrade(ctx, c, &resources.Items[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// semverLess returns true if a is less than b.
+func semverLess(a, b string) bool {
+	// Note we use un-prefixed tags, the library expects different.
+	return semver.Compare("v"+a, "v"+b) < 0
+}
+
+func upgrade(ctx context.Context, c client.Client, resource *unikornv1.Project) error {
+	version, ok := resource.Labels[constants.VersionLabel]
+	if !ok {
+		return unikornv1.ErrMissingLabel
+	}
+
+	newResource := resource.DeepCopy()
+
+	// In 0.3.27, the underlying namespace for a project was augmented with the
+	// "unikorn.eschercloud.ai/kind" label to avoid aliasing with control plane
+	// namespaces as "unikorn.eschercloud.ai/project" was added to them to provide
+	// scoping.
+	if semverLess(version, "0.3.27") {
+		namespace, err := util.GetResourceNamespaceLegacy(ctx, c, constants.ProjectLabel, resource.Name)
+		if err != nil {
+			return err
+		}
+
+		namespace.Labels[constants.KindLabel] = constants.KindLabelValueProject
+
+		if err := c.Update(ctx, namespace, &client.UpdateOptions{}); err != nil {
+			return err
+		}
+
+		newResource.Labels[constants.VersionLabel] = "0.3.27"
+	}
+
+	if err := c.Patch(ctx, newResource, client.MergeFrom(resource)); err != nil {
 		return err
 	}
 

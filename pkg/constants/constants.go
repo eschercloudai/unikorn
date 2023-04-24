@@ -50,6 +50,19 @@ const (
 	// for them).  Metadata may be upgraded to a later version for any resource.
 	VersionLabel = "unikorn.eschercloud.ai/version"
 
+	// KindLabel is used to match a resource that may be owned by a particular kind.
+	// For example, projects and control planes are modelled on namespaces.  For CPs
+	// you have to select based on project and CP name, because of name reuse, but
+	// this raises the problem that selecting a project's namespace will match multiple
+	// so this provides a concrete type associated with each resource.
+	KindLabel = "unikorn.eschercloud.ai/kind"
+
+	// KindLabelValueProject is used to denote a resource belongs to this type.
+	KindLabelValueProject = "project"
+
+	// KindLabelValueControlPlane is used to denote a resource belongs to this type.
+	KindLabelValueControlPlane = "controlplane"
+
 	// ProjectLabel is a label applied to namespaces to indicate it is under
 	// control of this tool.  Useful for label selection.
 	ProjectLabel = "unikorn.eschercloud.ai/project"

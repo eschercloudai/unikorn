@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -25,11 +26,13 @@ import (
 	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/managers/options"
+	utilclient "github.com/eschercloudai/unikorn/pkg/util/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	klog "k8s.io/klog/v2"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -47,6 +50,11 @@ type ControllerFactory interface {
 
 	// RegisterWatches adds any watches that would trigger a reconcile.
 	RegisterWatches(controller.Controller) error
+
+	// Upgrade allows version based upgrades of managed resources.
+	// DO NOT MODIFY THE SPEC EVER.  Only things like metadata can
+	// be touched.
+	Upgrade(client.Client) error
 }
 
 // getScheme returns a scheme that knows about core Kubernetes and Unikorn types
@@ -116,6 +124,19 @@ func getController(o *options.Options, manager manager.Manager, f ControllerFact
 	return c, nil
 }
 
+func doUpgrade(f ControllerFactory) error {
+	client, err := utilclient.New(context.TODO())
+	if err != nil {
+		return err
+	}
+
+	if err := f.Upgrade(client); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Run provides common manager initialization and execution.
 func Run(f ControllerFactory) {
 	zapOptions := &zap.Options{}
@@ -135,6 +156,11 @@ func Run(f ControllerFactory) {
 
 	logger := log.Log.WithName("init")
 	logger.Info("service starting", "application", constants.Application, "version", constants.Version, "revision", constants.Revision)
+
+	if err := doUpgrade(f); err != nil {
+		logger.Error(err, "resource upgrade failed")
+		os.Exit(1)
+	}
 
 	manager, err := getManager()
 	if err != nil {

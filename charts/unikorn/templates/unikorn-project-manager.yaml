@@ -26,6 +26,7 @@ rules:
   - get
   - watch
   - update
+  - patch
 - apiGroups:
   - unikorn.eschercloud.ai
   resources:
@@ -42,6 +43,7 @@ rules:
   - list
   - watch
   - delete
+  - update
 # Manage projects (cascading deletion).
 - apiGroups:
   - unikorn.eschercloud.ai
