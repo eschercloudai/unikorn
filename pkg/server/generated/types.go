@@ -437,6 +437,9 @@ type ControlPlaneResponse = ControlPlane
 // ControlPlanesResponse A list of Unikorn control planes.
 type ControlPlanesResponse = ControlPlanes
 
+// ForbiddenResponse Generic error message.
+type ForbiddenResponse = Oauth2Error
+
 // InternalServerErrorResponse Generic error message.
 type InternalServerErrorResponse = Oauth2Error
 

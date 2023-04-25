@@ -411,6 +411,8 @@ paths:
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/forbiddenResponse'
         '404':
           $ref: '#/components/responses/notFoundResponse'
         '500':
@@ -1141,6 +1143,12 @@ components:
             $ref: '#/components/schemas/oauth2Error'
     unauthorizedResponse:
       description: Authentication failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/oauth2Error'
+    forbiddenResponse:
+      description: Request was denied by authorization.
       content:
         application/json:
           schema:
