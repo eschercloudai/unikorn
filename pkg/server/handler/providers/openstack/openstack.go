@@ -567,7 +567,7 @@ func (o *Openstack) CreateApplicationCredential(r *http.Request, options *genera
 
 	result, err := client.CreateApplicationCredential(r.Context(), user, options.Name, description, roles)
 	if err != nil {
-		return nil, err
+		return nil, errors.HTTPForbidden("failed to create application credential, ensure you have the correct roles assigned to your user").WithError(err)
 	}
 
 	return convertApplicationCredential(result), nil
