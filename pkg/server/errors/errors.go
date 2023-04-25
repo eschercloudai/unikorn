@@ -89,16 +89,17 @@ func (e *HTTPError) Error() string {
 // Write returns the error code and description to the client.
 func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
 	// Emit the response to the client.
-	w.Header().Add("Content-Type", "application/json")
 	w.Header().Add("Cache-Control", "no-cache")
-
-	w.WriteHeader(e.status)
 
 	// Short cut errors with no response.
 	switch e.status {
 	case http.StatusNotFound, http.StatusConflict:
+		w.WriteHeader(e.status)
 		return
 	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(e.status)
 
 	// Log out any detail from the error that shouldn't be
 	// reported to the client.  Do it before things can error
