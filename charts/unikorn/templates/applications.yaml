@@ -169,7 +169,7 @@ spec:
   - name: validator.plugin.env[0].name
     value: "WITH_WORKLOAD"
   - name: validator.plugin.env[0].value
-    value: "false"
+    value: f
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
