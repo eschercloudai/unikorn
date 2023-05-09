@@ -33,7 +33,8 @@ import (
 	klog "k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -49,7 +50,7 @@ type ControllerFactory interface {
 	Reconciler(manager.Manager) reconcile.Reconciler
 
 	// RegisterWatches adds any watches that would trigger a reconcile.
-	RegisterWatches(controller.Controller) error
+	RegisterWatches(manager.Manager, controller.Controller) error
 
 	// Upgrade allows version based upgrades of managed resources.
 	// DO NOT MODIFY THE SPEC EVER.  Only things like metadata can
@@ -80,7 +81,7 @@ func getScheme() (*runtime.Scheme, error) {
 func getManager() (manager.Manager, error) {
 	// Create a manager with leadership election to prevent split brain
 	// problems, and set the scheme so it gets propagated to the client.
-	config, err := config.GetConfig()
+	config, err := clientconfig.GetConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -111,9 +112,11 @@ func getController(o *options.Options, manager manager.Manager, f ControllerFact
 	recoverPanic := true
 
 	controllerOptions := controller.Options{
-		Reconciler:              f.Reconciler(manager),
-		MaxConcurrentReconciles: o.MaxConcurrentReconciles,
-		RecoverPanic:            &recoverPanic,
+		Controller: config.Controller{
+			MaxConcurrentReconciles: o.MaxConcurrentReconciles,
+			RecoverPanic:            &recoverPanic,
+		},
+		Reconciler: f.Reconciler(manager),
 	}
 
 	c, err := controller.New(constants.Application, manager, controllerOptions)
@@ -174,7 +177,7 @@ func Run(f ControllerFactory) {
 		os.Exit(1)
 	}
 
-	if err := f.RegisterWatches(controller); err != nil {
+	if err := f.RegisterWatches(manager, controller); err != nil {
 		logger.Error(err, "watcher registration error")
 		os.Exit(1)
 	}

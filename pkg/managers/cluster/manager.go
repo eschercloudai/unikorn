@@ -17,6 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"context"
+
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/managers/common"
@@ -46,24 +48,24 @@ type eventHandlerOwnerFromLabel struct {
 var _ handler.EventHandler = &eventHandlerOwnerFromLabel{}
 
 // Create is called in response to an create event - e.g. Pod Creation.
-func (e *eventHandlerOwnerFromLabel) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *eventHandlerOwnerFromLabel) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	e.enqueue(evt.Object, q)
 }
 
 // Update is called in response to an update event -  e.g. Pod Updated.
-func (e *eventHandlerOwnerFromLabel) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *eventHandlerOwnerFromLabel) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	e.enqueue(evt.ObjectNew, q)
 	e.enqueue(evt.ObjectOld, q)
 }
 
 // Delete is called in response to a delete event - e.g. Pod Deleted.
-func (e *eventHandlerOwnerFromLabel) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *eventHandlerOwnerFromLabel) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	e.enqueue(evt.Object, q)
 }
 
 // Generic is called in response to an event of an unknown type or a synthetic event triggered as a cron or
 // external trigger request - e.g. reconcile Autoscaling, or a Webhook.
-func (e *eventHandlerOwnerFromLabel) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *eventHandlerOwnerFromLabel) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 	e.enqueue(evt.Object, q)
 }
 
@@ -102,14 +104,14 @@ func (*Factory) Reconciler(manager manager.Manager) reconcile.Reconciler {
 }
 
 // RegisterWatches adds any watches that would trigger a reconcile.
-func (*Factory) RegisterWatches(controller controller.Controller) error {
+func (*Factory) RegisterWatches(manager manager.Manager, controller controller.Controller) error {
 	// Any changes to the cluster spec, trigger a reconcile.
-	if err := controller.Watch(&source.Kind{Type: &unikornv1alpha1.KubernetesCluster{}}, &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
+	if err := controller.Watch(source.Kind(manager.GetCache(), &unikornv1alpha1.KubernetesCluster{}), &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
 		return err
 	}
 
 	// Any changes to workload pools that are selected by the cluster, trigger a reconcile.
-	if err := controller.Watch(&source.Kind{Type: &unikornv1alpha1.KubernetesWorkloadPool{}}, &eventHandlerOwnerFromLabel{label: constants.KubernetesClusterLabel}, &predicate.GenerationChangedPredicate{}); err != nil {
+	if err := controller.Watch(source.Kind(manager.GetCache(), &unikornv1alpha1.KubernetesWorkloadPool{}), &eventHandlerOwnerFromLabel{label: constants.KubernetesClusterLabel}, &predicate.GenerationChangedPredicate{}); err != nil {
 		return err
 	}
 

@@ -91,11 +91,7 @@ func (c *Checker) upgradeResource(ctx context.Context, resource *unikornv1.Contr
 
 	resource.Spec.ApplicationBundle = &target.Name
 
-	if err := c.client.Update(ctx, resource); err != nil {
-		return err
-	}
-
-	return nil
+	return c.client.Update(ctx, resource)
 }
 
 func (c *Checker) Check(ctx context.Context) error {

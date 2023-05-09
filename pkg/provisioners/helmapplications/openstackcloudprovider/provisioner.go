@@ -151,7 +151,7 @@ func (p *Provisioner) generateGlobalValues() (map[string]interface{}, error) {
 // Generate implements the application.Generator interface.
 // Note there is an option, to just pass through the clouds.yaml file, however
 // the chart doesn't allow it to be exposed so we need to translate between formats.
-func (p *Provisioner) Values(version *string) (interface{}, error) {
+func (p *Provisioner) Values(_ *string) (interface{}, error) {
 	cloudConfigGlobal, err := p.generateGlobalValues()
 	if err != nil {
 		return nil, err

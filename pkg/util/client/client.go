@@ -60,6 +60,10 @@ func New(ctx context.Context) (client.Client, error) {
 
 	clientOptions := client.Options{
 		Scheme: scheme,
+		Cache: &client.CacheOptions{
+			Reader:       cache,
+			Unstructured: true,
+		},
 	}
 
 	c, err := client.New(config, clientOptions)
@@ -67,10 +71,5 @@ func New(ctx context.Context) (client.Client, error) {
 		return nil, err
 	}
 
-	input := client.NewDelegatingClientInput{
-		CacheReader: cache,
-		Client:      c,
-	}
-
-	return client.NewDelegatingClient(input)
+	return c, nil
 }
