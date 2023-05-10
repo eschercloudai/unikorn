@@ -48,8 +48,8 @@ func (*Factory) Reconciler(manager manager.Manager) reconcile.Reconciler {
 }
 
 // RegisterWatches adds any watches that would trigger a reconcile.
-func (*Factory) RegisterWatches(controller controller.Controller) error {
-	if err := controller.Watch(&source.Kind{Type: &unikornv1.ControlPlane{}}, &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
+func (*Factory) RegisterWatches(manager manager.Manager, controller controller.Controller) error {
+	if err := controller.Watch(source.Kind(manager.GetCache(), &unikornv1.ControlPlane{}), &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
 		return err
 	}
 

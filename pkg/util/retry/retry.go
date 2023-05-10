@@ -85,6 +85,7 @@ func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
 			// reconcile yielding code.  If this becomes a problem, we may
 			// need to define our own "expired" error type, that can wrap
 			// the underlying error.
+			//nolint:errorlint
 			return fmt.Errorf("%w: %s", c.Err(), rerr)
 		case <-t.C:
 			if rerr = f(); rerr != nil {

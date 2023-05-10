@@ -39,3 +39,8 @@ linters-settings:
     skip-generated: true
   nlreturn:
     block-size: 2
+issues:
+  # Too big a change in the context of a module upgrade.
+  exclude:
+  - if-return
+  - unused-parameter
