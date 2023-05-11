@@ -27,7 +27,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/server/authorization"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/oauth2"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -187,7 +187,7 @@ func (v *OpenAPIValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add any contextual information to bubble up to the handler.
-	r = r.WithContext(authorization.NewContextWithClaims(r.Context(), authContext.claims))
+	r = r.WithContext(oauth2.NewContextWithClaims(r.Context(), authContext.claims))
 
 	// Override the writer so we can inspect the contents and status.
 	writer := &bufferingResponseWriter{

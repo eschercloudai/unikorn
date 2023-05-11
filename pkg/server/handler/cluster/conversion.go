@@ -233,7 +233,7 @@ func (c *Client) createClientConfig(options *generated.KubernetesCluster) ([]byt
 			cloud: {
 				AuthType: clientconfig.AuthV3ApplicationCredential,
 				AuthInfo: &clientconfig.AuthInfo{
-					AuthURL:                     c.authenticator.Endpoint(),
+					AuthURL:                     c.authenticator.Keystone.Endpoint(),
 					ApplicationCredentialID:     options.Openstack.ApplicationCredentialID,
 					ApplicationCredentialSecret: options.Openstack.ApplicationCredentialSecret,
 				},
@@ -260,7 +260,7 @@ func (c *Client) createOpenstack(options *generated.KubernetesCluster) (*unikorn
 	// TODO: ignore this jazz when doing a read, we don't want to expose
 	// app cred secrets.
 	if options.Openstack.ApplicationCredentialID != applicationCredentialSentinel {
-		ca, err := util.GetURLCACertificate(c.authenticator.Endpoint())
+		ca, err := util.GetURLCACertificate(c.authenticator.Keystone.Endpoint())
 		if err != nil {
 			return nil, errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
 		}

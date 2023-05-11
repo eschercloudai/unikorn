@@ -14,13 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package authorization
+package oauth2
 
 import (
 	"context"
-	"crypto"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,9 +26,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/spf13/pflag"
-	jose "gopkg.in/go-jose/go-jose.v2"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
+
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
 )
 
 var (
@@ -46,72 +43,6 @@ var (
 	// from a context.
 	ErrContextError = errors.New("value missing from context")
 )
-
-// JWTIssuer is in charge of API token issue and verification.
-// It is expected that the keys come from a mounted kubernetes.io/tls
-// secret, and that is managed by cert-manager.  As a result the keys
-// will rotate every 60 days (by default), so you MUST ensure they are
-// not cached in perpetuity.  Additionally, due to horizontal scale-out
-// these secrets need to be shared between all replicas so that a token
-// issued by one, can be verified by another.  As such if you ever do
-// cache the certificate load, it will need to be coordinated between
-// all instances.
-type JWTIssuer struct {
-	// tLSKeyPath identifies where to get the JWE/JWS private key from.
-	tLSKeyPath string
-
-	// tLSCertPath identifies where to get the JWE/JWS public key from.
-	tLSCertPath string
-
-	// duration allows the token lifetime to be capped.
-	duration time.Duration
-}
-
-// NewJWTIssuer returns a new JWT issuer and validator.
-func NewJWTIssuer() *JWTIssuer {
-	return &JWTIssuer{}
-}
-
-const (
-	tlsKeyPathDefault  = "/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.key"
-	tlsCertPathDefault = "/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.crt"
-)
-
-// AddFlags registers flags with the provided flag set.
-func (i *JWTIssuer) AddFlags(f *pflag.FlagSet) {
-	f.StringVar(&i.tLSKeyPath, "jose-tls-key", tlsKeyPathDefault, "TLS key used to sign JWS and decrypt JWE.")
-	f.StringVar(&i.tLSCertPath, "jose-tls-cert", tlsCertPathDefault, "TLS cert used to verify JWS and encrypt JWE.")
-	// TODO: this was 1h, because access tokens should be short-lived so their
-	// window of opportunity--if stolen--is short.  However it's annoying.  In
-	// future we should issue a long-lived single-use refresh token.  This is
-	// deemed more secure as it's exposed to the network nowhere near as much,
-	// i.e, twice.
-	f.DurationVar(&i.duration, "token-expiry-duration", 24*time.Hour, "JWT expiry duration")
-}
-
-// GetKeyPair returns the public and private key from the configuration data.
-func (i *JWTIssuer) GetKeyPair() (any, crypto.PrivateKey, error) {
-	// See JWTIssuer documentation for notes on caching.
-	tlsCertificate, err := tls.LoadX509KeyPair(i.tLSCertPath, i.tLSKeyPath)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(tlsCertificate.Certificate) != 1 {
-		return nil, nil, fmt.Errorf("%w: unexpected certificate chain", ErrKeyFormat)
-	}
-
-	certificate, err := x509.ParseCertificate(tlsCertificate.Certificate[0])
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if certificate.PublicKeyAlgorithm != x509.ECDSA {
-		return nil, nil, fmt.Errorf("%w: certifcate public key algorithm is not ECDSA", ErrKeyFormat)
-	}
-
-	return certificate.PublicKey, tlsCertificate.PrivateKey, nil
-}
 
 // Scope defines security context scopes for an API request.
 type Scope string
@@ -241,28 +172,15 @@ func ClaimsFromContext(ctx context.Context) (*Claims, error) {
 }
 
 // Issue issues a new JWT token.
-func (i *JWTIssuer) Issue(r *http.Request, subject string, uclaims *UnikornClaims, scope *ScopeList, expiresAt time.Time) (string, *Claims, error) {
-	publicKey, privateKey, err := i.GetKeyPair()
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to get key pair: %w", err)
-	}
-
+func Issue(i *jose.JWTIssuer, r *http.Request, subject string, uclaims *UnikornClaims, scope *ScopeList, expiresAt time.Time) (string, error) {
 	now := time.Now()
-
-	// Override the default token expiration time if it exceeds our
-	// security requirements.
-	maxExpiresAt := now.Add(i.duration)
-
-	if expiresAt.After(maxExpiresAt) {
-		expiresAt = maxExpiresAt
-	}
 
 	nowRFC7519 := jwt.NumericDate(now.Unix())
 	expiresAtRFC7519 := jwt.NumericDate(expiresAt.Unix())
 
 	// The issuer and audience will be the same, and dyanmic based on the
 	// HTTP 1.1 Host header.
-	claims := Claims{
+	claims := &Claims{
 		Claims: jwt.Claims{
 			ID:      uuid.New().String(),
 			Subject: subject,
@@ -278,59 +196,20 @@ func (i *JWTIssuer) Issue(r *http.Request, subject string, uclaims *UnikornClaim
 		UnikornClaims: uclaims,
 	}
 
-	signingKey := jose.SigningKey{
-		Algorithm: jose.ES512,
-		Key:       privateKey,
-	}
-
-	signer, err := jose.NewSigner(signingKey, nil)
+	token, err := i.EncodeJWEToken(claims)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to create signer: %w", err)
+		return "", err
 	}
 
-	recipient := jose.Recipient{
-		Algorithm: jose.ECDH_ES,
-		Key:       publicKey,
-	}
-
-	encrypterOptions := &jose.EncrypterOptions{}
-	encrypterOptions = encrypterOptions.WithType("JWT").WithContentType("JWT")
-
-	encrypter, err := jose.NewEncrypter(jose.A256GCM, recipient, encrypterOptions)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create encrypter: %w", err)
-	}
-
-	token, err := jwt.SignedAndEncrypted(signer, encrypter).Claims(claims).CompactSerialize()
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create token: %w", err)
-	}
-
-	return token, &claims, nil
+	return token, nil
 }
 
 // Verify checks the token parses and validates.
-func (i *JWTIssuer) Verify(r *http.Request, tokenString string) (*Claims, error) {
-	publicKey, privateKey, err := i.GetKeyPair()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get key pair: %w", err)
-	}
-
-	// Parse and decrypt the JWE token with the private key.
-	nestedToken, err := jwt.ParseSignedAndEncrypted(tokenString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse encrypted token: %w", err)
-	}
-
-	token, err := nestedToken.Decrypt(privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt token: %w", err)
-	}
-
+func Verify(i *jose.JWTIssuer, r *http.Request, tokenString string) (*Claims, error) {
 	// Parse and verify the claims with the public key.
 	claims := &Claims{}
 
-	if err := token.Claims(publicKey, claims); err != nil {
+	if err := i.DecodeJWEToken(tokenString, claims); err != nil {
 		return nil, fmt.Errorf("failed to decrypt claims: %w", err)
 	}
 

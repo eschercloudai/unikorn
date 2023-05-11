@@ -23,6 +23,8 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/oauth2"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 )
 
@@ -34,17 +36,17 @@ type authorizationContext struct {
 	err error
 
 	// claims contains all claims defined in the token.
-	claims *authorization.Claims
+	claims *oauth2.Claims
 }
 
 // Authorizer provides OpenAPI based authorization middleware.
 type Authorizer struct {
 	// issuer allows creation and validation of JWT bearer tokens.
-	issuer *authorization.JWTIssuer
+	issuer *jose.JWTIssuer
 }
 
 // NewAuthorizer returns a new authorizer with required parameters.
-func NewAuthorizer(issuer *authorization.JWTIssuer) *Authorizer {
+func NewAuthorizer(issuer *jose.JWTIssuer) *Authorizer {
 	return &Authorizer{
 		issuer: issuer,
 	}
@@ -78,14 +80,14 @@ func (a *Authorizer) authorizeOAuth2(ctx *authorizationContext, r *http.Request,
 	}
 
 	// Check the token is from us, for us, and in date.
-	claims, err := a.issuer.Verify(r, token)
+	claims, err := oauth2.Verify(a.issuer, r, token)
 	if err != nil {
 		return errors.OAuth2AccessDenied("token validation failed").WithError(err)
 	}
 
 	// Check the token is authorized to do what the schema says.
 	for _, scope := range scopes {
-		if !claims.Scope.Includes(authorization.Scope(scope)) {
+		if !claims.Scope.Includes(oauth2.Scope(scope)) {
 			return errors.OAuth2InvalidScope("token missing required scope").WithValues("scope", scope)
 		}
 	}

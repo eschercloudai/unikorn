@@ -74,20 +74,23 @@ func (h *Handler) setUncacheable(w http.ResponseWriter) {
 	w.Header().Add("Cache-Control", "no-cache")
 }
 
-func (h *Handler) PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Request) {
-	token, claims, err := h.authenticator.Basic(r)
+func (h *Handler) GetApiV1AuthOauth2Authorization(w http.ResponseWriter, r *http.Request) {
+	h.authenticator.OAuth2.Authorization(w, r)
+}
+
+func (h *Handler) PostApiV1AuthOauth2Tokens(w http.ResponseWriter, r *http.Request) {
+	result, err := h.authenticator.OAuth2.Token(w, r)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
 	}
 
-	result := &generated.Token{
-		Token: token,
-		Email: claims.Subject,
-	}
-
 	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) GetApiV1AuthOidcCallback(w http.ResponseWriter, r *http.Request) {
+	h.authenticator.OAuth2.OIDCCallback(w, r)
 }
 
 func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Request) {
@@ -98,15 +101,10 @@ func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	token, claims, err := h.authenticator.Token(r, scope)
+	result, err := h.authenticator.Token(r, scope)
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return
-	}
-
-	result := &generated.Token{
-		Token: token,
-		Email: claims.Subject,
 	}
 
 	h.setUncacheable(w)

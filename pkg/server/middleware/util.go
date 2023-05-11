@@ -65,10 +65,5 @@ func (o *OpenAPI) findRoute(r *http.Request) (*routers.Route, map[string]string,
 		return nil, nil, errors.OAuth2ServerError("unable to find route").WithError(err)
 	}
 
-	// TODO: move to static validation.
-	if route.Operation.Security == nil {
-		return nil, nil, errors.OAuth2ServerError("no security requirements set")
-	}
-
 	return route, params, nil
 }

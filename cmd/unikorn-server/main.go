@@ -35,6 +35,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler"
 	"github.com/eschercloudai/unikorn/pkg/server/middleware"
@@ -115,7 +116,7 @@ func start() {
 	serverOptions := &serverOptions{}
 	serverOptions.addFlags(pflag.CommandLine)
 
-	issuer := authorization.NewJWTIssuer()
+	issuer := jose.NewJWTIssuer()
 	issuer.AddFlags(pflag.CommandLine)
 
 	authenticator := authorization.NewAuthenticator(issuer)
