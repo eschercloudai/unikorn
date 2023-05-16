@@ -22,7 +22,7 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/server/authorization"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/oauth2"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 
@@ -48,7 +48,7 @@ func NewClient(client client.Client) *Client {
 
 // NameFromContext translates an Openstack project ID to one we an use.
 func NameFromContext(ctx context.Context) (string, error) {
-	claims, err := authorization.ClaimsFromContext(ctx)
+	claims, err := oauth2.ClaimsFromContext(ctx)
 	if err != nil {
 		return "", err
 	}

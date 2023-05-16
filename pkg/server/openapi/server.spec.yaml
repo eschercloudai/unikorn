@@ -4,24 +4,49 @@ info:
   description: RESTful API service for Unikorn custom resources and UI.
   version: 0.2.0
 paths:
-  /api/v1/auth/tokens/password:
-    description: Password based authentication services.
-    post:
-      x-no-body: true
+  /api/v1/auth/oauth2/authorization:
+    description: OAuth2 authorization grant endpoint.
+    get:
+      x-no-security-requirements: true
       description: |-
-        Authenticates against Openstack, and returns a signed and encrypted oauth2
-        JWT.  This token has a claim that contains the Openstack authorization token.
-        This token can be used to poll allowed Openstack projects and upgrade to a
-        project scoped token.
-      security:
-      - httpBasicAuthentication: []
+        Provides authentication and authorization as per the OAuth2 specification.
+        This particular implementation uses a "code" type response, and PKCE.
+      responses:
+        '302':
+          description: A redirect to the specified URI with an authorization code.
+        # TODO: returns HTML not JSON
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/auth/oauth2/tokens:
+    description: OAuth2 code exchange endpoint.
+    post:
+      x-no-security-requirements: true
+      description: |-
+        Provides authorization code to token exchange as per the OAuth2 specification.
+      requestBody:
+        $ref: '#/components/requestBodies/tokenRequest'
       responses:
         '200':
-          $ref: '#/components/responses/tokenResponse'
+          description: A token.
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
           $ref: '#/components/responses/unauthorizedResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/auth/oidc/callback:
+    description: OIDC response code callback endpoint.
+    get:
+      x-no-security-requirements: true
+      description: |-
+        Intenally when using oauth2, we actually talk to an OIDC IdP, so have to
+        essentially do oauth in oauth.  This endpoint allows code exchange with
+        the OIDC IdP, then redirects back to the browser with an oauth2 code.
+      responses:
+        '302':
+          description: A redirect back to the browser with an authorization code.
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/auth/tokens/token:
@@ -588,6 +613,9 @@ components:
           - invalid_scope
           - server_error
           - temporarily_unavailable
+          - invalid_client
+          - invalid_grant
+          - unsupported_grant_type
           # Proprietary
           - not_found
           - method_not_allowed
@@ -595,6 +623,56 @@ components:
         error_description:
           description: Verbose message describing the error.
           type: string
+    tokenRequestOptions:
+      description: oauth2 token endpoint.
+      type: object
+      required:
+      - grant_type
+      properties:
+        grant_type:
+          description: Supported grant type.
+          type: string
+        code:
+          description: Authorization code.
+          type: string
+          nullable: true
+        client_id:
+          description: Client ID.
+          type: string
+          nullable: true
+        redirect_uri:
+          description: Client redirect URI.
+          type: string
+          nullable: true
+        code_verifier:
+          description: Client code verifier.
+          type: string
+          nullable: true
+        username:
+          description: Resource owner username.
+          type: string
+          nullable: true
+        password:
+          description: Resource owner password.
+          type: string
+          nullable: true
+      oneOf:
+      - required:
+        - code
+        - client_id
+        - redirect_uri
+        - code_verifier
+        properties:
+          grant_type:
+            enum:
+            - authorization_code
+      - required:
+        - username
+        - password
+        properties:
+          grant_type:
+            enum:
+            - password
     tokenScope:
       description: Password authentication scope.
       type: object
@@ -612,15 +690,23 @@ components:
               type: string
           additionalProperties: false
     token:
-      description: Authentication token result.
+      description: Oauth2 token result.
       type: object
       required:
-      - token
-      - email
+      - token_type
+      - access_token
+      - expires_in
       properties:
-        token:
-          description: Authentication token.
+        token_type:
+          description: How the access token is to be presented to the resource server.
           type: string
+        access_token:
+          description: The opaque access token.
+          type: string
+        expires_in:
+          description: The time in seconds the token will last for.
+          type: integer
+        # TODO: this is kind like an OIDC id_token...
         email:
           description: The user's email address.
           type: string
@@ -1093,6 +1179,13 @@ components:
       items:
         $ref: '#/components/schemas/openstackAvailabilityZone'
   requestBodies:
+    tokenRequest:
+      description: oauth2 token endpoint.
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/tokenRequestOptions'
     tokenScopeRequest:
       description: Openstack authentication scoping information.
       required: true
@@ -1268,6 +1361,10 @@ components:
       flows:
         authorizationCode:
           authorizationUrl: https://kubernetes.eschercloud.com/api/v1/tokens/password"
+          tokenUrl: https://kubernetes.eschercloud.com/api/v1/tokens/token"
+          scopes:
+            project: Token is scoped to an OpenStack project
+        password:
           tokenUrl: https://kubernetes.eschercloud.com/api/v1/tokens/token"
           scopes:
             project: Token is scoped to an OpenStack project

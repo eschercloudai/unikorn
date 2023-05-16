@@ -17,13 +17,15 @@ limitations under the License.
 package authorization
 
 import (
-	"encoding/base64"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/keystone"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/oauth2"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 )
@@ -31,119 +33,79 @@ import (
 // Authenticator provides Keystone authentication functionality.
 type Authenticator struct {
 	// issuer allows creation and validation of JWT bearer tokens.
-	issuer *JWTIssuer
+	issuer *jose.JWTIssuer
 
-	// endpoint is the Keystone endpoint.
-	endpoint string
+	// OAuth2 is the oauth2 deletgating authenticator.
+	OAuth2 *oauth2.Authenticator
 
-	// domain is the default domain users live under.
-	domain string
+	// Keystone provides OpenStack authentication.
+	Keystone *keystone.Authenticator
 }
 
 // NewAuthenticator returns a new authenticator with required fields populated.
 // You must call AddFlags after this.
-func NewAuthenticator(issuer *JWTIssuer) *Authenticator {
+func NewAuthenticator(issuer *jose.JWTIssuer) *Authenticator {
+	keystone := keystone.New()
+	oauth2 := oauth2.New(issuer, keystone)
+
 	return &Authenticator{
-		issuer: issuer,
+		issuer:   issuer,
+		OAuth2:   oauth2,
+		Keystone: keystone,
 	}
 }
 
 // AddFlags to the specified flagset.
 func (a *Authenticator) AddFlags(f *pflag.FlagSet) {
-	f.StringVar(&a.endpoint, "keystone-endpoint", "https://nl1.eschercloud.com:5000", "Keystone endpoint to use for authn/authz.")
-	f.StringVar(&a.domain, "keystone-user-domain-name", "Default", "Keystone user domain name for password authentication.")
-}
-
-// Endpoint returns the endpoint host.
-func (a *Authenticator) Endpoint() string {
-	return a.endpoint
-}
-
-// Basic performs basic authentication against Keystone and returns a token.
-func (a *Authenticator) Basic(r *http.Request) (string, *Claims, error) {
-	_, token, err := GetHTTPAuthenticationScheme(r)
-	if err != nil {
-		return "", nil, err
-	}
-
-	tuple, err := base64.StdEncoding.DecodeString(token)
-	if err != nil {
-		return "", nil, errors.OAuth2InvalidRequest("basic authorization not base64 encoded").WithError(err)
-	}
-
-	parts := strings.Split(string(tuple), ":")
-	if len(parts) != 2 {
-		return "", nil, errors.OAuth2InvalidRequest("basic authorization malformed")
-	}
-
-	username := parts[0]
-	password := parts[1]
-
-	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.endpoint))
-	if err != nil {
-		return "", nil, errors.OAuth2ServerError("unable to initialize identity").WithError(err)
-	}
-
-	// Do an unscoped authentication against Keystone.  The client is expected
-	// to list visible projects (or indeed cache them in local web-storage) then
-	// use that to do a scoped bearer token based upgrade.
-	keystoneToken, user, err := identity.CreateToken(r.Context(), openstack.NewCreateTokenOptionsUnscopedPassword(a.domain, username, password))
-	if err != nil {
-		return "", nil, errors.OAuth2AccessDenied("authentication failed").WithError(err)
-	}
-
-	uClaims := &UnikornClaims{
-		Token: keystoneToken.ID,
-		User:  user.ID,
-	}
-
-	jwToken, claims, err := a.issuer.Issue(r, username, uClaims, nil, keystoneToken.ExpiresAt)
-	if err != nil {
-		return "", nil, errors.OAuth2ServerError("unable to create access token").WithError(err)
-	}
-
-	return jwToken, claims, nil
+	a.OAuth2.AddFlags(f)
+	a.Keystone.AddFlags(f)
 }
 
 // Token performs token based authentication against Keystone with a scope, and returns a new token.
 // Used to upgrade from unscoped, or to refresh a token.
-func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (string, *Claims, error) {
-	tokenClaims, err := ClaimsFromContext(r.Context())
+func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (*generated.Token, error) {
+	tokenClaims, err := oauth2.ClaimsFromContext(r.Context())
 	if err != nil {
-		return "", nil, errors.OAuth2ServerError("failed get claims").WithError(err)
+		return nil, errors.OAuth2ServerError("failed get claims").WithError(err)
 	}
 
-	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.endpoint))
+	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.Keystone.Endpoint()))
 	if err != nil {
-		return "", nil, errors.OAuth2ServerError("unable to initialize identity").WithError(err)
+		return nil, errors.OAuth2ServerError("unable to initialize identity").WithError(err)
 	}
 
 	if tokenClaims.UnikornClaims == nil {
-		return "", nil, errors.OAuth2ServerError("unable to get unikorn claims")
+		return nil, errors.OAuth2ServerError("unable to get unikorn claims")
 	}
 
 	keystoneToken, user, err := identity.CreateToken(r.Context(), openstack.NewCreateTokenOptionsScopedToken(tokenClaims.UnikornClaims.Token, scope.Project.Id))
 	if err != nil {
-		return "", nil, errors.OAuth2AccessDenied("authentication failed").WithError(err)
+		return nil, errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
 
-	uClaims := &UnikornClaims{
+	uClaims := &oauth2.UnikornClaims{
 		Token:   keystoneToken.ID,
 		User:    user.ID,
 		Project: scope.Project.Id,
 	}
 
 	// Add some scope to the claims to allow the token to do more.
-	oAuth2Scope := &ScopeList{
-		Scopes: []Scope{
-			ScopeProject,
+	oAuth2Scope := &oauth2.ScopeList{
+		Scopes: []oauth2.Scope{
+			oauth2.ScopeProject,
 		},
 	}
 
-	jwToken, claims, err := a.issuer.Issue(r, tokenClaims.Subject, uClaims, oAuth2Scope, keystoneToken.ExpiresAt)
+	accessToken, err := oauth2.Issue(a.issuer, r, tokenClaims.Subject, uClaims, oAuth2Scope, keystoneToken.ExpiresAt)
 	if err != nil {
-		return "", nil, errors.OAuth2ServerError("unable to create access token").WithError(err)
+		return nil, errors.OAuth2ServerError("unable to create access token").WithError(err)
 	}
 
-	return jwToken, claims, nil
+	result := &generated.Token{
+		TokenType:   "Bearer",
+		AccessToken: accessToken,
+		ExpiresIn:   int(time.Until(keystoneToken.ExpiresAt).Seconds()),
+	}
+
+	return result, nil
 }

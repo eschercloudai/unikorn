@@ -21,8 +21,14 @@ type ServerInterface interface {
 	// (GET /api/v1/applicationBundles/controlPlane)
 	GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, r *http.Request)
 
-	// (POST /api/v1/auth/tokens/password)
-	PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Request)
+	// (GET /api/v1/auth/oauth2/authorization)
+	GetApiV1AuthOauth2Authorization(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/v1/auth/oauth2/tokens)
+	PostApiV1AuthOauth2Tokens(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/auth/oidc/callback)
+	GetApiV1AuthOidcCallback(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/v1/auth/tokens/token)
 	PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Request)
@@ -143,14 +149,42 @@ func (siw *ServerInterfaceWrapper) GetApiV1ApplicationBundlesControlPlane(w http
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// PostApiV1AuthTokensPassword operation middleware
-func (siw *ServerInterfaceWrapper) PostApiV1AuthTokensPassword(w http.ResponseWriter, r *http.Request) {
+// GetApiV1AuthOauth2Authorization operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1AuthOauth2Authorization(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	ctx = context.WithValue(ctx, HttpBasicAuthenticationScopes, []string{""})
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1AuthOauth2Authorization(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// PostApiV1AuthOauth2Tokens operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1AuthOauth2Tokens(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiV1AuthTokensPassword(w, r)
+		siw.Handler.PostApiV1AuthOauth2Tokens(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetApiV1AuthOidcCallback operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1AuthOidcCallback(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1AuthOidcCallback(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -862,7 +896,13 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/applicationBundles/controlPlane", wrapper.GetApiV1ApplicationBundlesControlPlane)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/auth/tokens/password", wrapper.PostApiV1AuthTokensPassword)
+		r.Get(options.BaseURL+"/api/v1/auth/oauth2/authorization", wrapper.GetApiV1AuthOauth2Authorization)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/auth/oauth2/tokens", wrapper.PostApiV1AuthOauth2Tokens)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/auth/oidc/callback", wrapper.GetApiV1AuthOidcCallback)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/auth/tokens/token", wrapper.PostApiV1AuthTokensToken)

@@ -4,17 +4,22 @@
 package generated
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
+
+	"github.com/deepmap/oapi-codegen/pkg/runtime"
 )
 
 const (
-	HttpBasicAuthenticationScopes = "httpBasicAuthentication.Scopes"
-	Oauth2AuthenticationScopes    = "oauth2Authentication.Scopes"
+	Oauth2AuthenticationScopes = "oauth2Authentication.Scopes"
 )
 
 // Defines values for Oauth2ErrorError.
 const (
 	AccessDenied            Oauth2ErrorError = "access_denied"
+	InvalidClient           Oauth2ErrorError = "invalid_client"
+	InvalidGrant            Oauth2ErrorError = "invalid_grant"
 	InvalidRequest          Oauth2ErrorError = "invalid_request"
 	InvalidScope            Oauth2ErrorError = "invalid_scope"
 	MethodNotAllowed        Oauth2ErrorError = "method_not_allowed"
@@ -22,6 +27,7 @@ const (
 	ServerError             Oauth2ErrorError = "server_error"
 	TemporarilyUnavailable  Oauth2ErrorError = "temporarily_unavailable"
 	UnauthorizedClient      Oauth2ErrorError = "unauthorized_client"
+	UnsupportedGrantType    Oauth2ErrorError = "unsupported_grant_type"
 	UnsupportedMediaType    Oauth2ErrorError = "unsupported_media_type"
 	UnsupportedResponseType Oauth2ErrorError = "unsupported_response_type"
 )
@@ -398,13 +404,54 @@ type TimeWindow struct {
 	Start Hour `json:"start"`
 }
 
-// Token Authentication token result.
+// Token Oauth2 token result.
 type Token struct {
-	// Email The user's email address.
-	Email string `json:"email"`
+	// AccessToken The opaque access token.
+	AccessToken string `json:"access_token"`
 
-	// Token Authentication token.
-	Token string `json:"token"`
+	// Email The user's email address.
+	Email *string `json:"email,omitempty"`
+
+	// ExpiresIn The time in seconds the token will last for.
+	ExpiresIn int `json:"expires_in"`
+
+	// TokenType How the access token is to be presented to the resource server.
+	TokenType string `json:"token_type"`
+}
+
+// TokenRequestOptions oauth2 token endpoint.
+type TokenRequestOptions struct {
+	// ClientId Client ID.
+	ClientId *string `json:"client_id"`
+
+	// Code Authorization code.
+	Code *string `json:"code"`
+
+	// CodeVerifier Client code verifier.
+	CodeVerifier *string `json:"code_verifier"`
+
+	// GrantType Supported grant type.
+	GrantType string `json:"grant_type"`
+
+	// Password Resource owner password.
+	Password *string `json:"password"`
+
+	// RedirectUri Client redirect URI.
+	RedirectUri *string `json:"redirect_uri"`
+
+	// Username Resource owner username.
+	Username *string `json:"username"`
+	union    json.RawMessage
+}
+
+// TokenRequestOptions0 defines model for .
+type TokenRequestOptions0 struct {
+	GrantType *interface{} `json:"grant_type,omitempty"`
+}
+
+// TokenRequestOptions1 defines model for .
+type TokenRequestOptions1 struct {
+	GrantType *interface{} `json:"grant_type,omitempty"`
 }
 
 // TokenScope Password authentication scope.
@@ -479,7 +526,7 @@ type OpenstackProjectsResponse = OpenstackProjects
 // ProjectResponse A Unikorn project.
 type ProjectResponse = Project
 
-// TokenResponse Authentication token result.
+// TokenResponse Oauth2 token result.
 type TokenResponse = Token
 
 // UnauthorizedResponse Generic error message.
@@ -496,6 +543,9 @@ type CreateKubernetesClusterRequest = KubernetesCluster
 
 // TokenScopeRequest Password authentication scope.
 type TokenScopeRequest = TokenScope
+
+// PostApiV1AuthOauth2TokensFormdataRequestBody defines body for PostApiV1AuthOauth2Tokens for application/x-www-form-urlencoded ContentType.
+type PostApiV1AuthOauth2TokensFormdataRequestBody = TokenRequestOptions
 
 // PostApiV1AuthTokensTokenJSONRequestBody defines body for PostApiV1AuthTokensToken for application/json ContentType.
 type PostApiV1AuthTokensTokenJSONRequestBody = TokenScope
@@ -514,3 +564,181 @@ type PutApiV1ControlplanesControlPlaneNameClustersClusterNameJSONRequestBody = K
 
 // PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody defines body for PostApiV1ProvidersOpenstackApplicationCredentials for application/json ContentType.
 type PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody = ApplicationCredentialOptions
+
+// AsTokenRequestOptions0 returns the union data inside the TokenRequestOptions as a TokenRequestOptions0
+func (t TokenRequestOptions) AsTokenRequestOptions0() (TokenRequestOptions0, error) {
+	var body TokenRequestOptions0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTokenRequestOptions0 overwrites any union data inside the TokenRequestOptions as the provided TokenRequestOptions0
+func (t *TokenRequestOptions) FromTokenRequestOptions0(v TokenRequestOptions0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTokenRequestOptions0 performs a merge with any union data inside the TokenRequestOptions, using the provided TokenRequestOptions0
+func (t *TokenRequestOptions) MergeTokenRequestOptions0(v TokenRequestOptions0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+// AsTokenRequestOptions1 returns the union data inside the TokenRequestOptions as a TokenRequestOptions1
+func (t TokenRequestOptions) AsTokenRequestOptions1() (TokenRequestOptions1, error) {
+	var body TokenRequestOptions1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTokenRequestOptions1 overwrites any union data inside the TokenRequestOptions as the provided TokenRequestOptions1
+func (t *TokenRequestOptions) FromTokenRequestOptions1(v TokenRequestOptions1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTokenRequestOptions1 performs a merge with any union data inside the TokenRequestOptions, using the provided TokenRequestOptions1
+func (t *TokenRequestOptions) MergeTokenRequestOptions1(v TokenRequestOptions1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+func (t TokenRequestOptions) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if t.ClientId != nil {
+		object["client_id"], err = json.Marshal(t.ClientId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'client_id': %w", err)
+		}
+	}
+
+	if t.Code != nil {
+		object["code"], err = json.Marshal(t.Code)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'code': %w", err)
+		}
+	}
+
+	if t.CodeVerifier != nil {
+		object["code_verifier"], err = json.Marshal(t.CodeVerifier)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'code_verifier': %w", err)
+		}
+	}
+
+	object["grant_type"], err = json.Marshal(t.GrantType)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'grant_type': %w", err)
+	}
+
+	if t.Password != nil {
+		object["password"], err = json.Marshal(t.Password)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'password': %w", err)
+		}
+	}
+
+	if t.RedirectUri != nil {
+		object["redirect_uri"], err = json.Marshal(t.RedirectUri)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'redirect_uri': %w", err)
+		}
+	}
+
+	if t.Username != nil {
+		object["username"], err = json.Marshal(t.Username)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'username': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *TokenRequestOptions) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["client_id"]; found {
+		err = json.Unmarshal(raw, &t.ClientId)
+		if err != nil {
+			return fmt.Errorf("error reading 'client_id': %w", err)
+		}
+	}
+
+	if raw, found := object["code"]; found {
+		err = json.Unmarshal(raw, &t.Code)
+		if err != nil {
+			return fmt.Errorf("error reading 'code': %w", err)
+		}
+	}
+
+	if raw, found := object["code_verifier"]; found {
+		err = json.Unmarshal(raw, &t.CodeVerifier)
+		if err != nil {
+			return fmt.Errorf("error reading 'code_verifier': %w", err)
+		}
+	}
+
+	if raw, found := object["grant_type"]; found {
+		err = json.Unmarshal(raw, &t.GrantType)
+		if err != nil {
+			return fmt.Errorf("error reading 'grant_type': %w", err)
+		}
+	}
+
+	if raw, found := object["password"]; found {
+		err = json.Unmarshal(raw, &t.Password)
+		if err != nil {
+			return fmt.Errorf("error reading 'password': %w", err)
+		}
+	}
+
+	if raw, found := object["redirect_uri"]; found {
+		err = json.Unmarshal(raw, &t.RedirectUri)
+		if err != nil {
+			return fmt.Errorf("error reading 'redirect_uri': %w", err)
+		}
+	}
+
+	if raw, found := object["username"]; found {
+		err = json.Unmarshal(raw, &t.Username)
+		if err != nil {
+			return fmt.Errorf("error reading 'username': %w", err)
+		}
+	}
+
+	return err
+}

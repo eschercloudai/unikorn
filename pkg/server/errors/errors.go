@@ -177,6 +177,22 @@ func OAuth2InvalidRequest(description string) *HTTPError {
 	return newHTTPError(http.StatusBadRequest, generated.InvalidRequest, description)
 }
 
+func OAuth2UnauthorizedClient(description string) *HTTPError {
+	return newHTTPError(http.StatusBadRequest, generated.UnauthorizedClient, description)
+}
+
+func OAuth2UnsupportedGrantType(description string) *HTTPError {
+	return newHTTPError(http.StatusBadRequest, generated.UnsupportedGrantType, description)
+}
+
+func OAuth2InvalidGrant(description string) *HTTPError {
+	return newHTTPError(http.StatusBadRequest, generated.InvalidGrant, description)
+}
+
+func OAuth2InvalidClient(description string) *HTTPError {
+	return newHTTPError(http.StatusBadRequest, generated.InvalidClient, description)
+}
+
 // OAuth2AccessDenied tells the client the authentication failed e.g.
 // username/password are wrong, or a token has expired and needs reauthentication.
 func OAuth2AccessDenied(description string) *HTTPError {

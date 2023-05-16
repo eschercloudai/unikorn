@@ -29,6 +29,7 @@ import (
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
+	"github.com/eschercloudai/unikorn/pkg/server/authorization/oauth2"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/util"
@@ -71,7 +72,7 @@ func New(options *Options, authenticator *authorization.Authenticator) (*Opensta
 
 	o := &Openstack{
 		options:                 options,
-		endpoint:                authenticator.Endpoint(),
+		endpoint:                authenticator.Keystone.Endpoint(),
 		identityClientCache:     identityClientCache,
 		computeClientCache:      computeClientCache,
 		blockStorageClientCache: blockStorageClientCache,
@@ -82,7 +83,7 @@ func New(options *Options, authenticator *authorization.Authenticator) (*Opensta
 }
 
 func getToken(r *http.Request) (string, error) {
-	claims, err := authorization.ClaimsFromContext(r.Context())
+	claims, err := oauth2.ClaimsFromContext(r.Context())
 	if err != nil {
 		return "", errors.OAuth2ServerError("failed get token claims").WithError(err)
 	}
@@ -95,7 +96,7 @@ func getToken(r *http.Request) (string, error) {
 }
 
 func getUser(r *http.Request) (string, error) {
-	claims, err := authorization.ClaimsFromContext(r.Context())
+	claims, err := oauth2.ClaimsFromContext(r.Context())
 	if err != nil {
 		return "", errors.OAuth2ServerError("failed get token claims").WithError(err)
 	}

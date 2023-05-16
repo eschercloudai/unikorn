@@ -49,13 +49,15 @@ func main() {
 	for pathName, path := range spec.Paths {
 		for method, operation := range path.Operations() {
 			// Everything needs security defining.
-			if operation.Security == nil {
+			_, noSecurityAllowed := operation.Extensions["x-no-security-requirements"]
+
+			if operation.Security == nil && !noSecurityAllowed {
 				report("no security requirements set for ", method, pathName)
 				os.Exit(1)
 			}
 
 			// If you have multiple, then the errors become ambiguous to handle.
-			if len(*operation.Security) != 1 {
+			if operation.Security != nil && len(*operation.Security) != 1 {
 				report("security requirement for", method, pathName, "require one security requirement")
 				os.Exit(1)
 			}
