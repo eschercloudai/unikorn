@@ -119,6 +119,12 @@ spec:
         {{- if .Values.server.otlpEndpoint }}
           {{ printf "- --otlp-endpoint=%s" .Values.server.otlpEndpoint | nindent 8 }}
         {{- end }}
+        {{- if .Values.server.keystone.endpoint -}}
+          {{ printf "- --keystone-endpoint=%s" .Values.server.keystone.endpoint | nindent 8 }}
+        {{- end }}
+        {{- if .Values.server.keystone.userDomain -}}
+          {{ printf "- --keystone-user-domain-name=%s" .Values.server.keystone.userDomain | nindent 8 }}
+        {{- end }}
         volumeMounts:
         - name: unikorn-server-jose-tls
           mountPath: /var/lib/secrets/unikorn.eschercloud.ai/jose
