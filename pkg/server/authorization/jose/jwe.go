@@ -18,8 +18,10 @@ package jose
 
 import (
 	"crypto"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -74,32 +76,36 @@ func (i *JWTIssuer) AddFlags(f *pflag.FlagSet) {
 	f.StringVar(&i.tLSCertPath, "jose-tls-cert", tlsCertPathDefault, "TLS cert used to verify JWS and encrypt JWE.")
 }
 
-// GetKeyPair returns the public and private key from the configuration data.
-func (i *JWTIssuer) GetKeyPair() (any, crypto.PrivateKey, error) {
+// GetKeyPair returns the public key, private key and key id from the configuration data.
+// The key id is inspired by X.509 subject key identifiers, so a hash over the subject public
+// key info.
+func (i *JWTIssuer) GetKeyPair() (any, crypto.PrivateKey, string, error) {
 	// See JWTIssuer documentation for notes on caching.
 	tlsCertificate, err := tls.LoadX509KeyPair(i.tLSCertPath, i.tLSKeyPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	if len(tlsCertificate.Certificate) != 1 {
-		return nil, nil, fmt.Errorf("%w: unexpected certificate chain", ErrKeyFormat)
+		return nil, nil, "", fmt.Errorf("%w: unexpected certificate chain", ErrKeyFormat)
 	}
 
 	certificate, err := x509.ParseCertificate(tlsCertificate.Certificate[0])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	if certificate.PublicKeyAlgorithm != x509.ECDSA {
-		return nil, nil, fmt.Errorf("%w: certifcate public key algorithm is not ECDSA", ErrKeyFormat)
+		return nil, nil, "", fmt.Errorf("%w: certifcate public key algorithm is not ECDSA", ErrKeyFormat)
 	}
 
-	return certificate.PublicKey, tlsCertificate.PrivateKey, nil
+	kid := sha256.Sum256(certificate.RawSubjectPublicKeyInfo)
+
+	return certificate.PublicKey, tlsCertificate.PrivateKey, base64.RawURLEncoding.EncodeToString(kid[:]), nil
 }
 
 func (i *JWTIssuer) EncodeJWEToken(claims interface{}) (string, error) {
-	publicKey, privateKey, err := i.GetKeyPair()
+	publicKey, privateKey, kid, err := i.GetKeyPair()
 	if err != nil {
 		return "", fmt.Errorf("failed to get key pair: %w", err)
 	}
@@ -117,6 +123,7 @@ func (i *JWTIssuer) EncodeJWEToken(claims interface{}) (string, error) {
 	recipient := jose.Recipient{
 		Algorithm: jose.ECDH_ES,
 		Key:       publicKey,
+		KeyID:     kid,
 	}
 
 	encrypterOptions := &jose.EncrypterOptions{}
@@ -136,7 +143,7 @@ func (i *JWTIssuer) EncodeJWEToken(claims interface{}) (string, error) {
 }
 
 func (i *JWTIssuer) DecodeJWEToken(tokenString string, claims interface{}) error {
-	publicKey, privateKey, err := i.GetKeyPair()
+	publicKey, privateKey, _, err := i.GetKeyPair()
 	if err != nil {
 		return fmt.Errorf("failed to get key pair: %w", err)
 	}
@@ -158,4 +165,23 @@ func (i *JWTIssuer) DecodeJWEToken(tokenString string, claims interface{}) error
 	}
 
 	return nil
+}
+
+func (i *JWTIssuer) JWKS() (*jose.JSONWebKeySet, error) {
+	pub, _, kid, err := i.GetKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	jwks := &jose.JSONWebKeySet{
+		Keys: []jose.JSONWebKey{
+			{
+				Key:   pub,
+				KeyID: kid,
+				Use:   "sig",
+			},
+		},
+	}
+
+	return jwks, nil
 }
