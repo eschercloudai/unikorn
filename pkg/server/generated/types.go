@@ -107,6 +107,9 @@ type ControlPlanes = []ControlPlane
 // Hour An hour of the day in UTC.
 type Hour = int
 
+// JsonWebKeySet JSON web key set.
+type JsonWebKeySet = []map[string]interface{}
+
 // KubernetesCluster Unikorn Kubernetes cluster creation parameters.
 type KubernetesCluster struct {
 	// Api Kubernetes API settings.
@@ -454,13 +457,16 @@ type TokenRequestOptions1 struct {
 	GrantType *interface{} `json:"grant_type,omitempty"`
 }
 
-// TokenScope Password authentication scope.
+// TokenScope Openstack token scope.
 type TokenScope struct {
-	// Project Openstack project scoping.
-	Project struct {
-		// Id Openstack project ID.
-		Id string `json:"id"`
-	} `json:"project"`
+	// Project Openstack token project scope.
+	Project TokenScopeProject `json:"project"`
+}
+
+// TokenScopeProject Openstack token project scope.
+type TokenScopeProject struct {
+	// Id Openstack project ID.
+	Id string `json:"id"`
 }
 
 // ApplicationCredentialParameter A basic string parameter.
@@ -489,6 +495,9 @@ type ForbiddenResponse = Oauth2Error
 
 // InternalServerErrorResponse Generic error message.
 type InternalServerErrorResponse = Oauth2Error
+
+// JwksResponse JSON web key set.
+type JwksResponse = JsonWebKeySet
 
 // KubernetesClusterResponse Unikorn Kubernetes cluster creation parameters.
 type KubernetesClusterResponse = KubernetesCluster
@@ -541,7 +550,7 @@ type CreateControlPlaneRequest = ControlPlane
 // CreateKubernetesClusterRequest Unikorn Kubernetes cluster creation parameters.
 type CreateKubernetesClusterRequest = KubernetesCluster
 
-// TokenScopeRequest Password authentication scope.
+// TokenScopeRequest Openstack token scope.
 type TokenScopeRequest = TokenScope
 
 // PostApiV1AuthOauth2TokensFormdataRequestBody defines body for PostApiV1AuthOauth2Tokens for application/x-www-form-urlencoded ContentType.

@@ -175,6 +175,7 @@ $(SRVGENDIR): $(SRVSCHEMA)
 	oapi-codegen -generate spec -package $(SRVGENPKG) $< > $(SRVGENDIR)/schema.go
 	oapi-codegen -generate types -package $(SRVGENPKG) $< > $(SRVGENDIR)/types.go
 	oapi-codegen -generate chi-server -package $(SRVGENPKG) $< > $(SRVGENDIR)/router.go
+	oapi-codegen -generate client -package $(SRVGENPKG) $< > $(SRVGENDIR)/client.go
 	@touch $@
 
 # When checking out, the files timestamps are pretty much random, and make cause

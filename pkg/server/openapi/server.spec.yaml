@@ -70,6 +70,16 @@ paths:
           $ref: '#/components/responses/unauthorizedResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
+  /api/v1/auth/jwks:
+    description: JSON web key set endpoint.
+    get:
+      description: |-
+        Returns an array of public keys used to verify JWT tokens issued by
+        this server.
+      x-no-security-requirements: true
+      responses:
+        '200':
+          $ref: '#/components/responses/jwksResponse'
   /api/v1/project:
     description: Unikorn project services.
     get:
@@ -674,21 +684,23 @@ components:
             enum:
             - password
     tokenScope:
-      description: Password authentication scope.
+      description: Openstack token scope.
       type: object
       required:
       - project
       properties:
         project:
-          description: Openstack project scoping.
-          type: object
-          required:
-          - id
-          properties:
-            id:
-              description: Openstack project ID.
-              type: string
-          additionalProperties: false
+          $ref: '#/components/schemas/tokenScopeProject'
+    tokenScopeProject:
+      description: Openstack token project scope.
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          description: Openstack project ID.
+          type: string
+      additionalProperties: false
     token:
       description: Oauth2 token result.
       type: object
@@ -710,6 +722,12 @@ components:
         email:
           description: The user's email address.
           type: string
+    jsonWebKeySet:
+      description: JSON web key set.
+      type: array
+      items:
+        description: JSON web key.
+        type: object
     kubernetesResourceStatus:
       description: A Kubernetes resource status.
       type: object
@@ -1262,6 +1280,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/token'
+    jwksResponse:
+      description: A JSON web key set.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/jsonWebKeySet'
     projectResponse:
       description: A Unikorn project.
       content:

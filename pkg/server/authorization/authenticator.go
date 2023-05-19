@@ -109,3 +109,7 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (*ge
 
 	return result, nil
 }
+
+func (a *Authenticator) JWKS() (interface{}, error) {
+	return a.issuer.JWKS()
+}

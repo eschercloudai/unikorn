@@ -21,6 +21,9 @@ type ServerInterface interface {
 	// (GET /api/v1/applicationBundles/controlPlane)
 	GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, r *http.Request)
 
+	// (GET /api/v1/auth/jwks)
+	GetApiV1AuthJwks(w http.ResponseWriter, r *http.Request)
+
 	// (GET /api/v1/auth/oauth2/authorization)
 	GetApiV1AuthOauth2Authorization(w http.ResponseWriter, r *http.Request)
 
@@ -140,6 +143,21 @@ func (siw *ServerInterfaceWrapper) GetApiV1ApplicationBundlesControlPlane(w http
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetApiV1ApplicationBundlesControlPlane(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetApiV1AuthJwks operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1AuthJwks(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1AuthJwks(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -894,6 +912,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/applicationBundles/controlPlane", wrapper.GetApiV1ApplicationBundlesControlPlane)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/auth/jwks", wrapper.GetApiV1AuthJwks)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/auth/oauth2/authorization", wrapper.GetApiV1AuthOauth2Authorization)

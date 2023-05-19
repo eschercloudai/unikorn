@@ -111,6 +111,17 @@ func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Reques
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
+func (h *Handler) GetApiV1AuthJwks(w http.ResponseWriter, r *http.Request) {
+	result, err := h.authenticator.JWKS()
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setUncacheable(w)
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
 func (h *Handler) GetApiV1Project(w http.ResponseWriter, r *http.Request) {
 	result, err := project.NewClient(h.client).Get(r.Context())
 	if err != nil {
