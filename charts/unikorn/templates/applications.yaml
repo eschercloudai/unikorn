@@ -183,3 +183,12 @@ spec:
   version: 0.16.2
   createNamespace: true
   interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: cert-manager-issuers-1.0.0-1
+spec:
+  repo: https://eschercloudai.github.io/helm-addons
+  chart: cert-manager-issuers
+  version: 1.0.0

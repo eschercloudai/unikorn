@@ -24,6 +24,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/conditional"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanager"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanagerissuers"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/cilium"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterautoscaler"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
@@ -60,6 +61,7 @@ type Provisioner struct {
 	clusterAutoscalerApplication        *unikornv1.HelmApplication
 	nginxIngressApplication             *unikornv1.HelmApplication
 	certManagerApplication              *unikornv1.HelmApplication
+	certManagerIssuersApplication       *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
@@ -80,6 +82,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	unbundler.AddApplication(&provisioner.metricsServerApplication, "metrics-server")
 	unbundler.AddApplication(&provisioner.nginxIngressApplication, "nginx-ingress", util.Optional)
 	unbundler.AddApplication(&provisioner.certManagerApplication, "cert-manager", util.Optional)
+	unbundler.AddApplication(&provisioner.certManagerIssuersApplication, "cert-manager-issuers", util.Optional)
 
 	if err := unbundler.Unbundle(ctx, client); err != nil {
 		return nil, err
@@ -150,7 +153,10 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 				func() bool {
 					return p.certManagerApplication != nil && p.cluster.CertManagerEnabled()
 				},
-				certmanager.New(p.client, p.cluster, p.certManagerApplication).OnRemote(remote),
+				serial.New("cert-manager",
+					certmanager.New(p.client, p.cluster, p.certManagerApplication).OnRemote(remote),
+					certmanagerissuers.New(p.client, p.cluster, p.certManagerIssuersApplication).OnRemote(remote),
+				),
 			),
 		),
 	)

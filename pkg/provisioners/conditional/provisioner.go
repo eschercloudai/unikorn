@@ -61,6 +61,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
 	if !p.condition() {
+		// TODO: check to see if the application exists, then delete it.
 		log.Info("skipping conditional provision", "provisioner", p.name)
 
 		return nil
