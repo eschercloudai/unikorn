@@ -127,3 +127,7 @@ spec:
     reference:
       kind: HelmApplication
       name: cert-manager-1.11.0-1
+  - name: cert-manager-issuers
+    reference:
+      kind: HelmApplication
+      name: cert-manager-issuers-1.0.0-1
