@@ -166,6 +166,9 @@ type KubernetesClusterFeatures struct {
 	// Autoscaling Enable auto-scaling.
 	Autoscaling *bool `json:"autoscaling,omitempty"`
 
+	// CertManager Enable cert-manager.
+	CertManager *bool `json:"certManager,omitempty"`
+
 	// Ingress Enable an ingress controller.
 	Ingress *bool `json:"ingress,omitempty"`
 }

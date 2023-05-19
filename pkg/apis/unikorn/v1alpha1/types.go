@@ -587,6 +587,8 @@ type KubernetesClusterFeaturesSpec struct {
 	Autoscaling *bool `json:"autoscaling,omitempty"`
 	// Ingress, if true, provisions an Nginx ingress controller.
 	Ingress *bool `json:"ingress,omitempty"`
+	// CertManager, if true, provisions cert-manager.
+	CertManager *bool `json:"certManager,omitempty"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {

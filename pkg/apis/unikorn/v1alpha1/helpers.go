@@ -106,6 +106,7 @@ func (c *Project) UpdateAvailableCondition(status corev1.ConditionStatus, reason
 // if it were to be placed in a single global namespace.
 func (c *Project) ResourceLabels() (labels.Set, error) {
 	labels := labels.Set{
+		constants.KindLabel:    constants.KindLabelValueProject,
 		constants.ProjectLabel: c.Name,
 	}
 
@@ -171,6 +172,7 @@ func (c *ControlPlane) ResourceLabels() (labels.Set, error) {
 	}
 
 	labels := labels.Set{
+		constants.KindLabel:         constants.KindLabelValueControlPlane,
 		constants.ProjectLabel:      project,
 		constants.ControlPlaneLabel: c.Name,
 	}
@@ -259,6 +261,7 @@ func (c *KubernetesCluster) ResourceLabels() (labels.Set, error) {
 	}
 
 	labels := labels.Set{
+		constants.KindLabel:              constants.KindLabelValueKubernetesCluster,
 		constants.ProjectLabel:           project,
 		constants.ControlPlaneLabel:      controlPlane,
 		constants.KubernetesClusterLabel: c.Name,
@@ -292,6 +295,11 @@ func (c *KubernetesCluster) AutoscalingEnabled() bool {
 // IngressEnabled indicates whether an ingress controller is required.
 func (c *KubernetesCluster) IngressEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.Ingress != nil && *c.Spec.Features.Ingress
+}
+
+// CertManagerEnabled indicates whether cert-manager is required.
+func (c *KubernetesCluster) CertManagerEnabled() bool {
+	return c.Spec.Features != nil && c.Spec.Features.CertManager != nil && *c.Spec.Features.CertManager
 }
 
 // GetName is the name passed down to Helm.

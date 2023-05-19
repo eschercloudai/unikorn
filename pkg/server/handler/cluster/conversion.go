@@ -161,6 +161,7 @@ func convertFeatures(in *unikornv1.KubernetesCluster) *generated.KubernetesClust
 	features := &generated.KubernetesClusterFeatures{
 		Autoscaling: in.Spec.Features.Autoscaling,
 		Ingress:     in.Spec.Features.Ingress,
+		CertManager: in.Spec.Features.CertManager,
 	}
 
 	return features
@@ -485,6 +486,7 @@ func createFeatures(options *generated.KubernetesCluster) *unikornv1.KubernetesC
 	features := &unikornv1.KubernetesClusterFeaturesSpec{
 		Autoscaling: options.Features.Autoscaling,
 		Ingress:     options.Features.Ingress,
+		CertManager: options.Features.CertManager,
 	}
 
 	return features

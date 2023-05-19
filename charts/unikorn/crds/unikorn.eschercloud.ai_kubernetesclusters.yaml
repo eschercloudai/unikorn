@@ -310,6 +310,9 @@ spec:
                     description: Autoscaling, if true, provisions a cluster autoscaler
                       and allows workload pools to specify autoscaling configuration.
                     type: boolean
+                  certManager:
+                    description: CertManager, if true, provisions cert-manager.
+                    type: boolean
                   ingress:
                     description: Ingress, if true, provisions an Nginx ingress controller.
                     type: boolean
