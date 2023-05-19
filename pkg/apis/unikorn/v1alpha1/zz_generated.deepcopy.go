@@ -740,6 +740,11 @@ func (in *KubernetesClusterFeaturesSpec) DeepCopyInto(out *KubernetesClusterFeat
 		*out = new(bool)
 		**out = **in
 	}
+	if in.CertManager != nil {
+		in, out := &in.CertManager, &out.CertManager
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

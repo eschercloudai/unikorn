@@ -21,14 +21,12 @@ import (
 	"errors"
 
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/generic"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -67,20 +65,9 @@ func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
 	return p
 }
 
-func (p *Provisioner) namespaceSelector() (labels.Set, error) {
-	labels, err := p.project.ResourceLabels()
-	if err != nil {
-		return nil, err
-	}
-
-	labels[constants.KindLabel] = constants.KindLabelValueProject
-
-	return labels, nil
-}
-
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	labels, err := p.namespaceSelector()
+	labels, err := p.project.ResourceLabels()
 	if err != nil {
 		return err
 	}
@@ -115,7 +102,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	labels, err := p.namespaceSelector()
+	labels, err := p.project.ResourceLabels()
 	if err != nil {
 		return err
 	}

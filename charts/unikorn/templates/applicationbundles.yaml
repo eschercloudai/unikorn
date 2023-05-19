@@ -44,36 +44,6 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ApplicationBundle
 metadata:
-  name: kubernetes-cluster-1.0.0
-spec:
-  kind: KubernetesCluster
-  version: 1.0.0
-  endOfLife: 2022-05-01T00:00:00Z
-  applications:
-  - name: cluster-openstack
-    reference:
-      kind: HelmApplication
-      name: cluster-openstack-0.3.12-1
-  - name: cilium
-    reference:
-      kind: HelmApplication
-      name: cilium-1.12.4-1
-  - name: openstack-cloud-provider
-    reference:
-      kind: HelmApplication
-      name: openstack-cloud-provider-1.4.0-1
-  - name: cluster-autoscaler
-    reference:
-      kind: HelmApplication
-      name: cluster-autoscaler-0.0.0-1
-  - name: nvidia-gpu-operator
-    reference:
-      kind: HelmApplication
-      name: nvidia-gpu-operator-22.9.1-1
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: ApplicationBundle
-metadata:
   name: kubernetes-cluster-1.1.0
 spec:
   kind: KubernetesCluster
@@ -153,3 +123,7 @@ spec:
     reference:
       kind: HelmApplication
       name: nvidia-gpu-operator-23.3.1-1
+  - name: cert-manager
+    reference:
+      kind: HelmApplication
+      name: cert-manager-1.11.0-1

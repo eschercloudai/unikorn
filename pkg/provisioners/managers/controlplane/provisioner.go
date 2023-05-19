@@ -23,7 +23,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/generic"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanager"
@@ -35,7 +34,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -95,22 +93,11 @@ func New(ctx context.Context, client client.Client, controlPlane *unikornv1.Cont
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-func (p *Provisioner) namespaceSelector() (labels.Set, error) {
-	labels, err := p.controlPlane.ResourceLabels()
-	if err != nil {
-		return nil, err
-	}
-
-	labels[constants.KindLabel] = constants.KindLabelValueControlPlane
-
-	return labels, nil
-}
-
 // provisionNamespace creates a namespace for the control plane so that clusters
 // contained within have their own namespace and won't clash with others in the
 // same project.
 func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace, error) {
-	labels, err := p.namespaceSelector()
+	labels, err := p.controlPlane.ResourceLabels()
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +207,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	labels, err := p.namespaceSelector()
+	labels, err := p.controlPlane.ResourceLabels()
 	if err != nil {
 		return err
 	}

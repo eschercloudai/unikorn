@@ -931,6 +931,9 @@ components:
         ingress:
           description: Enable an ingress controller.
           type: boolean
+        certManager:
+          description: Enable cert-manager.
+          type: boolean
     kubernetesCluster:
       description: Unikorn Kubernetes cluster creation parameters.
       type: object

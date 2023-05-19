@@ -63,6 +63,9 @@ const (
 	// KindLabelValueControlPlane is used to denote a resource belongs to this type.
 	KindLabelValueControlPlane = "controlplane"
 
+	// KindLabelValueKubernetesCluster is used to denote a resource belongs to this type.
+	KindLabelValueKubernetesCluster = "kubernetescluster"
+
 	// ProjectLabel is a label applied to namespaces to indicate it is under
 	// control of this tool.  Useful for label selection.
 	ProjectLabel = "unikorn.eschercloud.ai/project"

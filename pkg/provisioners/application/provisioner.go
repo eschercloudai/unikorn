@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -36,7 +37,7 @@ import (
 )
 
 const (
-	// namespace is where all the applications live.  BY necessity at
+	// namespace is where all the applications live.  By necessity at
 	// present.
 	// TODO: Make this dynamic.
 	namespace = "argocd"
@@ -91,9 +92,6 @@ type Customizer interface {
 // namespace, so we use the resource to define a unique set of labels that
 // identifies that resource out of all others, and add in the application
 // name to uniquely identify the application within that resource.
-// TODO: These can still alias e.g. {a: a, app: foo} and {a: a, b: b, app: foo}
-// match when selected using the first set with the same application deployed
-// in different scopes.
 type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
@@ -277,6 +275,13 @@ func (p *Provisioner) generateResource() (*unstructured.Unstructured, error) {
 		return nil, err
 	}
 
+	// TODO: temportary hack to add "kind" to the labels.
+	labelsMap := make(map[string]interface{}, len(labels))
+
+	for k, v := range labels {
+		labelsMap[k] = v
+	}
+
 	parameters, err := p.getParameters()
 	if err != nil {
 		return nil, err
@@ -294,7 +299,7 @@ func (p *Provisioner) generateResource() (*unstructured.Unstructured, error) {
 			"metadata": map[string]interface{}{
 				"generateName": p.name + "-",
 				"namespace":    namespace,
-				"labels":       labels,
+				"labels":       labelsMap,
 			},
 			"spec": map[string]interface{}{
 				"project": "default",
@@ -356,6 +361,29 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 		return nil, err
 	}
 
+	// TODO: temportary hack to add "kind" to the labels.
+	if len(resources.Items) == 0 {
+		legacyLabels, err := p.getLabels()
+		if err != nil {
+			return nil, err
+		}
+
+		delete(legacyLabels, constants.KindLabel)
+
+		selector := labels.SelectorFromSet(legacyLabels)
+
+		noKindReq, err := labels.NewRequirement(constants.KindLabel, selection.DoesNotExist, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		selector = selector.Add(*noKindReq)
+
+		if err := p.client.List(ctx, resources, &client.ListOptions{Namespace: namespace, LabelSelector: selector}); err != nil {
+			return nil, err
+		}
+	}
+
 	var resource *unstructured.Unstructured
 
 	if len(resources.Items) > 1 {
@@ -389,6 +417,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	//nolint:nestif
 	if resource == nil {
 		log.Info("creating new application", "application", p.name)
 
@@ -403,6 +432,16 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		// Replace the specification with what we expect.
 		temp := resource.DeepCopy()
 		temp.Object["spec"] = required.Object["spec"]
+
+		// TODO: temportary hack to add "kind" to the labels.
+		labels, _, err := unstructured.NestedMap(required.Object, "metadata", "labels")
+		if err != nil {
+			return err
+		}
+
+		if err := unstructured.SetNestedMap(temp.Object, labels, "metadata", "labels"); err != nil {
+			return err
+		}
 
 		if err := p.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
 			return err
