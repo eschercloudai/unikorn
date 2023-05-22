@@ -28,6 +28,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/cilium"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterautoscaler"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/kubernetesdashboard"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/metricsserver"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nginxingress"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nvidiagpuoperator"
@@ -62,6 +63,7 @@ type Provisioner struct {
 	nginxIngressApplication             *unikornv1.HelmApplication
 	certManagerApplication              *unikornv1.HelmApplication
 	certManagerIssuersApplication       *unikornv1.HelmApplication
+	kubernetesDashboardApplication      *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
@@ -83,6 +85,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	unbundler.AddApplication(&provisioner.nginxIngressApplication, "nginx-ingress", util.Optional)
 	unbundler.AddApplication(&provisioner.certManagerApplication, "cert-manager", util.Optional)
 	unbundler.AddApplication(&provisioner.certManagerIssuersApplication, "cert-manager-issuers", util.Optional)
+	unbundler.AddApplication(&provisioner.kubernetesDashboardApplication, "kubernetes-dashboard", util.Optional)
 
 	if err := unbundler.Unbundle(ctx, client); err != nil {
 		return nil, err
@@ -139,7 +142,7 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 			cilium.New(p.client, p.cluster, p.ciliumApplication).OnRemote(remote),
 			openstackcloudprovider.New(p.client, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote),
 		),
-		concurrent.New("cluster add-ons",
+		concurrent.New("cluster add-ons wave 1",
 			openstackplugincindercsi.New(p.client, p.cluster, p.openstackPluginCinderCSIApplication).OnRemote(remote),
 			metricsserver.New(p.client, p.cluster, p.metricsServerApplication).OnRemote(remote),
 			nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote),
@@ -157,6 +160,14 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 					certmanager.New(p.client, p.cluster, p.certManagerApplication).OnRemote(remote),
 					certmanagerissuers.New(p.client, p.cluster, p.certManagerIssuersApplication).OnRemote(remote),
 				),
+			),
+		),
+		concurrent.New("cluster add-ons wave 2",
+			conditional.New("kubernetes-dashboard",
+				func() bool {
+					return p.kubernetesDashboardApplication != nil && p.cluster.KubernetesDashboardEnabled()
+				},
+				kubernetesdashboard.New(p.client, p.cluster, p.kubernetesDashboardApplication, remote).OnRemote(remote),
 			),
 		),
 	)

@@ -745,6 +745,11 @@ func (in *KubernetesClusterFeaturesSpec) DeepCopyInto(out *KubernetesClusterFeat
 		*out = new(bool)
 		**out = **in
 	}
+	if in.KubernetesDashboard != nil {
+		in, out := &in.KubernetesDashboard, &out.KubernetesDashboard
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

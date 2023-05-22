@@ -589,6 +589,9 @@ type KubernetesClusterFeaturesSpec struct {
 	Ingress *bool `json:"ingress,omitempty"`
 	// CertManager, if true, provisions cert-manager.
 	CertManager *bool `json:"certManager,omitempty"`
+	// KubernetesDashboard, if true, provisions the kubernetes dashboard.
+	// Clients must also enable the Ingress and CertManager features.
+	KubernetesDashboard *bool `json:"kubernetesDashboard,omitempty"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {

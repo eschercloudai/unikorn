@@ -82,6 +82,9 @@ const (
 	// between them.
 	ApplicationLabel = "unikorn.eschercloud.ai/application"
 
+	// IngressEndpointAnnotation helps us find the ingress IP address.
+	IngressEndpointAnnotation = "unikorn.eschercloud.ai/ingress-endpoint"
+
 	// Finalizer is applied to resources that need to be deleted manually
 	// and do other complex logic.
 	Finalizer = "unikorn"
