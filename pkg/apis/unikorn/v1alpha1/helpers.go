@@ -302,6 +302,11 @@ func (c *KubernetesCluster) CertManagerEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.CertManager != nil && *c.Spec.Features.CertManager
 }
 
+// KubernetesDashboardEnabled indicates whether the Kubernetes dashboard is required.
+func (c *KubernetesCluster) KubernetesDashboardEnabled() bool {
+	return c.Spec.Features != nil && c.Spec.Features.KubernetesDashboard != nil && *c.Spec.Features.KubernetesDashboard
+}
+
 // GetName is the name passed down to Helm.
 func (w *KubernetesWorkloadPool) GetName() string {
 	if w.Spec.Name != nil {

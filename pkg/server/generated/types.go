@@ -171,6 +171,9 @@ type KubernetesClusterFeatures struct {
 
 	// Ingress Enable an ingress controller.
 	Ingress *bool `json:"ingress,omitempty"`
+
+	// KubernetesDashboard Enable the Kubernetes dashboard.  Requires ingress and certManager to be enabled.
+	KubernetesDashboard *bool `json:"kubernetesDashboard,omitempty"`
 }
 
 // KubernetesClusterNetwork A kubernetes cluster network settings.

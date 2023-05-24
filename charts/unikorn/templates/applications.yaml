@@ -73,11 +73,11 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: cluster-openstack-0.3.13-1
+  name: cluster-openstack-0.3.15-1
 spec:
   repo: https://eschercloudai.github.io/helm-cluster-api
   chart: cluster-api-cluster-openstack
-  version: v0.3.14
+  version: v0.3.15
   createNamespace: true
   interface: 1.0.0
 ---
@@ -182,7 +182,18 @@ spec:
   chart: nginx-ingress
   version: 0.16.2
   createNamespace: true
-  interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: ingress-nginx-4.6.1-1
+spec:
+  repo: https://kubernetes.github.io/ingress-nginx
+  chart: ingress-nginx
+  version: 4.6.1
+  parameters:
+  - name: controller.service.annotations.unikorn\.eschercloud\.ai/ingress-endpoint
+    value: 'true'
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
@@ -192,3 +203,13 @@ spec:
   repo: https://eschercloudai.github.io/helm-addons
   chart: cert-manager-issuers
   version: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: kubernetes-dashboard-6.0.7-1
+spec:
+  repo: https://kubernetes.github.io/dashboard
+  chart: kubernetes-dashboard
+  version: 6.0.7
+  interface: 1.0.0

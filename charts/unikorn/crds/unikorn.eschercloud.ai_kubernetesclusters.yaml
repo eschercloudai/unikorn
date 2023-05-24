@@ -316,6 +316,11 @@ spec:
                   ingress:
                     description: Ingress, if true, provisions an Nginx ingress controller.
                     type: boolean
+                  kubernetesDashboard:
+                    description: KubernetesDashboard, if true, provisions the kubernetes
+                      dashboard. Clients must also enable the Ingress and CertManager
+                      features.
+                    type: boolean
                 type: object
               network:
                 description: Network defines the Kubernetes networking.

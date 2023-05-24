@@ -934,6 +934,9 @@ components:
         certManager:
           description: Enable cert-manager.
           type: boolean
+        kubernetesDashboard:
+          description: Enable the Kubernetes dashboard.  Requires ingress and certManager to be enabled.
+          type: boolean
     kubernetesCluster:
       description: Unikorn Kubernetes cluster creation parameters.
       type: object
