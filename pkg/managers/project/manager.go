@@ -89,6 +89,14 @@ func upgrade(ctx context.Context, c client.Client, resource *unikornv1.Project) 
 		return unikornv1.ErrMissingLabel
 	}
 
+	// Skip development versions.  This may lead to people unwittingly using old
+	// resources that don't match the requirements of a newer version, but it's
+	// better than trying to upgrade to a newer version accidentally when it's
+	// already at that version, and legacy resource selection won't work at all.
+	if version == "0.0.0" {
+		return nil
+	}
+
 	newResource := resource.DeepCopy()
 
 	// In 0.3.27, the underlying namespace for a project was augmented with the
