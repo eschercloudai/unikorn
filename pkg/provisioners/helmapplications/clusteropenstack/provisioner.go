@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/util"
@@ -302,6 +303,17 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 		openstackValues["sshKeyName"] = *p.cluster.Spec.Openstack.SSHKeyName
 	}
 
+	labels, err := p.cluster.ResourceLabels()
+	if err != nil {
+		return nil, err
+	}
+
+	serverMetadata := map[string]interface{}{
+		"cluster":      p.cluster.Name,
+		"controlPlane": labels[constants.ControlPlaneLabel],
+		"project":      labels[constants.ProjectLabel],
+	}
+
 	// TODO: generate types from the Helm values schema.
 	values := map[string]interface{}{
 		"openstack": openstackValues,
@@ -315,6 +327,7 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 					"value":  "true",
 				},
 			},
+			"serverMetadata": serverMetadata,
 		},
 		"controlPlane": map[string]interface{}{
 			"version":  string(*p.cluster.Spec.ControlPlane.Version),
