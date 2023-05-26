@@ -182,7 +182,7 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: cluster-autoscaler-openstack-0.3.16-1
+  name: cluster-autoscaler-openstack-0.1.0-1
 spec:
   repo: https://eschercloudai.github.io/helm-cluster-api
   chart: cluster-api-cluster-autoscaler-openstack
