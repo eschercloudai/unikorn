@@ -1,20 +1,6 @@
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: cert-manager-1.10.1-1
-spec:
-  repo: https://charts.jetstack.io
-  chart: cert-manager
-  version: v1.10.1
-  release: cert-manager
-  createNamespace: true
-  parameters:
-  - name: installCRDs
-    value: "true"
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
   name: cert-manager-1.11.0-1
 spec:
   repo: https://charts.jetstack.io
@@ -35,20 +21,6 @@ spec:
   chart: vcluster
   version: 0.12.1
   release: vcluster
----
-# This version (0.7.0) had an availability zone scheduling bug.
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
-  name: cluster-api-0.1.5-1
-spec:
-  repo: https://eschercloudai.github.io/helm-cluster-api
-  chart: cluster-api
-  version: v0.1.5
-  interface: 1.0.0
-  parameters:
-  - name: cluster-api-provider-openstack.image
-    value: spjmurray/capi-openstack-controller:v0.7.0-simon1
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
