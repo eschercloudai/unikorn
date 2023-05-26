@@ -96,7 +96,11 @@ spec:
   - name: cluster-autoscaler
     reference:
       kind: HelmApplication
-      name: cluster-autoscaler-0.0.0-1
+      name: cluster-autoscaler-1.27.1-1
+  - name: cluster-autoscaler-openstack
+    reference:
+      kind: HelmApplication
+      name: cluster-autoscaler-openstack-0.3.16-1
   - name: nvidia-gpu-operator
     reference:
       kind: HelmApplication

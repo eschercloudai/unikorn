@@ -136,7 +136,6 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  # Cool story bro (Nick Jones!!)
   name: cluster-autoscaler-0.0.0-1
 spec:
   repo: https://github.com/yankcrime/autoscaler
@@ -155,6 +154,39 @@ spec:
   - name: image.tag
     value: v1.26.1
   interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: cluster-autoscaler-1.27.1-1
+spec:
+  repo: https://github.com/kubernetes/autoscaler
+  path: charts/cluster-autoscaler
+  version: cluster-autoscaler-chart-9.29.0
+  interface: 1.0.0
+  parameters:
+  - name: cloudProvider
+    value: clusterapi
+  - name: clusterAPIMode
+    value: kubeconfig-incluster
+  - name: extraArgs.scale-down-delay-after-add
+    value: 5m
+  - name: extraArgs.scale-down-unneeded-time
+    value: 5m
+  - name: image.tag
+    value: v1.27.1
+  - name: rbac.serviceAccount.name
+    value: cluster-autoscaler
+  interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: cluster-autoscaler-openstack-0.3.16-1
+spec:
+  repo: https://eschercloudai.github.io/helm-cluster-api
+  chart: cluster-api-cluster-autoscaler-openstack
+  version: v0.1.0
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication

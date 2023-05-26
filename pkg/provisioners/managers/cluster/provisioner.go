@@ -27,6 +27,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanagerissuers"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/cilium"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterautoscaler"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterautoscaleropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/kubernetesdashboard"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/metricsserver"
@@ -53,17 +54,18 @@ type Provisioner struct {
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1.KubernetesCluster
 
-	clusterOpenstackApplication         *unikornv1.HelmApplication
-	ciliumApplication                   *unikornv1.HelmApplication
-	openstackCloudProviderApplication   *unikornv1.HelmApplication
-	openstackPluginCinderCSIApplication *unikornv1.HelmApplication
-	metricsServerApplication            *unikornv1.HelmApplication
-	nvidiaGPUOperatorApplication        *unikornv1.HelmApplication
-	clusterAutoscalerApplication        *unikornv1.HelmApplication
-	nginxIngressApplication             *unikornv1.HelmApplication
-	certManagerApplication              *unikornv1.HelmApplication
-	certManagerIssuersApplication       *unikornv1.HelmApplication
-	kubernetesDashboardApplication      *unikornv1.HelmApplication
+	clusterOpenstackApplication           *unikornv1.HelmApplication
+	ciliumApplication                     *unikornv1.HelmApplication
+	openstackCloudProviderApplication     *unikornv1.HelmApplication
+	openstackPluginCinderCSIApplication   *unikornv1.HelmApplication
+	metricsServerApplication              *unikornv1.HelmApplication
+	nvidiaGPUOperatorApplication          *unikornv1.HelmApplication
+	clusterAutoscalerApplication          *unikornv1.HelmApplication
+	clusterAutoscalerOpenStackApplication *unikornv1.HelmApplication
+	nginxIngressApplication               *unikornv1.HelmApplication
+	certManagerApplication                *unikornv1.HelmApplication
+	certManagerIssuersApplication         *unikornv1.HelmApplication
+	kubernetesDashboardApplication        *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
@@ -81,6 +83,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	unbundler.AddApplication(&provisioner.openstackPluginCinderCSIApplication, "openstack-plugin-cinder-csi")
 	unbundler.AddApplication(&provisioner.nvidiaGPUOperatorApplication, "nvidia-gpu-operator")
 	unbundler.AddApplication(&provisioner.clusterAutoscalerApplication, "cluster-autoscaler")
+	unbundler.AddApplication(&provisioner.clusterAutoscalerOpenStackApplication, "cluster-autoscaler-openstack")
 	unbundler.AddApplication(&provisioner.metricsServerApplication, "metrics-server")
 	unbundler.AddApplication(&provisioner.nginxIngressApplication, "nginx-ingress", util.Optional)
 	unbundler.AddApplication(&provisioner.certManagerApplication, "cert-manager", util.Optional)
@@ -120,6 +123,10 @@ func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusterop
 
 func (p *Provisioner) newClusterAutoscalerProvisioner() provisioners.Provisioner {
 	return clusterautoscaler.New(p.client, p.cluster, p.clusterAutoscalerApplication, p.cluster.Name, p.cluster.Name+"-kubeconfig").OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
+}
+
+func (p *Provisioner) newClusterAutoscalerOpenStackProvisioner() provisioners.Provisioner {
+	return clusterautoscaleropenstack.New(p.client, p.cluster, p.clusterAutoscalerOpenStackApplication, p.cluster.Name, p.cluster.Name+"-kubeconfig").OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 }
 
 // getAddonsProvisioner returns a generic provisioner for provisioning and deprovisioning.
@@ -198,7 +205,10 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		),
 		conditional.New("cluster-autoscaler",
 			p.cluster.AutoscalingEnabled,
-			p.newClusterAutoscalerProvisioner(),
+			concurrent.New("cluster-autoscaler",
+				p.newClusterAutoscalerProvisioner(),
+				p.newClusterAutoscalerOpenStackProvisioner(),
+			),
 		),
 	)
 
@@ -230,7 +240,10 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		addonsProvisioner,
 		conditional.New("cluster-autoscaler",
 			p.cluster.AutoscalingEnabled,
-			p.newClusterAutoscalerProvisioner(),
+			concurrent.New("cluster-autoscaler",
+				p.newClusterAutoscalerProvisioner(),
+				p.newClusterAutoscalerOpenStackProvisioner(),
+			),
 		),
 	)
 
