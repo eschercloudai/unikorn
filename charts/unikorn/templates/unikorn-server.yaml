@@ -125,6 +125,37 @@ spec:
         {{- if .Values.server.keystone.userDomain -}}
           {{ printf "- --keystone-user-domain-name=%s" .Values.server.keystone.userDomain | nindent 8 }}
         {{- end }}
+        {{- with $auth := .Values.server.authorization }}
+          {{- with $backend := $auth.backend }}
+            {{- with $oidc := $backend.oidc }}
+              {{- if $oidc.clientID }}
+                {{ printf "- --oidc-client-id=%s" $oidc.clientID | nindent 8 }}
+              {{- end }}
+              {{- if $oidc.issuer }}
+                {{ printf "- --oidc-issuer=%s" $oidc.issuer | nindent 8 }}
+              {{- end }}
+              {{- if $oidc.authorizationEndpoint }}
+                {{ printf "- --oidc-autorization-endpoint=%s" $oidc.authorizationEndpoint | nindent 8 }}
+              {{- end }}
+              {{- if $oidc.tokenEndpoint }}
+                {{ printf "- --oidc-token-endpoint=%s" $oidc.tokenEndpoint | nindent 8 }}
+              {{- end }}
+              {{- if $oidc.jwksURL }}
+                {{ printf "- --oidc-jwks-url=%s" $oidc.jwksURL | nindent 8 }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- with $frontend := $auth.frontend }}
+            {{- with $oauth2 := $frontend.oauth2 }}
+              {{- if $oauth2.clientID }}
+                {{ printf "- --oauth2-client-id=%s" $oauth2.clientID| nindent 8 }}
+              {{- end }}
+              {{- if $oauth2.redirectURI }}
+                {{ printf "- --oauth2-redirect-uri=%s" $oauth2.redirectURI | nindent 8 }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
         volumeMounts:
         - name: unikorn-server-jose-tls
           mountPath: /var/lib/secrets/unikorn.eschercloud.ai/jose

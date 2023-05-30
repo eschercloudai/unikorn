@@ -85,6 +85,29 @@ server:
     endpoint: "https://nl1.eschercloud.com:5000"
     userDomain: "Default"
 
+  # SSO authorization configuration.
+  # authorization:
+  #   backend:
+  #     OIDC authentication backend.
+  #     oidc:
+  #       # Client ID issued by the authorization server.
+  #       clientID: ""
+  #       # Issuer that creates id_tokens for validation.
+  #       issuer: ""
+  #       # Where to redirect to in order to get a code.
+  #       authorizationEndpoint: ""
+  #       # Where to call to exchange a code for a token.
+  #       tokenEndpoint: ""
+  #       # Where to get the java web key set for validation of id_tokens.
+  #       jwksURL: ""
+  #   frontend:
+  #     OAuth2 authorization frontend.
+  #     oauth2:
+  #       # Client ID of the UI (or another client).
+  #       clientID: ""
+  #       # Secure redirect URI of the client that does the code exchange.
+  #       redirectURI: ""
+
 # UI that works with the server.
 ui:
   # Temporarily block deployment until it's complete.
