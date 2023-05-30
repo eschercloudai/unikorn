@@ -83,7 +83,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	unbundler.AddApplication(&provisioner.openstackPluginCinderCSIApplication, "openstack-plugin-cinder-csi")
 	unbundler.AddApplication(&provisioner.nvidiaGPUOperatorApplication, "nvidia-gpu-operator")
 	unbundler.AddApplication(&provisioner.clusterAutoscalerApplication, "cluster-autoscaler")
-	unbundler.AddApplication(&provisioner.clusterAutoscalerOpenStackApplication, "cluster-autoscaler-openstack")
+	unbundler.AddApplication(&provisioner.clusterAutoscalerOpenStackApplication, "cluster-autoscaler-openstack", util.Optional)
 	unbundler.AddApplication(&provisioner.metricsServerApplication, "metrics-server")
 	unbundler.AddApplication(&provisioner.nginxIngressApplication, "nginx-ingress", util.Optional)
 	unbundler.AddApplication(&provisioner.certManagerApplication, "cert-manager", util.Optional)
@@ -207,7 +207,15 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 			p.cluster.AutoscalingEnabled,
 			concurrent.New("cluster-autoscaler",
 				p.newClusterAutoscalerProvisioner(),
-				p.newClusterAutoscalerOpenStackProvisioner(),
+				// TODO: this came in 1.2.0, so is not present in 1.1.0 thus
+				// needs to be optional temporarily otherwise everything will break
+				// on older clusters.
+				conditional.New("cluster-autoscaler-openstack",
+					func() bool {
+						return p.clusterAutoscalerOpenStackApplication != nil
+					},
+					p.newClusterAutoscalerOpenStackProvisioner(),
+				),
 			),
 		),
 	)
@@ -242,7 +250,15 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 			p.cluster.AutoscalingEnabled,
 			concurrent.New("cluster-autoscaler",
 				p.newClusterAutoscalerProvisioner(),
-				p.newClusterAutoscalerOpenStackProvisioner(),
+				// TODO: this came in 1.2.0, so is not present in 1.1.0 thus
+				// needs to be optional temporarily otherwise everything will break
+				// on older clusters.
+				conditional.New("cluster-autoscaler-openstack",
+					func() bool {
+						return p.clusterAutoscalerOpenStackApplication != nil
+					},
+					p.newClusterAutoscalerOpenStackProvisioner(),
+				),
 			),
 		),
 	)
