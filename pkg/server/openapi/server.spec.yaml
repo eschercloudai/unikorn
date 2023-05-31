@@ -715,13 +715,12 @@ components:
         access_token:
           description: The opaque access token.
           type: string
+        id_token:
+          description: An OIDC ID token.
+          type: string
         expires_in:
           description: The time in seconds the token will last for.
           type: integer
-        # TODO: this is kind like an OIDC id_token...
-        email:
-          description: The user's email address.
-          type: string
     jsonWebKeySet:
       description: JSON web key set.
       type: array

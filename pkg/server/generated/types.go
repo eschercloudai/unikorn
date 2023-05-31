@@ -418,11 +418,11 @@ type Token struct {
 	// AccessToken The opaque access token.
 	AccessToken string `json:"access_token"`
 
-	// Email The user's email address.
-	Email *string `json:"email,omitempty"`
-
 	// ExpiresIn The time in seconds the token will last for.
 	ExpiresIn int `json:"expires_in"`
+
+	// IdToken An OIDC ID token.
+	IdToken *string `json:"id_token,omitempty"`
 
 	// TokenType How the access token is to be presented to the resource server.
 	TokenType string `json:"token_type"`

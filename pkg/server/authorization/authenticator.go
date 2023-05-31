@@ -91,7 +91,7 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (*ge
 
 	// Add some scope to the claims to allow the token to do more.
 	oAuth2Scope := &oauth2.ScopeList{
-		Scopes: []oauth2.Scope{
+		Scopes: []oauth2.APIScope{
 			oauth2.ScopeProject,
 		},
 	}

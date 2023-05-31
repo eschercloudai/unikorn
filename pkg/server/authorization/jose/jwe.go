@@ -104,6 +104,25 @@ func (i *JWTIssuer) GetKeyPair() (any, crypto.PrivateKey, string, error) {
 	return certificate.PublicKey, tlsCertificate.PrivateKey, base64.RawURLEncoding.EncodeToString(kid[:]), nil
 }
 
+func (i *JWTIssuer) EncodeJWT(claims interface{}) (string, error) {
+	_, privateKey, _, err := i.GetKeyPair()
+	if err != nil {
+		return "", fmt.Errorf("failed to get key pair: %w", err)
+	}
+
+	signingKey := jose.SigningKey{
+		Algorithm: jose.ES512,
+		Key:       privateKey,
+	}
+
+	signer, err := jose.NewSigner(signingKey, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create signer: %w", err)
+	}
+
+	return jwt.Signed(signer).Claims(claims).CompactSerialize()
+}
+
 func (i *JWTIssuer) EncodeJWEToken(claims interface{}) (string, error) {
 	publicKey, privateKey, kid, err := i.GetKeyPair()
 	if err != nil {
