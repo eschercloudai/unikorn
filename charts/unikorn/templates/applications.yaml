@@ -25,6 +25,16 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
+  name: vcluster-0.15.0-1
+spec:
+  repo: https://charts.loft.sh
+  chart: vcluster
+  version: 0.15.0
+  release: vcluster
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
   name: cluster-api-0.1.7-1
 spec:
   repo: https://eschercloudai.github.io/helm-cluster-api
