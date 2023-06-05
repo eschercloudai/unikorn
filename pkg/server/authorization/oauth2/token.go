@@ -44,17 +44,17 @@ var (
 	ErrContextError = errors.New("value missing from context")
 )
 
-// Scope defines security context scopes for an API request.
-type Scope string
+// APIScope defines security context scopes for an API request.
+type APIScope string
 
 const (
 	// ScopeProject tells us the claims token is project scoped.
-	ScopeProject Scope = "project"
+	ScopeProject APIScope = "project"
 )
 
 // ScopeList defines a list of scopes.
 type ScopeList struct {
-	Scopes []Scope
+	Scopes []APIScope
 }
 
 // Ensure the correct interfaces are implemented.
@@ -62,7 +62,7 @@ var _ json.Marshaler = &ScopeList{}
 var _ json.Unmarshaler = &ScopeList{}
 
 // Includes tells you whether a scurity requirement is fulfilled.
-func (l *ScopeList) Includes(scope Scope) bool {
+func (l *ScopeList) Includes(scope APIScope) bool {
 	if l == nil {
 		return false
 	}
@@ -102,10 +102,10 @@ func (l *ScopeList) UnmarshalJSON(value []byte) error {
 
 	scopes := strings.Split(list, " ")
 
-	l.Scopes = make([]Scope, len(scopes))
+	l.Scopes = make([]APIScope, len(scopes))
 
 	for i := range scopes {
-		l.Scopes[i] = Scope(scopes[i])
+		l.Scopes[i] = APIScope(scopes[i])
 	}
 
 	return nil
