@@ -31,6 +31,9 @@ spec:
   chart: vcluster
   version: 0.15.0
   release: vcluster
+  parameters:
+  - name: hostpathMapper.enabled
+    value: 'true'
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
