@@ -18,12 +18,14 @@ package oauth2
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -103,6 +105,39 @@ const (
 	ErrorServerError             Error = "server_error"
 )
 
+// Scope wraps up scope functionality.
+type Scope []string
+
+// NewScope takes a raw scope from a query and return a canonical scope type.
+func NewScope(s string) Scope {
+	return Scope(strings.Split(s, " "))
+}
+
+// Has returns true if a scope exists.
+func (s Scope) Has(scope string) bool {
+	for _, value := range s {
+		if value == scope {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IDToken defines an OIDC id_token.
+type IDToken struct {
+	// These are default claims you always get.
+	Issuer   string   `json:"iss"`
+	Subject  string   `json:"sub"`
+	Audience []string `json:"aud"`
+	Expiry   int64    `json:"exp"`
+	IssuedAt int64    `json:"iat"`
+	Nonce    string   `json:"nonce,omitempty"`
+	// Optional claims that must be asked for.
+	Email   string `json:"email,omitempty"`
+	Picture string `json:"picture,omitempty"`
+}
+
 // State records state across the call to the authorization server.
 // This must be encrypted with JWE.
 type State struct {
@@ -122,6 +157,10 @@ type State struct {
 	// authenticate we are handing the authorization token back to the
 	// correct client.
 	ClientCodeChallenge string `json:"ccc"`
+	// ClientScope records the requested client scope.
+	ClientScope Scope `json:"csc,omitempty"`
+	// ClientNonce is injected into a OIDC id_token.
+	ClientNonce string `json:"cno,omitempty"`
 }
 
 // Code is an authorization code to return to the client that can be
@@ -139,6 +178,10 @@ type Code struct {
 	// authenticate we are handing the authorization token back to the
 	// correct client.
 	ClientCodeChallenge string `json:"ccc"`
+	// ClientScope records the requested client scope.
+	ClientScope Scope `json:"csc,omitempty"`
+	// ClientNonce is injected into a OIDC id_token.
+	ClientNonce string `json:"cno,omitempty"`
 	// KeystoneToken is the exchanged keystone token.
 	KeystoneToken string `json:"kst"`
 	// KeystoneUserID is exactly that.
@@ -324,6 +367,15 @@ func (a *Authenticator) Authorization(w http.ResponseWriter, r *http.Request) {
 		ClientCodeChallenge: query.Get("code_challenge"),
 	}
 
+	// To implement OIDC we need a copy of the scopes.
+	if query.Has("scope") {
+		oidcState.ClientScope = NewScope(query.Get("scope"))
+	}
+
+	if query.Has("nonce") {
+		oidcState.ClientNonce = query.Get("nonce")
+	}
+
 	state, err := a.issuer.EncodeJWEToken(oidcState)
 	if err != nil {
 		authorizationError(w, r, clientRedirectURI, ErrorServerError, "failed to encode oidc state: "+err.Error())
@@ -413,8 +465,6 @@ func (a *Authenticator) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(`{"id_token":"` + idTokenRaw + `"}`)
-
 	idToken, err := a.oidcExtractIDToken(r.Context(), idTokenRaw)
 	if err != nil {
 		authorizationError(w, r, state.ClientRedirectURI, ErrorServerError, "id_token verification failed: "+err.Error())
@@ -444,6 +494,8 @@ func (a *Authenticator) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		ClientID:            state.ClientID,
 		ClientRedirectURI:   state.ClientRedirectURI,
 		ClientCodeChallenge: state.ClientCodeChallenge,
+		ClientScope:         state.ClientScope,
+		ClientNonce:         state.ClientNonce,
 		KeystoneToken:       token,
 		KeystoneUserID:      tokenMeta.Token.User.ID,
 		Email:               claims.Email,
@@ -505,6 +557,45 @@ func tokenValidateCode(code *Code, r *http.Request) error {
 	return nil
 }
 
+// oidcPicture returns a URL to a picture for the user.
+func oidcPicture(email string) string {
+	//nolint:gosec
+	return fmt.Sprintf("https://www.gravatar.com/avatar/%x", md5.Sum([]byte(email)))
+}
+
+// oidcIDToken builds an OIDC ID token.
+func (a *Authenticator) oidcIDToken(r *http.Request, scope Scope, expiry time.Time, clientID, email string) (*string, error) {
+	//nolint:nilnil
+	if !scope.Has("openid") {
+		return nil, nil
+	}
+
+	claims := &IDToken{
+		Issuer:  "https://" + r.Host,
+		Subject: email,
+		Audience: []string{
+			clientID,
+		},
+		Expiry:   expiry.Unix(),
+		IssuedAt: time.Now().Unix(),
+	}
+
+	if scope.Has("email") {
+		claims.Email = email
+	}
+
+	if scope.Has("picture") {
+		claims.Picture = oidcPicture(email)
+	}
+
+	idToken, err := a.issuer.EncodeJWT(claims)
+	if err != nil {
+		return nil, err
+	}
+
+	return &idToken, nil
+}
+
 // Token issues an OAuth2 access token from the provided autorization code.
 func (a *Authenticator) Token(w http.ResponseWriter, r *http.Request) (*generated.Token, error) {
 	if err := r.ParseForm(); err != nil {
@@ -513,7 +604,7 @@ func (a *Authenticator) Token(w http.ResponseWriter, r *http.Request) (*generate
 
 	// TODO: DELETE ME!!!!! See comments below.
 	if r.Form.Get("grant_type") == "password" {
-		return a.TokenPassword(w, r)
+		return a.tokenPassword(r)
 	}
 
 	if err := tokenValidate(r); err != nil {
@@ -540,11 +631,17 @@ func (a *Authenticator) Token(w http.ResponseWriter, r *http.Request) (*generate
 		return nil, err
 	}
 
+	// Handle OIDC.
+	idToken, err := a.oidcIDToken(r, code.ClientScope, code.Expiry, r.Form.Get("client_id"), code.Email)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &generated.Token{
 		TokenType:   "Bearer",
 		AccessToken: accessToken,
+		IdToken:     idToken,
 		ExpiresIn:   int(time.Until(code.Expiry).Seconds()),
-		Email:       &code.Email,
 	}
 
 	return result, nil
@@ -563,14 +660,16 @@ func tokenPasswordValidate(r *http.Request) error {
 		}
 	}
 
+	// TODO: if the openid scope is defined, then we need a client ID also to set
+	// the audience in the id_token.
 	return nil
 }
 
-// TokenPassword does username/password style logins.  This should never, ever be used, and
+// tokenPassword does username/password style logins.  This should never, ever be used, and
 // is dropped as of oauth2.1.  Part of the problem is that unlike the authorization flow callback
 // there are potentially a whole load of 3rd party scripts running to inject a supply chain attack
 // and steal either the credentials or the access token.
-func (a *Authenticator) TokenPassword(w http.ResponseWriter, r *http.Request) (*generated.Token, error) {
+func (a *Authenticator) tokenPassword(r *http.Request) (*generated.Token, error) {
 	if err := tokenPasswordValidate(r); err != nil {
 		return nil, err
 	}
@@ -590,15 +689,18 @@ func (a *Authenticator) TokenPassword(w http.ResponseWriter, r *http.Request) (*
 		return nil, err
 	}
 
-	// TODO: the email is not the username, and needs another call to keystone as it's
-	// not returned, or supported by gophrcloud at least.
-	email := r.Form.Get("username")
+	// TODO: the email is not necessarily the username, and needs another call
+	// to keystone as it's not returned, or supported by gophercloud at least.
+	idToken, err := a.oidcIDToken(r, NewScope(r.Form.Get("scope")), token.ExpiresAt, r.Form.Get("client_id"), r.Form.Get("username"))
+	if err != nil {
+		return nil, err
+	}
 
 	result := &generated.Token{
 		TokenType:   "Bearer",
 		AccessToken: accessToken,
+		IdToken:     idToken,
 		ExpiresIn:   int(time.Until(token.ExpiresAt).Seconds()),
-		Email:       &email,
 	}
 
 	return result, nil
