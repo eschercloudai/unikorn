@@ -85,16 +85,6 @@ func New(client client.Client, generator provisioners.RemoteCluster) *Provisione
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-// OnRemote implements the Provision interface.
-func (p *Provisioner) OnRemote(_ provisioners.RemoteCluster) provisioners.Provisioner {
-	return p
-}
-
-// InNamespace implements the Provision interface.
-func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
-	return p
-}
-
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)

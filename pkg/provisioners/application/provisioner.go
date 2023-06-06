@@ -114,6 +114,11 @@ type Provisioner struct {
 
 	// application is the generic Helm application descriptor.
 	application *unikornv1.HelmApplication
+
+	// backgroundDelete means we don't care about whether it's deprovisioned
+	// successfully or not, especially useful for flaky apps living in a
+	// remote cluster that going to get terminated anyway.
+	backgroundDelete bool
 }
 
 // New returns a new initialized provisioner object.
@@ -130,14 +135,14 @@ func New(client client.Client, name string, resource MutuallyExclusiveResource, 
 var _ provisioners.Provisioner = &Provisioner{}
 
 // OnRemote implements the Provision interface.
-func (p *Provisioner) OnRemote(remote provisioners.RemoteCluster) provisioners.Provisioner {
+func (p *Provisioner) OnRemote(remote provisioners.RemoteCluster) *Provisioner {
 	p.remote = remote
 
 	return p
 }
 
 // InNamespace deploys the application into an explicit namespace.
-func (p *Provisioner) InNamespace(namespace string) provisioners.Provisioner {
+func (p *Provisioner) InNamespace(namespace string) *Provisioner {
 	p.namespace = namespace
 
 	return p
@@ -147,6 +152,12 @@ func (p *Provisioner) InNamespace(namespace string) provisioners.Provisioner {
 // you cannot do it all from the default set of arguments.
 func (p *Provisioner) WithGenerator(generator interface{}) *Provisioner {
 	p.generator = generator
+
+	return p
+}
+
+func (p *Provisioner) BackgroundDelete() *Provisioner {
+	p.backgroundDelete = true
 
 	return p
 }
@@ -502,10 +513,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("waiting for application deletion", "application", p.name)
+	if !p.backgroundDelete {
+		log.Info("waiting for application deletion", "application", p.name)
 
-	if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, resource)).Check(ctx); err != nil {
-		return err
+		if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, resource)).Check(ctx); err != nil {
+			return err
+		}
 	}
 
 	log.Info("application deleted", "application", p.name)

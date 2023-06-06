@@ -56,18 +56,6 @@ func NewResourceProvisioner(client client.Client, resource client.Object) *Resou
 	}
 }
 
-// OnRemote implements the Provision interface.
-func (p *ResourceProvisioner) OnRemote(remote provisioners.RemoteCluster) provisioners.Provisioner {
-	p.remote = remote
-
-	return p
-}
-
-// InNamespace implements the Provision interface.
-func (p *ResourceProvisioner) InNamespace(_ string) provisioners.Provisioner {
-	return p
-}
-
 // getClient either uses the current client, or gets a new remote one.
 func (p *ResourceProvisioner) getClient(ctx context.Context) (client.Client, error) {
 	client := p.client

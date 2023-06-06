@@ -58,16 +58,6 @@ func NewKubectlProvisioner(config *genericclioptions.ConfigFlags, path string) *
 	}
 }
 
-// OnRemote implements the Provision interface.
-func (p *KubectlProvisioner) OnRemote(_ provisioners.RemoteCluster) provisioners.Provisioner {
-	return p
-}
-
-// InNamespace implements the Provision interface.
-func (p *KubectlProvisioner) InNamespace(_ string) provisioners.Provisioner {
-	return p
-}
-
 // Provision implements the Provision interface.
 func (p *KubectlProvisioner) Provision(_ context.Context) error {
 	var args []string
