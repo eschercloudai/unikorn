@@ -46,13 +46,6 @@ type RemoteCluster interface {
 // packages in a technology agnostic way.  For example some things may be
 // installed as a raw set of resources, a YAML manifest, Helm etc.
 type Provisioner interface {
-	// OnRemote allows a provisioner to target a specific cluster.
-	OnRemote(RemoteCluster) Provisioner
-
-	// InNamespace allows the setting of the provisioning namespace
-	// at a generic level.
-	InNamespace(string) Provisioner
-
 	// Provision deploys the requested package.
 	// Implementations should ensure this receiver is idempotent.
 	Provision(context.Context) error

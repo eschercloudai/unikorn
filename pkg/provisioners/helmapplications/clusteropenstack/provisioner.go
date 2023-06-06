@@ -64,7 +64,7 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(ctx context.Context, client client.Client, cluster *unikornv1.KubernetesCluster, application *unikornv1.HelmApplication) (provisioners.Provisioner, error) {
+func New(ctx context.Context, client client.Client, cluster *unikornv1.KubernetesCluster, application *unikornv1.HelmApplication) (*Provisioner, error) {
 	// Do this once so it's atomic, we don't want it changing in different
 	// places.
 	workloadPools, err := getWorkloadPools(ctx, client, cluster)
@@ -98,14 +98,14 @@ var _ application.ReleaseNamer = &Provisioner{}
 var _ application.ValuesGenerator = &Provisioner{}
 
 // OnRemote implements the Provision interface.
-func (p *Provisioner) OnRemote(remote provisioners.RemoteCluster) provisioners.Provisioner {
+func (p *Provisioner) OnRemote(remote provisioners.RemoteCluster) *Provisioner {
 	p.remote = remote
 
 	return p
 }
 
 // InNamespace implements the Provision interface.
-func (p *Provisioner) InNamespace(namespace string) provisioners.Provisioner {
+func (p *Provisioner) InNamespace(namespace string) *Provisioner {
 	p.namespace = namespace
 
 	return p

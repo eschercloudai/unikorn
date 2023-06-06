@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
@@ -48,7 +47,7 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, cluster *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) provisioners.Provisioner {
+func New(client client.Client, cluster *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
 	provisioner := &Provisioner{
 		client:  client,
 		cluster: cluster,

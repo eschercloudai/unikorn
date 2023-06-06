@@ -100,16 +100,6 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-// OnRemote implements the Provision interface.
-func (p *Provisioner) OnRemote(_ provisioners.RemoteCluster) provisioners.Provisioner {
-	return p
-}
-
-// InNamespace implements the Provision interface.
-func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
-	return p
-}
-
 // getRemoteClusterGenerator returns a generator capable of reading the cluster
 // kubeconfig from the underlying control plane.
 func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusteropenstack.RemoteClusterGenerator, error) {
@@ -146,26 +136,26 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 	provisioner := serial.New("cluster add-ons",
 		remotecluster.New(p.client, remote),
 		concurrent.New("cluster bootstrap",
-			cilium.New(p.client, p.cluster, p.ciliumApplication).OnRemote(remote),
-			openstackcloudprovider.New(p.client, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote),
+			cilium.New(p.client, p.cluster, p.ciliumApplication).OnRemote(remote).BackgroundDelete(),
+			openstackcloudprovider.New(p.client, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote).BackgroundDelete(),
 		),
 		concurrent.New("cluster add-ons wave 1",
-			openstackplugincindercsi.New(p.client, p.cluster, p.openstackPluginCinderCSIApplication).OnRemote(remote),
-			metricsserver.New(p.client, p.cluster, p.metricsServerApplication).OnRemote(remote),
-			nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote),
+			openstackplugincindercsi.New(p.client, p.cluster, p.openstackPluginCinderCSIApplication).OnRemote(remote).BackgroundDelete(),
+			metricsserver.New(p.client, p.cluster, p.metricsServerApplication).OnRemote(remote).BackgroundDelete(),
+			nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote).BackgroundDelete(),
 			conditional.New("nginx-ingress",
 				func() bool {
 					return p.nginxIngressApplication != nil && p.cluster.IngressEnabled()
 				},
-				nginxingress.New(p.client, p.cluster, p.nginxIngressApplication).OnRemote(remote),
+				nginxingress.New(p.client, p.cluster, p.nginxIngressApplication).OnRemote(remote).BackgroundDelete(),
 			),
 			conditional.New("cert-manager",
 				func() bool {
 					return p.certManagerApplication != nil && p.cluster.CertManagerEnabled()
 				},
 				serial.New("cert-manager",
-					certmanager.New(p.client, p.cluster, p.certManagerApplication).OnRemote(remote),
-					certmanagerissuers.New(p.client, p.cluster, p.certManagerIssuersApplication).OnRemote(remote),
+					certmanager.New(p.client, p.cluster, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
+					certmanagerissuers.New(p.client, p.cluster, p.certManagerIssuersApplication).OnRemote(remote).BackgroundDelete(),
 				),
 			),
 		),
@@ -174,7 +164,7 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 				func() bool {
 					return p.kubernetesDashboardApplication != nil && p.cluster.KubernetesDashboardEnabled()
 				},
-				kubernetesdashboard.New(p.client, p.cluster, p.kubernetesDashboardApplication, remote).OnRemote(remote),
+				kubernetesdashboard.New(p.client, p.cluster, p.kubernetesDashboardApplication, remote).OnRemote(remote).BackgroundDelete(),
 			),
 		),
 	)

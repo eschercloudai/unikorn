@@ -53,7 +53,7 @@ type Provisioner struct {
 var _ application.ValuesGenerator = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication, remote provisioners.RemoteCluster) provisioners.Provisioner {
+func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication, remote provisioners.RemoteCluster) *application.Provisioner {
 	p := &Provisioner{
 		remote: remote,
 	}

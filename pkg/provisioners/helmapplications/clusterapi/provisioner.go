@@ -18,7 +18,6 @@ package clusterapi
 
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,7 +36,7 @@ type Provisioner struct{}
 var _ application.Customizer = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) provisioners.Provisioner {
+func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
 	return application.New(client, applicationName, resource, helm).WithGenerator(&Provisioner{})
 }
 

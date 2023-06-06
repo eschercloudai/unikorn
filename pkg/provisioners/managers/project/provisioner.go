@@ -55,16 +55,6 @@ func New(client client.Client, project *unikornv1alpha1.Project) *Provisioner {
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
-// OnRemote implements the Provision interface.
-func (p *Provisioner) OnRemote(_ provisioners.RemoteCluster) provisioners.Provisioner {
-	return p
-}
-
-// InNamespace implements the Provision interface.
-func (p *Provisioner) InNamespace(_ string) provisioners.Provisioner {
-	return p
-}
-
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	labels, err := p.project.ResourceLabels()

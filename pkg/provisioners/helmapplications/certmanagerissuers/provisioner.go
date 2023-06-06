@@ -18,7 +18,6 @@ package certmanagerissuers
 
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +29,6 @@ const (
 )
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) provisioners.Provisioner {
+func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
 	return application.New(client, applicationName, resource, helm)
 }
