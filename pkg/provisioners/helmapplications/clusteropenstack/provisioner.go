@@ -123,6 +123,10 @@ func (p *Provisioner) generateMachineHelmValues(machine *unikornv1.MachineGeneri
 		object["failureDomain"] = *failureDomain
 	}
 
+	if machine.ServerGroupID != nil {
+		object["serverGroupID"] = *machine.ServerGroupID
+	}
+
 	if machine.DiskSize != nil {
 		disk := map[string]interface{}{
 			"size": machine.DiskSize.Value() >> 30,

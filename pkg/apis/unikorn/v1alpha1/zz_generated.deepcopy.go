@@ -1175,6 +1175,11 @@ func (in *MachineGeneric) DeepCopyInto(out *MachineGeneric) {
 		*out = new(int)
 		**out = **in
 	}
+	if in.ServerGroupID != nil {
+		in, out := &in.ServerGroupID, &out.ServerGroupID
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

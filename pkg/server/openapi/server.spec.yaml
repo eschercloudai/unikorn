@@ -919,6 +919,9 @@ components:
           type: string
         disk:
           $ref: '#/components/schemas/openstackVolume'
+        serverGroupID:
+          description: Openstack server group to provision the machine in.
+          type: string
     kubernetesClusterAutoscaling:
       description: A Kubernetes cluster workload pool autoscaling configuration.
       type: object

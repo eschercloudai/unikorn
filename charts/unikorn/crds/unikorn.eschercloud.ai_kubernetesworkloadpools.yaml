@@ -166,6 +166,11 @@ spec:
                 description: Replicas is the initial pool size to deploy.
                 minimum: 0
                 type: integer
+              serverGroupId:
+                description: 'ServerGroupID sets the server group of the control plane
+                  in order to maintain anti-affinity rules. TODO: make this a required
+                  field on the control plane.'
+                type: string
               version:
                 description: Version is the Kubernetes version to install.  For performance
                   reasons this should match what is already pre-installed on the provided

@@ -367,6 +367,9 @@ type OpenstackMachinePool struct {
 	// Replicas Number of machines.
 	Replicas int `json:"replicas"`
 
+	// ServerGroupID Openstack server group to provision the machine in.
+	ServerGroupID *string `json:"serverGroupID,omitempty"`
+
 	// Version Kubernetes version.
 	Version string `json:"version"`
 }
