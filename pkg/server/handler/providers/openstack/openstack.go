@@ -20,8 +20,8 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/applicationcredentials"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -46,6 +46,7 @@ type Openstack struct {
 	computeClientCache      *lru.Cache[string, *openstack.ComputeClient]
 	blockStorageClientCache *lru.Cache[string, *openstack.BlockStorageClient]
 	networkClientCache      *lru.Cache[string, *openstack.NetworkClient]
+	imageClientCache        *lru.Cache[string, *openstack.ImageClient]
 }
 
 // New returns a new initialized Openstack handler.
@@ -70,6 +71,11 @@ func New(options *Options, authenticator *authorization.Authenticator) (*Opensta
 		return nil, err
 	}
 
+	imageClientCache, err := lru.New[string, *openstack.ImageClient](1024)
+	if err != nil {
+		return nil, err
+	}
+
 	o := &Openstack{
 		options:                 options,
 		endpoint:                authenticator.Keystone.Endpoint(),
@@ -77,6 +83,7 @@ func New(options *Options, authenticator *authorization.Authenticator) (*Opensta
 		computeClientCache:      computeClientCache,
 		blockStorageClientCache: blockStorageClientCache,
 		networkClientCache:      networkClientCache,
+		imageClientCache:        imageClientCache,
 	}
 
 	return o, nil
@@ -184,6 +191,26 @@ func (o *Openstack) NetworkClient(r *http.Request) (*openstack.NetworkClient, er
 	}
 
 	o.networkClientCache.Add(token, client)
+
+	return client, nil
+}
+
+func (o *Openstack) ImageClient(r *http.Request) (*openstack.ImageClient, error) {
+	token, err := getToken(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if client, ok := o.imageClientCache.Get(token); ok {
+		return client, nil
+	}
+
+	client, err := openstack.NewImageClient(openstack.NewTokenProvider(o.endpoint, token))
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed get image client").WithError(err)
+	}
+
+	o.imageClientCache.Add(token, client)
 
 	return client, nil
 }
@@ -385,7 +412,7 @@ func (o *Openstack) GetFlavor(r *http.Request, name string) (*generated.Openstac
 }
 
 func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, error) {
-	client, err := o.ComputeClient(r)
+	client, err := o.ImageClient(r)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
 	}
@@ -398,31 +425,21 @@ func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, erro
 	images := make(generated.OpenstackImages, len(result))
 
 	for i, image := range result {
-		created, err := time.Parse(time.RFC3339, image.Created)
-		if err != nil {
-			return nil, errors.OAuth2ServerError("failed parse image creation time").WithError(err)
-		}
-
-		modified, err := time.Parse(time.RFC3339, image.Updated)
-		if err != nil {
-			return nil, errors.OAuth2ServerError("failed parse image modification time").WithError(err)
-		}
-
 		// images are pre-filtered by the provider library, so these keys exist.
-		kubernetesVersion, ok := image.Metadata["k8s"].(string)
+		kubernetesVersion, ok := image.Properties["k8s"].(string)
 		if !ok {
 			return nil, errors.OAuth2ServerError("failed parse image kubernetes version")
 		}
 
-		nvidiaDriverVersion, ok := image.Metadata["gpu"].(string)
+		nvidiaDriverVersion, ok := image.Properties["gpu"].(string)
 		if !ok {
 			return nil, errors.OAuth2ServerError("failed parse image gpu driver version")
 		}
 
 		images[i].Id = image.ID
 		images[i].Name = image.Name
-		images[i].Created = created
-		images[i].Modified = modified
+		images[i].Created = image.CreatedAt
+		images[i].Modified = image.UpdatedAt
 		images[i].Versions.Kubernetes = "v" + kubernetesVersion
 		images[i].Versions.NvidiaDriver = nvidiaDriverVersion
 	}
@@ -600,4 +617,55 @@ func (o *Openstack) DeleteApplicationCredential(r *http.Request, name generated.
 	}
 
 	return nil
+}
+
+func (o *Openstack) GetServerGroup(r *http.Request, name string) (*generated.OpenstackServerGroup, error) {
+	client, err := o.ComputeClient(r)
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
+	}
+
+	result, err := client.ListServerGroups(r.Context())
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed to list server groups").WithError(err)
+	}
+
+	filtered := util.Filter(result, func(group servergroups.ServerGroup) bool {
+		return group.Name == name
+	})
+
+	switch len(filtered) {
+	case 0:
+		return nil, errors.HTTPNotFound()
+	case 1:
+		group := &generated.OpenstackServerGroup{
+			Id:     filtered[0].ID,
+			Name:   filtered[0].Name,
+			Policy: *filtered[0].Policy,
+		}
+
+		return group, nil
+	default:
+		return nil, errors.OAuth2ServerError("multiple server groups matched name")
+	}
+}
+
+func (o *Openstack) CreateServerGroup(r *http.Request, name string) (*generated.OpenstackServerGroup, error) {
+	client, err := o.ComputeClient(r)
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
+	}
+
+	result, err := client.CreateServerGroup(r.Context(), name, o.options.serverGroupPolicy)
+	if err != nil {
+		return nil, errors.OAuth2ServerError("failed get create server group").WithError(err)
+	}
+
+	group := &generated.OpenstackServerGroup{
+		Id:     result.ID,
+		Name:   result.Name,
+		Policy: *result.Policy,
+	}
+
+	return group, nil
 }

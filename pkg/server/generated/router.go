@@ -107,6 +107,12 @@ type ServerInterface interface {
 
 	// (GET /api/v1/providers/openstack/projects)
 	GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/v1/providers/openstack/servergroups)
+	PostApiV1ProvidersOpenstackServergroups(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/providers/openstack/servergroups/{serverGroupName})
+	GetApiV1ProvidersOpenstackServergroupsServerGroupName(w http.ResponseWriter, r *http.Request, serverGroupName ServerGroupNameParameter)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -794,6 +800,51 @@ func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackProjects(w http.Res
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// PostApiV1ProvidersOpenstackServergroups operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV1ProvidersOpenstackServergroups(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV1ProvidersOpenstackServergroups(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetApiV1ProvidersOpenstackServergroupsServerGroupName operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ProvidersOpenstackServergroupsServerGroupName(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "serverGroupName" -------------
+	var serverGroupName ServerGroupNameParameter
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "serverGroupName", runtime.ParamLocationPath, chi.URLParam(r, "serverGroupName"), &serverGroupName)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "serverGroupName", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1ProvidersOpenstackServergroupsServerGroupName(w, r, serverGroupName)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -999,6 +1050,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/providers/openstack/projects", wrapper.GetApiV1ProvidersOpenstackProjects)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/providers/openstack/servergroups", wrapper.PostApiV1ProvidersOpenstackServergroups)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/providers/openstack/servergroups/{serverGroupName}", wrapper.GetApiV1ProvidersOpenstackServergroupsServerGroupName)
 	})
 
 	return r

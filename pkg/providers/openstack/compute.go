@@ -18,9 +18,6 @@ package openstack
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"strconv"
@@ -30,8 +27,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/images"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -59,6 +56,10 @@ func NewComputeClient(provider Provider) (*ComputeClient, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Need at least 2.15 for soft-anti-affinity policy.
+	// Need at least 2.64 for new server group interface.
+	client.Microversion = "2.93"
 
 	c := &ComputeClient{
 		client: client,
@@ -189,86 +190,6 @@ func FlavorGPUs(flavor *flavors.Flavor, extraSpecs map[string]string) (*GPUMeta,
 	return nil, false, nil
 }
 
-// verifyImage asserts the image is trustworthy for use with our goodselves.
-func verifyImage(image *images.Image, key *ecdsa.PublicKey) bool {
-	if image.Metadata == nil {
-		return false
-	}
-
-	// Legacy behaviour (for unikornctl only) that accepts images if
-	// they have Kubernetes and Nvidia driver versions.
-	if key == nil {
-		if value, ok := image.Metadata["k8s"]; !ok || value == "" {
-			return false
-		}
-
-		if value, ok := image.Metadata["gpu"]; !ok || value == "" {
-			return false
-		}
-
-		return true
-	}
-
-	// These will be digitally signed by Baski when created, so we only trust
-	// those images.
-	signatureRaw, ok := image.Metadata["digest"]
-	if !ok {
-		return false
-	}
-
-	signatureB64, ok := signatureRaw.(string)
-	if !ok {
-		return false
-	}
-
-	signature, err := base64.StdEncoding.DecodeString(signatureB64)
-	if err != nil {
-		return false
-	}
-
-	hash := sha256.Sum256([]byte(image.ID))
-
-	return ecdsa.VerifyASN1(key, hash[:], signature)
-}
-
-// Images returns a list of images.
-func (c *ComputeClient) Images(ctx context.Context, key *ecdsa.PublicKey) ([]images.Image, error) {
-	tracer := otel.GetTracerProvider().Tracer(constants.Application)
-
-	_, span := tracer.Start(ctx, "/compute/v2/images", trace.WithSpanKind(trace.SpanKindClient))
-	defer span.End()
-
-	// Only return active images that are ready to be used.
-	opts := &images.ListOpts{
-		Status: "ACTIVE",
-	}
-
-	page, err := images.ListDetail(c.client, opts).AllPages()
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := images.ExtractImages(page)
-	if err != nil {
-		return nil, err
-	}
-
-	// Filter out images that aren't compatible.
-	filtered := []images.Image{}
-
-	for i := range result {
-		image := result[i]
-
-		if !verifyImage(&image, key) {
-			continue
-		}
-
-		filtered = append(filtered, image)
-	}
-
-	return filtered, nil
-}
-
 // AvailabilityZones returns a list of availability zones.
 func (c *ComputeClient) AvailabilityZones(ctx context.Context) ([]availabilityzones.AvailabilityZone, error) {
 	tracer := otel.GetTracerProvider().Tracer(constants.Application)
@@ -297,4 +218,35 @@ func (c *ComputeClient) AvailabilityZones(ctx context.Context) ([]availabilityzo
 	}
 
 	return filtered, nil
+}
+
+// ListServerGroups returns all server groups in the project.
+func (c *ComputeClient) ListServerGroups(ctx context.Context) ([]servergroups.ServerGroup, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/compute/v2/os-server-groups", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
+	page, err := servergroups.List(c.client, &servergroups.ListOpts{}).AllPages()
+	if err != nil {
+		return nil, err
+	}
+
+	return servergroups.ExtractServerGroups(page)
+}
+
+// CreateServerGroup creates the named server group with the given policy and returns
+// the result.
+func (c *ComputeClient) CreateServerGroup(ctx context.Context, name, policy string) (*servergroups.ServerGroup, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/compute/v2/os-server-groups", trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
+	opts := &servergroups.CreateOpts{
+		Name:   name,
+		Policy: policy,
+	}
+
+	return servergroups.Create(c.client, opts).Extract()
 }

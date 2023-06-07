@@ -386,6 +386,18 @@ type OpenstackProject struct {
 // OpenstackProjects A list of Openstack projects.
 type OpenstackProjects = []OpenstackProject
 
+// OpenstackServerGroup An OpenStack server group.
+type OpenstackServerGroup struct {
+	// Id A globally unique server group identifier.
+	Id string `json:"id"`
+
+	// Name A server group name.
+	Name string `json:"name"`
+
+	// Policy The policy applied to the server group.
+	Policy string `json:"policy"`
+}
+
 // OpenstackVolume An Openstack volume.
 type OpenstackVolume struct {
 	// AvailabilityZone Volume availability zone.
@@ -399,6 +411,12 @@ type OpenstackVolume struct {
 type Project struct {
 	// Status A Kubernetes resource status.
 	Status *KubernetesResourceStatus `json:"status,omitempty"`
+}
+
+// ServerGroupOptions OpenStack server group parameters.
+type ServerGroupOptions struct {
+	// Name A server group name.
+	Name string `json:"name"`
 }
 
 // StringParameter A basic string parameter.
@@ -484,6 +502,9 @@ type ClusterNameParameter = StringParameter
 // ControlPlaneNameParameter A basic string parameter.
 type ControlPlaneNameParameter = StringParameter
 
+// ServerGroupNameParameter A basic string parameter.
+type ServerGroupNameParameter = StringParameter
+
 // ApplicationBundleResponse A list of application bundles.
 type ApplicationBundleResponse = ApplicationBundles
 
@@ -538,6 +559,9 @@ type OpenstackKeyPairsResponse = OpenstackKeyPairs
 // OpenstackProjectsResponse A list of Openstack projects.
 type OpenstackProjectsResponse = OpenstackProjects
 
+// OpenstackServerGroupResponse An OpenStack server group.
+type OpenstackServerGroupResponse = OpenstackServerGroup
+
 // ProjectResponse A Unikorn project.
 type ProjectResponse = Project
 
@@ -555,6 +579,9 @@ type CreateControlPlaneRequest = ControlPlane
 
 // CreateKubernetesClusterRequest Unikorn Kubernetes cluster creation parameters.
 type CreateKubernetesClusterRequest = KubernetesCluster
+
+// ServerGroupRequest OpenStack server group parameters.
+type ServerGroupRequest = ServerGroupOptions
 
 // TokenScopeRequest Openstack token scope.
 type TokenScopeRequest = TokenScope
@@ -579,6 +606,9 @@ type PutApiV1ControlplanesControlPlaneNameClustersClusterNameJSONRequestBody = K
 
 // PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody defines body for PostApiV1ProvidersOpenstackApplicationCredentials for application/json ContentType.
 type PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody = ApplicationCredentialOptions
+
+// PostApiV1ProvidersOpenstackServergroupsJSONRequestBody defines body for PostApiV1ProvidersOpenstackServergroups for application/json ContentType.
+type PostApiV1ProvidersOpenstackServergroupsJSONRequestBody = ServerGroupOptions
 
 // AsTokenRequestOptions0 returns the union data inside the TokenRequestOptions as a TokenRequestOptions0
 func (t TokenRequestOptions) AsTokenRequestOptions0() (TokenRequestOptions0, error) {

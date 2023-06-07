@@ -126,7 +126,7 @@ func OpenstackFlavorCompletionFunc(cloud *string) func(*cobra.Command, []string,
 // OpenstackImageCompletionFunc lists any matching images by name.
 func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.NewComputeClient(openstack.NewCloudsProvider(*cloud))
+		client, err := openstack.NewImageClient(openstack.NewCloudsProvider(*cloud))
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

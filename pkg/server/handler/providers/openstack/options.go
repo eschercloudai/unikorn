@@ -83,9 +83,11 @@ func (v *PublicKeyVar) Type() string {
 }
 
 type Options struct {
-	key PublicKeyVar
+	key               PublicKeyVar
+	serverGroupPolicy string
 }
 
 func (o *Options) AddFlags(f *pflag.FlagSet) {
 	f.Var(&o.key, "image-signing-key", "Key used to verify valid images for use with the platform")
+	f.StringVar(&o.serverGroupPolicy, "server-group-policy", "soft-anti-affinity", "Scheduling policy to use for server groups")
 }
