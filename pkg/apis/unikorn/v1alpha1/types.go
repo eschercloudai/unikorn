@@ -398,6 +398,10 @@ type MachineGeneric struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=3
 	Replicas *int `json:"replicas,omitempty"`
+	// ServerGroupID sets the server group of the control plane in
+	// order to maintain anti-affinity rules.
+	// TODO: make this a required field on the control plane.
+	ServerGroupID *string `json:"serverGroupId,omitempty"`
 }
 
 // File is a file that can be deployed to a cluster node on creation.
