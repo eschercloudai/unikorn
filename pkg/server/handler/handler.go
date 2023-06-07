@@ -432,3 +432,32 @@ func (h *Handler) GetApiV1ProvidersOpenstackProjects(w http.ResponseWriter, r *h
 	h.setUncacheable(w)
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
+
+func (h *Handler) PostApiV1ProvidersOpenstackServergroups(w http.ResponseWriter, r *http.Request) {
+	options := &generated.ServerGroupOptions{}
+
+	if err := util.ReadJSONBody(r, options); err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	result, err := h.openstack.CreateServerGroup(r, options.Name)
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setUncacheable(w)
+	util.WriteJSONResponse(w, r, http.StatusCreated, result)
+}
+
+func (h *Handler) GetApiV1ProvidersOpenstackServergroupsServerGroupName(w http.ResponseWriter, r *http.Request, serverGroupName generated.ServerGroupNameParameter) {
+	result, err := h.openstack.GetServerGroup(r, serverGroupName)
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setUncacheable(w)
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
