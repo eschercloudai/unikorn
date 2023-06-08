@@ -85,6 +85,11 @@ const (
 	// IngressEndpointAnnotation helps us find the ingress IP address.
 	IngressEndpointAnnotation = "unikorn.eschercloud.ai/ingress-endpoint"
 
+	// ForceClusterNameAnnotation supports old snoflake clusters that are
+	// still hanging around whose names could alias across different control
+	// planes when provisioned into a single project.
+	ForceClusterNameAnnotation = "unikorn.eschercloud.ai/force-cluster-name"
+
 	// Finalizer is applied to resources that need to be deleted manually
 	// and do other complex logic.
 	Finalizer = "unikorn"

@@ -19,7 +19,9 @@ package cluster
 import (
 	"context"
 
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"golang.org/x/mod/semver"
+
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/managers/common"
 
@@ -106,12 +108,12 @@ func (*Factory) Reconciler(manager manager.Manager) reconcile.Reconciler {
 // RegisterWatches adds any watches that would trigger a reconcile.
 func (*Factory) RegisterWatches(manager manager.Manager, controller controller.Controller) error {
 	// Any changes to the cluster spec, trigger a reconcile.
-	if err := controller.Watch(source.Kind(manager.GetCache(), &unikornv1alpha1.KubernetesCluster{}), &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
+	if err := controller.Watch(source.Kind(manager.GetCache(), &unikornv1.KubernetesCluster{}), &handler.EnqueueRequestForObject{}, &predicate.GenerationChangedPredicate{}); err != nil {
 		return err
 	}
 
 	// Any changes to workload pools that are selected by the cluster, trigger a reconcile.
-	if err := controller.Watch(source.Kind(manager.GetCache(), &unikornv1alpha1.KubernetesWorkloadPool{}), &eventHandlerOwnerFromLabel{label: constants.KubernetesClusterLabel}, &predicate.GenerationChangedPredicate{}); err != nil {
+	if err := controller.Watch(source.Kind(manager.GetCache(), &unikornv1.KubernetesWorkloadPool{}), &eventHandlerOwnerFromLabel{label: constants.KubernetesClusterLabel}, &predicate.GenerationChangedPredicate{}); err != nil {
 		return err
 	}
 
@@ -122,5 +124,61 @@ func (*Factory) RegisterWatches(manager manager.Manager, controller controller.C
 // of the controller.  This must not affect the spec in any way as it causes split brain
 // and potential fail.
 func (*Factory) Upgrade(c client.Client) error {
+	ctx := context.TODO()
+
+	resources := &unikornv1.KubernetesClusterList{}
+
+	if err := c.List(ctx, resources, &client.ListOptions{}); err != nil {
+		return err
+	}
+
+	for i := range resources.Items {
+		if err := upgrade(ctx, c, &resources.Items[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// semverLess returns true if a is less than b.
+func semverLess(a, b string) bool {
+	// Note we use un-prefixed tags, the library expects different.
+	return semver.Compare("v"+a, "v"+b) < 0
+}
+
+func upgrade(ctx context.Context, c client.Client, resource *unikornv1.KubernetesCluster) error {
+	version, ok := resource.Labels[constants.VersionLabel]
+	if !ok {
+		return unikornv1.ErrMissingLabel
+	}
+
+	// Skip development versions.  This may lead to people unwittingly using old
+	// resources that don't match the requirements of a newer version, but it's
+	// better than trying to upgrade to a newer version accidentally when it's
+	// already at that version, and legacy resource selection won't work at all.
+	if version == "0.0.0" {
+		return nil
+	}
+
+	newResource := resource.DeepCopy()
+
+	// In 0.3.33 we made cluster names unique, so those given the same name in
+	// different control planes didn't end up using the same infrastructure and
+	// deleting each other by accident.
+	if semverLess(version, "0.3.33") {
+		if newResource.Annotations == nil {
+			newResource.Annotations = map[string]string{}
+		}
+
+		newResource.Annotations[constants.ForceClusterNameAnnotation] = newResource.Name
+
+		newResource.Labels[constants.VersionLabel] = "0.3.33"
+	}
+
+	if err := c.Patch(ctx, newResource, client.MergeFrom(resource)); err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -19,6 +19,7 @@ package clusteropenstack
 import (
 	"context"
 
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 
@@ -42,6 +43,8 @@ type RemoteClusterGenerator struct {
 	// name is the name of the cluster.
 	name string
 
+	remoteNamespace string
+
 	// labels are used to form a unique and context specific name for
 	// the remote cluster instance.
 	labels []string
@@ -51,12 +54,13 @@ type RemoteClusterGenerator struct {
 var _ provisioners.RemoteCluster = &RemoteClusterGenerator{}
 
 // NewRemoteClusterGenerator return a new instance of a remote cluster generator.
-func NewRemoteClusterGenerator(client client.Client, namespace, name string, labels []string) *RemoteClusterGenerator {
+func NewRemoteClusterGenerator(client client.Client, cluster *unikornv1.KubernetesCluster) *RemoteClusterGenerator {
 	return &RemoteClusterGenerator{
-		client:    client,
-		namespace: namespace,
-		name:      name,
-		labels:    labels,
+		client:          client,
+		namespace:       cluster.Namespace,
+		name:            GenerateReleaseName(cluster),
+		remoteNamespace: cluster.Name,
+		labels:          provisioners.ClusterOpenstackLabelsFromCluster(cluster),
 	}
 }
 
@@ -91,7 +95,7 @@ func (g *RemoteClusterGenerator) Config(ctx context.Context) (*clientcmdapi.Conf
 	secret := &corev1.Secret{}
 
 	secretKey := client.ObjectKey{
-		Namespace: g.name,
+		Namespace: g.remoteNamespace,
 		Name:      g.name + "-kubeconfig",
 	}
 

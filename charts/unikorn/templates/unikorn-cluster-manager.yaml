@@ -25,6 +25,7 @@ rules:
   verbs:
   - list
   - get
+  - patch
   - watch
   - update
 - apiGroups:

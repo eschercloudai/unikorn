@@ -377,8 +377,17 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 	return values, nil
 }
 
+func GenerateReleaseName(cluster *unikornv1.KubernetesCluster) string {
+	name, ok := cluster.Annotations[constants.ForceClusterNameAnnotation]
+	if ok {
+		return name
+	}
+
+	return cluster.Labels[constants.ControlPlaneLabel] + "-" + cluster.Name
+}
+
 func (p *Provisioner) ReleaseName() string {
-	return p.cluster.Name
+	return GenerateReleaseName(p.cluster)
 }
 
 func (p *Provisioner) getProvisioner() provisioners.Provisioner {
