@@ -28,22 +28,7 @@ const (
 	applicationName = "cluster-autoscaler-openstack"
 )
 
-// Provisioner encapsulates control plane provisioning.
-type Provisioner struct {
-	// clusterName defines the CAPI cluster name.
-	clusterName string
-
-	// clusterKubeconfigSecretName defines the secret that contains the
-	// kubeconfig for the cluster.
-	clusterKubeconfigSecretName string
-}
-
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication, clusterName, clusterKubeconfigSecretName string) *application.Provisioner {
-	provisoner := &Provisioner{
-		clusterName:                 clusterName,
-		clusterKubeconfigSecretName: clusterKubeconfigSecretName,
-	}
-
-	return application.New(client, applicationName, resource, helm).WithGenerator(provisoner)
+func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
+	return application.New(client, applicationName, resource, helm)
 }

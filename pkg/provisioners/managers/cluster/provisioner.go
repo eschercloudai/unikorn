@@ -108,15 +108,15 @@ func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusterop
 		return nil, err
 	}
 
-	return clusteropenstack.NewRemoteClusterGenerator(client, p.cluster.Namespace, p.cluster.Name, provisioners.ClusterOpenstackLabelsFromCluster(p.cluster)), nil
+	return clusteropenstack.NewRemoteClusterGenerator(client, p.cluster), nil
 }
 
 func (p *Provisioner) newClusterAutoscalerProvisioner() provisioners.Provisioner {
-	return clusterautoscaler.New(p.client, p.cluster, p.clusterAutoscalerApplication, p.cluster.Name, p.cluster.Name+"-kubeconfig").OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
+	return clusterautoscaler.New(p.client, p.cluster, p.clusterAutoscalerApplication).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 }
 
 func (p *Provisioner) newClusterAutoscalerOpenStackProvisioner() provisioners.Provisioner {
-	return clusterautoscaleropenstack.New(p.client, p.cluster, p.clusterAutoscalerOpenStackApplication, p.cluster.Name, p.cluster.Name+"-kubeconfig").OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
+	return clusterautoscaleropenstack.New(p.client, p.cluster, p.clusterAutoscalerOpenStackApplication).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 }
 
 // getAddonsProvisioner returns a generic provisioner for provisioning and deprovisioning.

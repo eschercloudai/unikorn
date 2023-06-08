@@ -19,6 +19,7 @@ package clusterautoscaler
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -39,10 +40,12 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication, clusterName, clusterKubeconfigSecretName string) *application.Provisioner {
+func New(client client.Client, resource *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
+	releaseName := clusteropenstack.GenerateReleaseName(resource)
+
 	provisoner := &Provisioner{
-		clusterName:                 clusterName,
-		clusterKubeconfigSecretName: clusterKubeconfigSecretName,
+		clusterName:                 releaseName,
+		clusterKubeconfigSecretName: releaseName + "-kubeconfig",
 	}
 
 	return application.New(client, applicationName, resource, helm).WithGenerator(provisoner)

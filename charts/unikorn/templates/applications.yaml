@@ -46,7 +46,7 @@ spec:
   interface: 1.0.0
   parameters:
   - name: cluster-api-provider-openstack.image
-    value: spjmurray/capi-openstack-controller-amd64:v0.7.3-simon2
+    value: spjmurray/capi-openstack-controller-amd64:v0.7.3-simon6
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
