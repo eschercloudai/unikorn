@@ -44,7 +44,16 @@ func VersionString() string {
 	return fmt.Sprintf("%s/%s (revision/%s)", Application, Version, Revision)
 }
 
+// IsProduction tells us whether we need to check for silly assumptions that
+// don't exist or are mostly irrelevant in development land.
+func IsProduction() bool {
+	return Version != DeveloperVersion
+}
+
 const (
+	// This is the default version in the Makefile.
+	DeveloperVersion = "0.0.0"
+
 	// VersionLabel is a label applied to resources so we know the application
 	// version that was used to create them (and thus what metadata is valid
 	// for them).  Metadata may be upgraded to a later version for any resource.
