@@ -18,6 +18,7 @@ package controlplane
 
 import (
 	"context"
+	"fmt"
 
 	"golang.org/x/mod/semver"
 
@@ -93,7 +94,11 @@ func upgrade(ctx context.Context, c client.Client, resource *unikornv1.ControlPl
 	// resources that don't match the requirements of a newer version, but it's
 	// better than trying to upgrade to a newer version accidentally when it's
 	// already at that version, and legacy resource selection won't work at all.
-	if version == "0.0.0" {
+	if version == constants.DeveloperVersion {
+		if constants.IsProduction() {
+			return fmt.Errorf("%w: unexpected developer resource", common.ErrUpgrade)
+		}
+
 		return nil
 	}
 

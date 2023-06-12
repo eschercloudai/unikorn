@@ -18,6 +18,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"os"
 
@@ -41,6 +42,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+)
+
+var (
+	ErrUpgrade = errors.New("resource upgrade error")
 )
 
 // ControllerFactory allows creation of a Unikorn controller with
