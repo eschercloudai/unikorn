@@ -198,3 +198,7 @@ spec:
     reference:
       kind: HelmApplication
       name: kubernetes-dashboard-6.0.7-1
+  - name: longhorn
+    reference:
+      kind: HelmApplication
+      name: longhorn-1.4.2-1

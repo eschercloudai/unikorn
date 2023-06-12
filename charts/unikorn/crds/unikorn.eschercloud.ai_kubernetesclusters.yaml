@@ -318,6 +318,10 @@ spec:
                   certManager:
                     description: CertManager, if true, provisions cert-manager.
                     type: boolean
+                  fileStorage:
+                    description: FileStorage, if true, enables a POSIX read/write
+                      many sile storage.
+                    type: boolean
                   ingress:
                     description: Ingress, if true, provisions an Nginx ingress controller.
                     type: boolean

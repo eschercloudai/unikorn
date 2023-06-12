@@ -979,6 +979,9 @@ components:
         kubernetesDashboard:
           description: Enable the Kubernetes dashboard.  Requires ingress and certManager to be enabled.
           type: boolean
+        fileStorage:
+          description: Enable POSIX file based persistent storage.
+          type: boolean
     kubernetesCluster:
       description: Unikorn Kubernetes cluster creation parameters.
       type: object

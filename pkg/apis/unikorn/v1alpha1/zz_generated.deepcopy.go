@@ -750,6 +750,11 @@ func (in *KubernetesClusterFeaturesSpec) DeepCopyInto(out *KubernetesClusterFeat
 		*out = new(bool)
 		**out = **in
 	}
+	if in.FileStorage != nil {
+		in, out := &in.FileStorage, &out.FileStorage
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

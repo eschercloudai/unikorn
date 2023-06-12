@@ -596,6 +596,8 @@ type KubernetesClusterFeaturesSpec struct {
 	// KubernetesDashboard, if true, provisions the kubernetes dashboard.
 	// Clients must also enable the Ingress and CertManager features.
 	KubernetesDashboard *bool `json:"kubernetesDashboard,omitempty"`
+	// FileStorage, if true, enables a POSIX read/write many file storage.
+	FileStorage *bool `json:"fileStorage,omitempty"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {
