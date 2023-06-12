@@ -258,3 +258,18 @@ spec:
   chart: kubernetes-dashboard
   version: 6.0.7
   interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: longhorn-1.4.2-1
+spec:
+  repo: https://charts.longhorn.io
+  chart: longhorn
+  version: 1.4.2
+  parameters:
+  - name: defaultSettings.kubernetesClusterAutoscalerEnabled
+    value: 'true'
+  - name: persistence.defaultClass
+    value: 'false'
+  createNamespace: true

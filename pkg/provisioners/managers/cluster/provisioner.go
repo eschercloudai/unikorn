@@ -30,6 +30,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterautoscaleropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/kubernetesdashboard"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/longhorn"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/metricsserver"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nginxingress"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nvidiagpuoperator"
@@ -66,6 +67,7 @@ type Provisioner struct {
 	certManagerApplication                *unikornv1.HelmApplication
 	certManagerIssuersApplication         *unikornv1.HelmApplication
 	kubernetesDashboardApplication        *unikornv1.HelmApplication
+	longhornApplication                   *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
@@ -89,6 +91,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	unbundler.AddApplication(&provisioner.certManagerApplication, "cert-manager", util.Optional)
 	unbundler.AddApplication(&provisioner.certManagerIssuersApplication, "cert-manager-issuers", util.Optional)
 	unbundler.AddApplication(&provisioner.kubernetesDashboardApplication, "kubernetes-dashboard", util.Optional)
+	unbundler.AddApplication(&provisioner.longhornApplication, "longhorn", util.Optional)
 
 	if err := unbundler.Unbundle(ctx, client); err != nil {
 		return nil, err
@@ -157,6 +160,12 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 					certmanager.New(p.client, p.cluster, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
 					certmanagerissuers.New(p.client, p.cluster, p.certManagerIssuersApplication).OnRemote(remote).BackgroundDelete(),
 				),
+			),
+			conditional.New("longhorn",
+				func() bool {
+					return p.longhornApplication != nil && p.cluster.FIleStorageEnabled()
+				},
+				longhorn.New(p.client, p.cluster, p.longhornApplication).OnRemote(remote).BackgroundDelete(),
 			),
 		),
 		concurrent.New("cluster add-ons wave 2",

@@ -307,6 +307,11 @@ func (c *KubernetesCluster) KubernetesDashboardEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.KubernetesDashboard != nil && *c.Spec.Features.KubernetesDashboard
 }
 
+// FIleStorageEnabled indicates whether a POSIX file storage CSI is required.
+func (c *KubernetesCluster) FIleStorageEnabled() bool {
+	return c.Spec.Features != nil && c.Spec.Features.FileStorage != nil && *c.Spec.Features.FileStorage
+}
+
 // GetName is the name passed down to Helm.
 func (w *KubernetesWorkloadPool) GetName() string {
 	if w.Spec.Name != nil {

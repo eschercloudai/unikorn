@@ -169,6 +169,9 @@ type KubernetesClusterFeatures struct {
 	// CertManager Enable cert-manager.
 	CertManager *bool `json:"certManager,omitempty"`
 
+	// FileStorage Enable POSIX file based persistent storage.
+	FileStorage *bool `json:"fileStorage,omitempty"`
+
 	// Ingress Enable an ingress controller.
 	Ingress *bool `json:"ingress,omitempty"`
 
