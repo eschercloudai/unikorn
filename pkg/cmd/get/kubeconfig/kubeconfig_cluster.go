@@ -27,6 +27,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/errors"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -95,7 +96,12 @@ func (o *getKubeconfigClusterOptions) run() error {
 		return err
 	}
 
-	secret, err := vclusterClient.CoreV1().Secrets(o.clusterFlags.Cluster).Get(context.TODO(), o.clusterFlags.Cluster+"-kubeconfig", metav1.GetOptions{})
+	cluster, err := o.unikornClient.UnikornV1alpha1().KubernetesClusters(namespace).Get(context.TODO(), o.clusterFlags.Cluster, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	secret, err := vclusterClient.CoreV1().Secrets(o.clusterFlags.Cluster).Get(context.TODO(), clusteropenstack.GenerateReleaseName(cluster)+"-kubeconfig", metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
