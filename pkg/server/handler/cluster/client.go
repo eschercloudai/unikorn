@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
@@ -137,9 +138,20 @@ func (c *Client) GetKubeconfig(ctx context.Context, controlPlaneName generated.C
 		return nil, errors.OAuth2ServerError("failed to get control plane client").WithError(err)
 	}
 
+	clusterObjectKey := client.ObjectKey{
+		Namespace: controlPlane.Namespace,
+		Name:      name,
+	}
+
+	cluster := &unikornv1.KubernetesCluster{}
+
+	if err := c.client.Get(ctx, clusterObjectKey, cluster); err != nil {
+		return nil, errors.HTTPNotFound()
+	}
+
 	objectKey := client.ObjectKey{
 		Namespace: name,
-		Name:      name + "-kubeconfig",
+		Name:      clusteropenstack.GenerateReleaseName(cluster) + "-kubeconfig",
 	}
 
 	secret := &corev1.Secret{}
