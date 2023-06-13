@@ -97,6 +97,12 @@ spec:
               repo:
                 description: Repo is either a Helm chart repository, or git repository.
                 type: string
+              serverSideApply:
+                description: ServerSideApply allows you to bypass using kubectl apply.  This
+                  is useful in situations where CRDs are too big and blow the annotation
+                  size limit. We'd like to have this on by default, but mutating admission
+                  webhooks and controllers modifying the spec mess this up.
+                type: boolean
               version:
                 description: Version is the chart version, or a branch when a path
                   is provided.

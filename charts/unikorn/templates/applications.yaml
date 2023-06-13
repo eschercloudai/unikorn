@@ -273,3 +273,29 @@ spec:
   - name: persistence.defaultClass
     value: 'false'
   createNamespace: true
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
+  name: kube-prometheus-stack-46.8.0-1
+spec:
+  repo: https://prometheus-community.github.io/helm-charts
+  chart: kube-prometheus-stack
+  version: 46.8.0
+  parameters:
+  - name: defaultRules.create
+    value: 'false'
+  - name: alertmanager.enabled
+    value: 'false'
+  - name: grafana.enabled
+    value: 'false'
+  - name: kubernetesServiceMonitors.enabled
+    value: 'false'
+  - name: kubeStateMetrics.enabled
+    value: 'false'
+  - name: nodeExporter.enabled
+    value: 'false'
+  - name: prometheus.enabled
+    value: 'false'
+  createNamespace: true
+  serverSideApply: true

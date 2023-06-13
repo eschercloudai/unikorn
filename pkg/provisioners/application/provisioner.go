@@ -276,6 +276,10 @@ func (p *Provisioner) getSyncOptions() []interface{} {
 		options = append(options, "CreateNamespace=true")
 	}
 
+	if p.application.Spec.ServerSideApply != nil && *p.application.Spec.ServerSideApply {
+		options = append(options, "ServerSideApply=true")
+	}
+
 	return options
 }
 

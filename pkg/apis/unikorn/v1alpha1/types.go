@@ -598,6 +598,8 @@ type KubernetesClusterFeaturesSpec struct {
 	KubernetesDashboard *bool `json:"kubernetesDashboard,omitempty"`
 	// FileStorage, if true, enables a POSIX read/write many file storage.
 	FileStorage *bool `json:"fileStorage,omitempty"`
+	// Prometheus, if true, installs the Prometheus Operator.
+	Prometheus *bool `json:"prometheus,omitempty"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {
@@ -732,6 +734,11 @@ type HelmApplicationSpec struct {
 	// CreateNamespace indicates whether the chart requires a namespace to be
 	// created by the tooling, rather than the chart itself.
 	CreateNamespace *bool `json:"createNamespace,omitempty"`
+	// ServerSideApply allows you to bypass using kubectl apply.  This is useful
+	// in situations where CRDs are too big and blow the annotation size limit.
+	// We'd like to have this on by default, but mutating admission webhooks and
+	// controllers modifying the spec mess this up.
+	ServerSideApply *bool `json:"serverSideApply,omitempty"`
 	// Interface is the name of a Unikorn function that configures the application.
 	// In particular it's used when reading values from a custom resource and mapping
 	// them to Helm values.  This allows us to version Helm interfaces in the context

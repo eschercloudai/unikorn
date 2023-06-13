@@ -36,6 +36,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nvidiagpuoperator"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackcloudprovider"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackplugincindercsi"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/prometheus"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
@@ -68,6 +69,7 @@ type Provisioner struct {
 	certManagerIssuersApplication         *unikornv1.HelmApplication
 	kubernetesDashboardApplication        *unikornv1.HelmApplication
 	longhornApplication                   *unikornv1.HelmApplication
+	prometheusApplication                 *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
@@ -78,6 +80,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 		cluster:            cluster,
 	}
 
+	// TODO: need to remove optional falg once old cluster bundles are retired.
 	unbundler := util.NewUnbundler(cluster, unikornv1.ApplicationBundleResourceKindKubernetesCluster)
 	unbundler.AddApplication(&provisioner.clusterOpenstackApplication, "cluster-openstack")
 	unbundler.AddApplication(&provisioner.ciliumApplication, "cilium")
@@ -92,6 +95,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	unbundler.AddApplication(&provisioner.certManagerIssuersApplication, "cert-manager-issuers", util.Optional)
 	unbundler.AddApplication(&provisioner.kubernetesDashboardApplication, "kubernetes-dashboard", util.Optional)
 	unbundler.AddApplication(&provisioner.longhornApplication, "longhorn", util.Optional)
+	unbundler.AddApplication(&provisioner.prometheusApplication, "prometheus", util.Optional)
 
 	if err := unbundler.Unbundle(ctx, client); err != nil {
 		return nil, err
@@ -163,9 +167,15 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 			),
 			conditional.New("longhorn",
 				func() bool {
-					return p.longhornApplication != nil && p.cluster.FIleStorageEnabled()
+					return p.longhornApplication != nil && p.cluster.FileStorageEnabled()
 				},
 				longhorn.New(p.client, p.cluster, p.longhornApplication).OnRemote(remote).BackgroundDelete(),
+			),
+			conditional.New("prometheus",
+				func() bool {
+					return p.prometheusApplication != nil && p.cluster.PrometheusEnabled()
+				},
+				prometheus.New(p.client, p.cluster, p.prometheusApplication).OnRemote(remote).BackgroundDelete(),
 			),
 		),
 		concurrent.New("cluster add-ons wave 2",

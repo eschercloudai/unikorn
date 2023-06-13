@@ -546,6 +546,11 @@ func (in *HelmApplicationSpec) DeepCopyInto(out *HelmApplicationSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ServerSideApply != nil {
+		in, out := &in.ServerSideApply, &out.ServerSideApply
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Interface != nil {
 		in, out := &in.Interface, &out.Interface
 		*out = new(string)
@@ -752,6 +757,11 @@ func (in *KubernetesClusterFeaturesSpec) DeepCopyInto(out *KubernetesClusterFeat
 	}
 	if in.FileStorage != nil {
 		in, out := &in.FileStorage, &out.FileStorage
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Prometheus != nil {
+		in, out := &in.Prometheus, &out.Prometheus
 		*out = new(bool)
 		**out = **in
 	}

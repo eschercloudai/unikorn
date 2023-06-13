@@ -202,3 +202,7 @@ spec:
     reference:
       kind: HelmApplication
       name: longhorn-1.4.2-1
+  - name: prometheus
+    reference:
+      kind: HelmApplication
+      name: kube-prometheus-stack-46.8.0-1
