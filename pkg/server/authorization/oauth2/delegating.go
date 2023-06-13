@@ -21,6 +21,7 @@ import (
 	"crypto/md5" //nolint:gosec
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -125,6 +126,8 @@ func (s Scope) Has(scope string) bool {
 }
 
 // IDToken defines an OIDC id_token.
+//
+//nolint:tagliatelle
 type IDToken struct {
 	// These are default claims you always get.
 	Issuer   string   `json:"iss"`
@@ -133,8 +136,10 @@ type IDToken struct {
 	Expiry   int64    `json:"exp"`
 	IssuedAt int64    `json:"iat"`
 	Nonce    string   `json:"nonce,omitempty"`
-	// Optional claims that must be asked for.
-	Email   string `json:"email,omitempty"`
+	ATHash   string   `json:"at_hash,omitempty"`
+	// Optional claims that may be asked for by the "email" scope.
+	Email string `json:"email,omitempty"`
+	// Optional claims that may be asked for by the "profile" scope.
 	Picture string `json:"picture,omitempty"`
 }
 
@@ -557,6 +562,15 @@ func tokenValidateCode(code *Code, r *http.Request) error {
 	return nil
 }
 
+// oidcHash is used to create at_hash and c_hash values.
+// TODO: this is very much tied to the algorithm defined (hard coded) in
+// the JOSE package.
+func oidcHash(value string) string {
+	sum := sha512.Sum512([]byte(value))
+
+	return base64.RawURLEncoding.EncodeToString(sum[:sha512.Size>>1])
+}
+
 // oidcPicture returns a URL to a picture for the user.
 func oidcPicture(email string) string {
 	//nolint:gosec
@@ -564,7 +578,7 @@ func oidcPicture(email string) string {
 }
 
 // oidcIDToken builds an OIDC ID token.
-func (a *Authenticator) oidcIDToken(r *http.Request, scope Scope, expiry time.Time, clientID, email string) (*string, error) {
+func (a *Authenticator) oidcIDToken(r *http.Request, scope Scope, expiry time.Time, atHash, clientID, email string) (*string, error) {
 	//nolint:nilnil
 	if !scope.Has("openid") {
 		return nil, nil
@@ -578,13 +592,14 @@ func (a *Authenticator) oidcIDToken(r *http.Request, scope Scope, expiry time.Ti
 		},
 		Expiry:   expiry.Unix(),
 		IssuedAt: time.Now().Unix(),
+		ATHash:   atHash,
 	}
 
 	if scope.Has("email") {
 		claims.Email = email
 	}
 
-	if scope.Has("picture") {
+	if scope.Has("profile") {
 		claims.Picture = oidcPicture(email)
 	}
 
@@ -632,7 +647,7 @@ func (a *Authenticator) Token(w http.ResponseWriter, r *http.Request) (*generate
 	}
 
 	// Handle OIDC.
-	idToken, err := a.oidcIDToken(r, code.ClientScope, code.Expiry, r.Form.Get("client_id"), code.Email)
+	idToken, err := a.oidcIDToken(r, code.ClientScope, code.Expiry, oidcHash(accessToken), r.Form.Get("client_id"), code.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -691,7 +706,7 @@ func (a *Authenticator) tokenPassword(r *http.Request) (*generated.Token, error)
 
 	// TODO: the email is not necessarily the username, and needs another call
 	// to keystone as it's not returned, or supported by gophercloud at least.
-	idToken, err := a.oidcIDToken(r, NewScope(r.Form.Get("scope")), token.ExpiresAt, r.Form.Get("client_id"), r.Form.Get("username"))
+	idToken, err := a.oidcIDToken(r, NewScope(r.Form.Get("scope")), token.ExpiresAt, oidcHash(accessToken), r.Form.Get("client_id"), r.Form.Get("username"))
 	if err != nil {
 		return nil, err
 	}
