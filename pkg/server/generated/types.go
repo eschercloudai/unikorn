@@ -107,8 +107,13 @@ type ControlPlanes = []ControlPlane
 // Hour An hour of the day in UTC.
 type Hour = int
 
+// JsonWebKey JSON web key.
+type JsonWebKey = map[string]interface{}
+
 // JsonWebKeySet JSON web key set.
-type JsonWebKeySet = []map[string]interface{}
+type JsonWebKeySet struct {
+	Keys *[]JsonWebKey `json:"keys,omitempty"`
+}
 
 // KubernetesCluster Unikorn Kubernetes cluster creation parameters.
 type KubernetesCluster struct {

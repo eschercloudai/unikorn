@@ -763,7 +763,15 @@ components:
           type: integer
     jsonWebKeySet:
       description: JSON web key set.
-      type: array
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/jsonWebKey'
+    jsonWebKey:
+      description: JSON web key.
+      type: object
       items:
         description: JSON web key.
         type: object

@@ -24,6 +24,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/applicationcredentials"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -104,7 +105,7 @@ type CreateTokenOptionsScopedToken struct {
 	token string
 
 	// projectID is the project ID.  We expect an ID because the name/description
-	// is returned to thte user for context, however the ID being passed back in
+	// is returned to the user for context, however the ID being passed back in
 	// defines both the domain and project name, so is simpler and less error
 	// prone.
 	projectID string
@@ -229,4 +230,14 @@ func (c *IdentityClient) DeleteApplicationCredential(ctx context.Context, userID
 	defer span.End()
 
 	return applicationcredentials.Delete(c.client, userID, id).ExtractErr()
+}
+
+// GetUser returns user details.
+func (c *IdentityClient) GetUser(ctx context.Context, userID string) (*users.User, error) {
+	tracer := otel.GetTracerProvider().Tracer(constants.Application)
+
+	_, span := tracer.Start(ctx, "/identity/v3/users/"+userID, trace.WithSpanKind(trace.SpanKindClient))
+	defer span.End()
+
+	return users.Get(c.client, userID).Extract()
 }

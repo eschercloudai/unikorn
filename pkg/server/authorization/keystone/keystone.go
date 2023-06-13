@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/spf13/pflag"
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
@@ -182,4 +183,14 @@ func (a *Authenticator) Basic(ctx context.Context, username, password string) (*
 	}
 
 	return token, user, nil
+}
+
+// GetUser returns user details.
+func (a *Authenticator) GetUser(ctx context.Context, token, userID string) (*users.User, error) {
+	identity, err := openstack.NewIdentityClient(openstack.NewTokenProvider(a.endpoint, token))
+	if err != nil {
+		return nil, err
+	}
+
+	return identity.GetUser(ctx, userID)
 }
