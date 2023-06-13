@@ -982,6 +982,9 @@ components:
         fileStorage:
           description: Enable POSIX file based persistent storage.
           type: boolean
+        prometheus:
+          description: Enable Prometheus.
+          type: boolean
     kubernetesCluster:
       description: Unikorn Kubernetes cluster creation parameters.
       type: object

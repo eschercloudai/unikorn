@@ -307,9 +307,14 @@ func (c *KubernetesCluster) KubernetesDashboardEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.KubernetesDashboard != nil && *c.Spec.Features.KubernetesDashboard
 }
 
-// FIleStorageEnabled indicates whether a POSIX file storage CSI is required.
-func (c *KubernetesCluster) FIleStorageEnabled() bool {
+// FileStorageEnabled indicates whether a POSIX file storage CSI is required.
+func (c *KubernetesCluster) FileStorageEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.FileStorage != nil && *c.Spec.Features.FileStorage
+}
+
+// PrometheusEnabled indicates whether the Prometheus Operator is required.
+func (c *KubernetesCluster) PrometheusEnabled() bool {
+	return c.Spec.Features != nil && c.Spec.Features.Prometheus != nil && *c.Spec.Features.Prometheus
 }
 
 // GetName is the name passed down to Helm.

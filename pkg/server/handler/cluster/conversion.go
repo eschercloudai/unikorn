@@ -165,6 +165,7 @@ func convertFeatures(in *unikornv1.KubernetesCluster) *generated.KubernetesClust
 		CertManager:         in.Spec.Features.CertManager,
 		KubernetesDashboard: in.Spec.Features.KubernetesDashboard,
 		FileStorage:         in.Spec.Features.FileStorage,
+		Prometheus:          in.Spec.Features.Prometheus,
 	}
 
 	return features
@@ -493,6 +494,7 @@ func createFeatures(options *generated.KubernetesCluster) *unikornv1.KubernetesC
 		CertManager:         options.Features.CertManager,
 		KubernetesDashboard: options.Features.KubernetesDashboard,
 		FileStorage:         options.Features.FileStorage,
+		Prometheus:          options.Features.Prometheus,
 	}
 
 	return features

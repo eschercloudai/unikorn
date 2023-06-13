@@ -320,7 +320,7 @@ spec:
                     type: boolean
                   fileStorage:
                     description: FileStorage, if true, enables a POSIX read/write
-                      many sile storage.
+                      many file storage.
                     type: boolean
                   ingress:
                     description: Ingress, if true, provisions an Nginx ingress controller.
@@ -329,6 +329,9 @@ spec:
                     description: KubernetesDashboard, if true, provisions the kubernetes
                       dashboard. Clients must also enable the Ingress and CertManager
                       features.
+                    type: boolean
+                  prometheus:
+                    description: Prometheus, if true, installs the Prometheus Operator.
                     type: boolean
                 type: object
               network:
