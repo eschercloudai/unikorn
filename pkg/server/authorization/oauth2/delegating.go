@@ -694,6 +694,11 @@ func (a *Authenticator) tokenPassword(r *http.Request) (*generated.Token, error)
 		return nil, errors.OAuth2AccessDenied("authentication failed").WithError(err)
 	}
 
+	userDetail, err := a.keystone.GetUser(r.Context(), token.ID, user.ID)
+	if err != nil {
+		return nil, errors.OAuth2ServerError("unable to get user detail").WithError(err)
+	}
+
 	claims := &UnikornClaims{
 		Token: token.ID,
 		User:  user.ID,
@@ -704,9 +709,12 @@ func (a *Authenticator) tokenPassword(r *http.Request) (*generated.Token, error)
 		return nil, err
 	}
 
-	// TODO: the email is not necessarily the username, and needs another call
-	// to keystone as it's not returned, or supported by gophercloud at least.
-	idToken, err := a.oidcIDToken(r, NewScope(r.Form.Get("scope")), token.ExpiresAt, oidcHash(accessToken), r.Form.Get("client_id"), r.Form.Get("username"))
+	email, ok := userDetail.Extra["email"].(string)
+	if !ok {
+		return nil, errors.OAuth2ServerError("unable to get user email")
+	}
+
+	idToken, err := a.oidcIDToken(r, NewScope(r.Form.Get("scope")), token.ExpiresAt, oidcHash(accessToken), r.Form.Get("client_id"), email)
 	if err != nil {
 		return nil, err
 	}
