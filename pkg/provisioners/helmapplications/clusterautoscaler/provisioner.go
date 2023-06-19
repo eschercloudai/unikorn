@@ -41,11 +41,9 @@ type Provisioner struct {
 
 // New returns a new initialized provisioner object.
 func New(client client.Client, resource *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
-	releaseName := clusteropenstack.GenerateReleaseName(resource)
-
 	provisoner := &Provisioner{
-		clusterName:                 releaseName,
-		clusterKubeconfigSecretName: releaseName + "-kubeconfig",
+		clusterName:                 clusteropenstack.CAPIClusterName(resource),
+		clusterKubeconfigSecretName: clusteropenstack.KubeconfigSecretName(resource),
 	}
 
 	return application.New(client, applicationName, resource, helm).WithGenerator(provisoner)

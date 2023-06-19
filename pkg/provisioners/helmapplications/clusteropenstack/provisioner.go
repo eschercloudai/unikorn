@@ -351,6 +351,10 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 		},
 	}
 
+	if _, ok := p.cluster.Annotations[constants.ForceClusterNameAnnotation]; ok {
+		values["legacyResourceNames"] = true
+	}
+
 	if p.cluster.Spec.API != nil {
 		apiValues := map[string]interface{}{}
 
@@ -377,17 +381,8 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 	return values, nil
 }
 
-func GenerateReleaseName(cluster *unikornv1.KubernetesCluster) string {
-	name, ok := cluster.Annotations[constants.ForceClusterNameAnnotation]
-	if ok {
-		return name
-	}
-
-	return cluster.Labels[constants.ControlPlaneLabel] + "-" + cluster.Name
-}
-
 func (p *Provisioner) ReleaseName() string {
-	return GenerateReleaseName(p.cluster)
+	return releaseName(p.cluster)
 }
 
 func (p *Provisioner) getProvisioner() provisioners.Provisioner {

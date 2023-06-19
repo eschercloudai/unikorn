@@ -101,7 +101,7 @@ func (o *getKubeconfigClusterOptions) run() error {
 		return err
 	}
 
-	secret, err := vclusterClient.CoreV1().Secrets(o.clusterFlags.Cluster).Get(context.TODO(), clusteropenstack.GenerateReleaseName(cluster)+"-kubeconfig", metav1.GetOptions{})
+	secret, err := vclusterClient.CoreV1().Secrets(o.clusterFlags.Cluster).Get(context.TODO(), clusteropenstack.KubeconfigSecretName(cluster), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

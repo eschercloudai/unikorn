@@ -151,14 +151,14 @@ func (c *Client) GetKubeconfig(ctx context.Context, controlPlaneName generated.C
 
 	objectKey := client.ObjectKey{
 		Namespace: name,
-		Name:      clusteropenstack.GenerateReleaseName(cluster) + "-kubeconfig",
+		Name:      clusteropenstack.KubeconfigSecretName(cluster),
 	}
 
 	secret := &corev1.Secret{}
 
 	if err := vclusterClient.Get(ctx, objectKey, secret); err != nil {
 		if kerrors.IsNotFound(err) {
-			return nil, errors.HTTPNotFound()
+			return nil, errors.HTTPNotFound().WithError(err)
 		}
 
 		return nil, errors.OAuth2ServerError("unable to get cluster configuration").WithError(err)
