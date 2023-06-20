@@ -51,6 +51,19 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
+  name: cluster-api-0.1.8-1
+spec:
+  repo: https://eschercloudai.github.io/helm-cluster-api
+  chart: cluster-api
+  version: v0.1.8
+  interface: 1.0.0
+  parameters:
+  - name: cluster-api-provider-openstack.image
+    value: spjmurray/capi-openstack-controller-amd64:v0.7.3-simon7
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
   name: cilium-1.12.4-1
 spec:
   repo: https://helm.cilium.io
