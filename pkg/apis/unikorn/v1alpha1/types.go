@@ -362,6 +362,7 @@ type KubernetesWorkloadPoolList struct {
 	Items           []KubernetesWorkloadPool `json:"items"`
 }
 
+// TODO: deprecate me.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
@@ -461,6 +462,7 @@ type KubernetesWorkloadPoolSpec struct {
 	// Name allows overriding the pool name.  Workload pool resources in the same
 	// namespace need unique names, but may apply to different clusters which exist
 	// in their own "namespace".
+	// TODO: deprecate me when the CRD goes.
 	Name *string `json:"name,omitempty"`
 	// FailureDomain is the failure domain to use for the pool.
 	FailureDomain *string `json:"failureDomain,omitempty"`
