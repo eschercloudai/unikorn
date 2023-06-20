@@ -18,8 +18,10 @@ package clusteropenstack
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -28,15 +30,31 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// In older versions we used the name verbatim, that could blow the 63 character limit
+// easily.  In new versions, the chart will hash the pool name to keep it to 8 characters.
+func (p *Provisioner) helmWorkloadPoolName(name string) string {
+	if _, ok := p.cluster.Annotations[constants.ForceClusterNameAnnotation]; ok {
+		return name
+	}
+
+	sum := sha256.Sum256([]byte(name))
+
+	hash := fmt.Sprintf("%x", sum)
+
+	return hash[:8]
+}
+
 // getWorkloadPoolMachineDeploymentNames gets a list of machine deployments that should
 // exist for this cluster.
 // TODO: this is horrific and relies on knowing the internal workings of the Helm chart
 // not just the public API!!!
+// TODO: the new cluster chart in 1.2.o will contain a "pool.eschercloud.ai/name" annotaion
+// that will give a verbatim pool name for use with this once 1.1.0 cluster have gone.
 func (p *Provisioner) getWorkloadPoolMachineDeploymentNames() []string {
 	names := make([]string, len(p.workloadPools.Items))
 
 	for i, pool := range p.workloadPools.Items {
-		names[i] = fmt.Sprintf("%s-pool-%s", p.cluster.Name, pool.GetName())
+		names[i] = fmt.Sprintf("%s-pool-%s", releaseName(p.cluster), p.helmWorkloadPoolName(pool.GetName()))
 	}
 
 	return names
@@ -50,7 +68,7 @@ func (p *Provisioner) filterOwnedResources(resources []unstructured.Unstructured
 		ownerReferences := resource.GetOwnerReferences()
 
 		for _, ownerReference := range ownerReferences {
-			if ownerReference.Kind != "Cluster" || ownerReference.Name != p.cluster.Name {
+			if ownerReference.Kind != "Cluster" || ownerReference.Name != releaseName(p.cluster) {
 				continue
 			}
 
