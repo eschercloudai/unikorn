@@ -39,7 +39,7 @@ spec:
   - name: cluster-api
     reference:
       kind: HelmApplication
-      name: cluster-api-0.1.7-1
+      name: cluster-api-0.1.8-1
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ApplicationBundle
