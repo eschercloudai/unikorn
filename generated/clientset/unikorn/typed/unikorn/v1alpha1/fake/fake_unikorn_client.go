@@ -44,10 +44,6 @@ func (c *FakeUnikornV1alpha1) KubernetesClusters(namespace string) v1alpha1.Kube
 	return &FakeKubernetesClusters{c, namespace}
 }
 
-func (c *FakeUnikornV1alpha1) KubernetesWorkloadPools(namespace string) v1alpha1.KubernetesWorkloadPoolInterface {
-	return &FakeKubernetesWorkloadPools{c, namespace}
-}
-
 func (c *FakeUnikornV1alpha1) Projects() v1alpha1.ProjectInterface {
 	return &FakeProjects{c}
 }

@@ -37,7 +37,6 @@ func NewGetCommand(f cmdutil.Factory) *cobra.Command {
 		newGetProjectCommand(f),
 		newGetControlPlaneCommand(f),
 		newGetClusterCommand(f),
-		newGetWorkloadPoolCommand(f),
 		kubeconfig.NewGetKubeconfigCommand(f),
 	}
 

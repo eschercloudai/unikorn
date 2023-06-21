@@ -15,16 +15,6 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: vcluster-0.12.1-1
-spec:
-  repo: https://charts.loft.sh
-  chart: vcluster
-  version: 0.12.1
-  release: vcluster
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
   name: vcluster-0.15.0-1
 spec:
   repo: https://charts.loft.sh
@@ -34,19 +24,6 @@ spec:
   parameters:
   - name: hostpathMapper.enabled
     value: 'true'
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
-  name: cluster-api-0.1.7-1
-spec:
-  repo: https://eschercloudai.github.io/helm-cluster-api
-  chart: cluster-api
-  version: v0.1.7
-  interface: 1.0.0
-  parameters:
-  - name: cluster-api-provider-openstack.image
-    value: spjmurray/capi-openstack-controller-amd64:v0.7.3-simon7
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
@@ -64,16 +41,6 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: cilium-1.12.4-1
-spec:
-  repo: https://helm.cilium.io
-  chart: cilium
-  version: 1.12.4
-  interface: 1.0.0
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
   name: cilium-1.13.3-1
 spec:
   repo: https://helm.cilium.io
@@ -85,17 +52,6 @@ spec:
       value: 'true'
     - name: hubble.ui.enabled
       value: 'true'
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
-  name: cluster-openstack-0.3.15-1
-spec:
-  repo: https://eschercloudai.github.io/helm-cluster-api
-  chart: cluster-api-cluster-openstack
-  version: v0.3.15
-  createNamespace: true
-  interface: 1.0.0
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
@@ -152,19 +108,6 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: nvidia-gpu-operator-22.9.2-1
-spec:
-  chart: gpu-operator
-  interface: 1.0.0
-  repo: https://helm.ngc.nvidia.com/nvidia
-  version: v22.9.2
-  parameters:
-  - name: validator.plugin
-    value: "null"
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
   name: nvidia-gpu-operator-23.3.1-1
 spec:
   chart: gpu-operator
@@ -176,27 +119,6 @@ spec:
     value: "WITH_WORKLOAD"
   - name: validator.plugin.env[0].value
     value: f
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
-  name: cluster-autoscaler-0.0.0-1
-spec:
-  repo: https://github.com/yankcrime/autoscaler
-  path: charts/cluster-autoscaler
-  version: openstack-sfz
-  interface: 1.0.0
-  parameters:
-  - name: cloudProvider
-    value: clusterapi
-  - name: clusterAPIMode
-    value: kubeconfig-incluster
-  - name: extraArgs.scale-down-delay-after-add
-    value: 5m
-  - name: extraArgs.scale-down-unneeded-time
-    value: 5m
-  - name: image.tag
-    value: v1.26.1
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
@@ -229,16 +151,6 @@ spec:
   repo: https://eschercloudai.github.io/helm-cluster-api
   chart: cluster-api-cluster-autoscaler-openstack
   version: v0.1.0
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: HelmApplication
-metadata:
-  name: nginx-ingress-0.16.2-1
-spec:
-  repo: https://helm.nginx.com/stable
-  chart: nginx-ingress
-  version: 0.16.2
-  createNamespace: true
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication

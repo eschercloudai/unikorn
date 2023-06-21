@@ -317,15 +317,6 @@ func (c *KubernetesCluster) PrometheusEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.Prometheus != nil && *c.Spec.Features.Prometheus
 }
 
-// GetName is the name passed down to Helm.
-func (w *KubernetesWorkloadPool) GetName() string {
-	if w.Spec.Name != nil {
-		return *w.Spec.Name
-	}
-
-	return w.Name
-}
-
 // Ensure type is sortable for stable deterministic output.
 var _ sort.Interface = &ProjectList{}
 

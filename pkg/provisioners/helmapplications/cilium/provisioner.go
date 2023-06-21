@@ -59,6 +59,16 @@ func (p *Provisioner) Values(_ *string) (interface{}, error) {
 
 	values := map[string]interface{}{
 		"operator": operatorValues,
+		"hubble": map[string]interface{}{
+			"relay": map[string]interface{}{
+				"nodeSelector": util.ControlPlaneNodeSelector(),
+				"tolerations":  util.ControlPlaneTolerations(),
+			},
+			"ui": map[string]interface{}{
+				"nodeSelector": util.ControlPlaneNodeSelector(),
+				"tolerations":  util.ControlPlaneTolerations(),
+			},
+		},
 	}
 
 	return values, nil

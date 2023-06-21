@@ -45,10 +45,6 @@ const (
 	KubernetesClusterKind = "KubernetesCluster"
 	// KubernetesClusterResource is the API endpoint for a cluster resource.
 	KubernetesClusterResource = "kubernetesclusters"
-	// KubernetesWorkloadPoolKind is the API kind for a workload pool resource.
-	KubernetesWorkloadPoolKind = "KubernetesWorkloadPool"
-	// KubernetesWorkloadPoolResource is the API endpoint for a workload pool resource.
-	KubernetesWorkloadPoolResource = "kubernetesworkloadpools"
 	// HelmApplicationKind is the API kind for helm application descriptors.
 	HelmApplicationKind = "HelmApplication"
 	// HelmApplicationResource is the API endpoint for helm application descriptors.
@@ -77,7 +73,6 @@ var (
 func init() {
 	SchemeBuilder.Register(&Project{}, &ProjectList{})
 	SchemeBuilder.Register(&ControlPlane{}, &ControlPlaneList{})
-	SchemeBuilder.Register(&KubernetesWorkloadPool{}, &KubernetesWorkloadPoolList{})
 	SchemeBuilder.Register(&KubernetesCluster{}, &KubernetesClusterList{})
 	SchemeBuilder.Register(&HelmApplication{}, &HelmApplicationList{})
 	SchemeBuilder.Register(&ApplicationBundle{}, &ApplicationBundleList{})

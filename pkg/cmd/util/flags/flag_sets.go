@@ -26,11 +26,8 @@ import (
 
 	"github.com/eschercloudai/unikorn/generated/clientset/unikorn"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	computil "k8s.io/kubectl/pkg/util/completion"
 )
@@ -241,55 +238,6 @@ func (o *ClusterFlags) AddFlags(f cmdutil.Factory, cmd *cobra.Command) {
 
 	// Note: cannot use "cluster" here as it clashes with cli-runtime.
 	registerFunc(cmd, &o.Cluster, "kubernetes-cluster", "", "Cluster scope of a resource.", o.CompleteCluster(f))
-}
-
-// CompleteWorkloadPool provides tab completion for the specified resource type.
-func (o *ClusterFlags) CompleteWorkloadPool(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := getClient(f)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		names, err := o.GetClusterWorkloadPools(context.TODO(), client)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		return names, cobra.ShellCompDirectiveNoFileComp
-	}
-}
-
-// GetClusterWorkloadPools gets workload pools linked to a cluster in a project's control plane.
-func (o *ClusterFlags) GetClusterWorkloadPools(ctx context.Context, client unikorn.Interface) ([]string, error) {
-	namespace, err := o.GetControlPlaneNamespace(ctx, client)
-	if err != nil {
-		return nil, err
-	}
-
-	selector := labels.Everything()
-
-	if o.Cluster != "" {
-		clusterLabel, err := labels.NewRequirement(constants.KubernetesClusterLabel, selection.Equals, []string{o.Cluster})
-		if err != nil {
-			return nil, err
-		}
-
-		selector = selector.Add(*clusterLabel)
-	}
-
-	pools, err := client.UnikornV1alpha1().KubernetesWorkloadPools(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		return nil, err
-	}
-
-	names := make([]string, len(pools.Items))
-
-	for i, pool := range pools.Items {
-		names[i] = pool.Name
-	}
-
-	return names, nil
 }
 
 // DeleteFlags define common deletion options.

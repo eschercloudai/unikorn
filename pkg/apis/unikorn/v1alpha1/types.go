@@ -355,29 +355,6 @@ type ControlPlaneCondition struct {
 	Message string `json:"message"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type KubernetesWorkloadPoolList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []KubernetesWorkloadPool `json:"items"`
-}
-
-// TODO: deprecate me.
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
-// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels.unikorn\\.eschercloud\\.ai/cluster"
-// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.version"
-// +kubebuilder:printcolumn:name="image",type="string",JSONPath=".spec.image"
-// +kubebuilder:printcolumn:name="flavor",type="string",JSONPath=".spec.flavor"
-// +kubebuilder:printcolumn:name="replicas",type="string",JSONPath=".spec.replicas"
-type KubernetesWorkloadPool struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              KubernetesWorkloadPoolSpec   `json:"spec"`
-	Status            KubernetesWorkloadPoolStatus `json:"status,omitempty"`
-}
-
 // MachineGeneric contains common things across all pool types, including
 // Kubernetes control plane nodes and workload pools.
 type MachineGeneric struct {
@@ -459,11 +436,8 @@ type MachineGenericAutoscalingSchedulerGPU struct {
 // state.
 type KubernetesWorkloadPoolSpec struct {
 	MachineGeneric `json:",inline"`
-	// Name allows overriding the pool name.  Workload pool resources in the same
-	// namespace need unique names, but may apply to different clusters which exist
-	// in their own "namespace".
-	// TODO: deprecate me when the CRD goes.
-	Name *string `json:"name,omitempty"`
+	// Name is the name of the pool.
+	Name string `json:"name"`
 	// FailureDomain is the failure domain to use for the pool.
 	FailureDomain *string `json:"failureDomain,omitempty"`
 	// Labels is the set of node labels to apply to the pool on
@@ -475,9 +449,6 @@ type KubernetesWorkloadPoolSpec struct {
 	// Autoscaling contains optional sclaing limits and scheduling
 	// hints for autoscaling.
 	Autoscaling *MachineGenericAutoscaling `json:"autoscaling,omitempty"`
-}
-
-type KubernetesWorkloadPoolStatus struct {
 }
 
 // KubernetesClusterList is a typed list of kubernetes clusters.
@@ -610,17 +581,9 @@ type KubernetesClusterControlPlaneSpec struct {
 
 type KubernetesClusterWorkloadPoolsPoolSpec struct {
 	KubernetesWorkloadPoolSpec `json:",inline"`
-
-	// Name is the name of the pool.
-	Name string `json:"name"`
 }
 
 type KubernetesClusterWorkloadPoolsSpec struct {
-	// Selector is a label selector to collect KubernetesClusterWorkloadPool
-	// resources.  If not specified Pools will be used exclusively.
-	// Label selectors are expected to be used for CLI generated clusters.
-	Selector *metav1.LabelSelector `json:"selector,omitempty"`
-
 	// Pools contains an inline set of pools.  This field will be ignored
 	// when Selector is set.  Inline pools are expected to be used for UI
 	// generated clusters.

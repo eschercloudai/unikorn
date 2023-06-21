@@ -34,7 +34,6 @@ func NewDeleteCommand(f cmdutil.Factory) *cobra.Command {
 		newDeleteProjectCommand(f),
 		newDeleteControlPlaneCommand(f),
 		newDeleteClusterCommand(f),
-		newDeleteWorkloadPoolCommand(f),
 	}
 
 	cmd.AddCommand(commands...)
