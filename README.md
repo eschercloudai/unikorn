@@ -52,7 +52,7 @@ Consult the [developer documentation](DEVELOPER.md) for local development instru
 Download the official binary (update the version as appropriate):
 
 ```shell
-wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.3.36/unikornctl-linux-amd64
+wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.3.37/unikornctl-linux-amd64
 ```
 
 ### Set up shell completion
@@ -232,7 +232,7 @@ spec:
   source:
     path: charts/unikorn
     repoURL: git@github.com:eschercloudai/unikorn
-    targetRevision: 0.3.36
+    targetRevision: 0.3.37
     helm:
       parameters:
       - name: dockerConfig

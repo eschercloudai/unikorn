@@ -37,6 +37,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
+        description: 'TODO: deprecate me.'
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -157,9 +158,10 @@ spec:
                   on initialisation/join.
                 type: object
               name:
-                description: Name allows overriding the pool name.  Workload pool
+                description: 'Name allows overriding the pool name.  Workload pool
                   resources in the same namespace need unique names, but may apply
-                  to different clusters which exist in their own "namespace".
+                  to different clusters which exist in their own "namespace". TODO:
+                  deprecate me when the CRD goes.'
                 type: string
               replicas:
                 default: 3

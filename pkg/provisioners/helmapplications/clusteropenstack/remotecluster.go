@@ -38,10 +38,6 @@ import (
 // releaseName generates a unique helm-compliant release name from the cluster's
 // name.
 func releaseName(cluster *unikornv1.KubernetesCluster) string {
-	if name, ok := cluster.Annotations[constants.ForceClusterNameAnnotation]; ok {
-		return name
-	}
-
 	// This must be no longer than 53 characters and unique across all control
 	// planes to avoid OpenStack network aliasing.
 	sum := sha256.Sum256([]byte(cluster.Labels[constants.ControlPlaneLabel] + ":" + cluster.Name))
@@ -55,24 +51,12 @@ func releaseName(cluster *unikornv1.KubernetesCluster) string {
 // the given cluster's name.  This is referred to by the cluster autoscaler for
 // example.
 func CAPIClusterName(cluster *unikornv1.KubernetesCluster) string {
-	// If the name is forced, this means that it's using the legacy naming
-	// version of the Helm chart, and it's based on the cluster name.
-	if name, ok := cluster.Annotations[constants.ForceClusterNameAnnotation]; ok {
-		return name
-	}
-
 	return releaseName(cluster)
 }
 
 // KubeconfigSecretName generates the kubeconfig secret name that will be generated
 // by CAPI for the given cluster's name.
 func KubeconfigSecretName(cluster *unikornv1.KubernetesCluster) string {
-	// If the name is forced, this means that it's using the legacy naming
-	// version of the Helm chart, and it's based on the cluster name.
-	if name, ok := cluster.Annotations[constants.ForceClusterNameAnnotation]; ok {
-		return name + "-kubeconfig"
-	}
-
 	return releaseName(cluster) + "-kubeconfig"
 }
 

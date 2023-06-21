@@ -1,32 +1,10 @@
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ApplicationBundle
 metadata:
-  name: control-plane-1.0.1
-spec:
-  kind: ControlPlane
-  version: 1.0.1
-  applications:
-  - name: vcluster
-    reference:
-      kind: HelmApplication
-      name: vcluster-0.12.1-1
-  - name: cert-manager
-    reference:
-      kind: HelmApplication
-      name: cert-manager-1.11.0-1
-  - name: cluster-api
-    reference:
-      kind: HelmApplication
-      name: cluster-api-0.1.7-1
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: ApplicationBundle
-metadata:
   name: control-plane-1.1.0
 spec:
   kind: ControlPlane
   version: 1.1.0
-  preview: true
   applications:
   - name: vcluster
     reference:
@@ -44,109 +22,8 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ApplicationBundle
 metadata:
-  name: kubernetes-cluster-1.1.0
-spec:
-  kind: KubernetesCluster
-  version: 1.1.0
-  endOfLife: 2023-07-01T00:00:00Z
-  applications:
-  - name: cluster-openstack
-    reference:
-      kind: HelmApplication
-      name: cluster-openstack-0.3.15-1
-  - name: cilium
-    reference:
-      kind: HelmApplication
-      name: cilium-1.12.4-1
-  - name: openstack-cloud-provider
-    reference:
-      kind: HelmApplication
-      name: openstack-cloud-provider-1.4.0-1
-  - name: openstack-plugin-cinder-csi
-    reference:
-      kind: HelmApplication
-      name: openstack-plugin-cinder-csi-2.3.0-1
-  - name: metrics-server
-    reference:
-      kind: HelmApplication
-      name: metrics-server-3.8.4-1
-  - name: nginx-ingress
-    reference:
-      kind: HelmApplication
-      name: nginx-ingress-0.16.2-1
-  - name: cluster-autoscaler
-    reference:
-      kind: HelmApplication
-      name: cluster-autoscaler-0.0.0-1
-  - name: nvidia-gpu-operator
-    reference:
-      kind: HelmApplication
-      name: nvidia-gpu-operator-22.9.2-1
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: ApplicationBundle
-metadata:
-  name: kubernetes-cluster-1.2.0
-spec:
-  kind: KubernetesCluster
-  version: 1.2.0
-  applications:
-  - name: cluster-openstack
-    reference:
-      kind: HelmApplication
-      name: cluster-openstack-0.3.22-1
-  - name: cilium
-    reference:
-      kind: HelmApplication
-      name: cilium-1.12.4-1
-  - name: openstack-cloud-provider
-    reference:
-      kind: HelmApplication
-      name: openstack-cloud-provider-1.4.0-1
-  - name: openstack-plugin-cinder-csi
-    reference:
-      kind: HelmApplication
-      name: openstack-plugin-cinder-csi-2.3.0-1
-  - name: metrics-server
-    reference:
-      kind: HelmApplication
-      name: metrics-server-3.8.4-1
-  - name: nginx-ingress
-    reference:
-      kind: HelmApplication
-      name: ingress-nginx-4.6.1-1
-  - name: cluster-autoscaler
-    reference:
-      kind: HelmApplication
-      name: cluster-autoscaler-1.27.1-1
-  - name: cluster-autoscaler-openstack
-    reference:
-      kind: HelmApplication
-      name: cluster-autoscaler-openstack-0.1.0-1
-  - name: nvidia-gpu-operator
-    reference:
-      kind: HelmApplication
-      name: nvidia-gpu-operator-23.3.1-1
-  - name: cert-manager
-    reference:
-      kind: HelmApplication
-      name: cert-manager-1.11.0-1
-  - name: cert-manager-issuers
-    reference:
-      kind: HelmApplication
-      name: cert-manager-issuers-1.0.0-1
-  - name: kubernetes-dashboard
-    reference:
-      kind: HelmApplication
-      name: kubernetes-dashboard-6.0.7-1
-
----
-apiVersion: unikorn.eschercloud.ai/v1alpha1
-kind: ApplicationBundle
-metadata:
   name: kubernetes-cluster-1.3.0
 spec:
-  preview: true
   kind: KubernetesCluster
   version: 1.3.0
   applications:

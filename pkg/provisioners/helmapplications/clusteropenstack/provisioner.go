@@ -27,8 +27,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/util"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -48,10 +46,6 @@ type Provisioner struct {
 	// remote is the remote cluster to deploy to.
 	remote provisioners.RemoteCluster
 
-	// workloadPools is a snapshot of the workload pool members at
-	// creation time.
-	workloadPools *unikornv1.KubernetesWorkloadPoolList
-
 	// controlPlanePrefix contains the IP address prefix to add
 	// to the cluster firewall if, required.
 	controlPlanePrefix string
@@ -65,13 +59,6 @@ type Provisioner struct {
 
 // New returns a new initialized provisioner object.
 func New(ctx context.Context, client client.Client, cluster *unikornv1.KubernetesCluster, application *unikornv1.HelmApplication) (*Provisioner, error) {
-	// Do this once so it's atomic, we don't want it changing in different
-	// places.
-	workloadPools, err := getWorkloadPools(ctx, client, cluster)
-	if err != nil {
-		return nil, err
-	}
-
 	// Add the SNAT address of the control plane's default route.
 	// Sadly, we are the only thing guaranteed to live behind the same
 	// router, the CLI tools and UI are or can be used anywhere, so
@@ -84,7 +71,6 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	provisioner := &Provisioner{
 		client:             client,
 		cluster:            cluster,
-		workloadPools:      workloadPools,
 		controlPlanePrefix: controlPlanePrefix,
 		application:        application,
 	}
@@ -142,91 +128,38 @@ func (p *Provisioner) generateMachineHelmValues(machine *unikornv1.MachineGeneri
 	return object
 }
 
-// getWorkloadPools athers all workload pools that belong to this cluster.
-// By default that's all the things, in reality most sane people will add label
-// selectors.
-func getWorkloadPools(ctx context.Context, c client.Client, cluster *unikornv1.KubernetesCluster) (*unikornv1.KubernetesWorkloadPoolList, error) {
-	// No workload pools at all.
-	if cluster.Spec.WorkloadPools == nil {
-		//nolint:nilnil
-		return nil, nil
-	}
-
-	// When using selector based pools, just list them.
-	if cluster.Spec.WorkloadPools.Selector != nil {
-		selector, err := metav1.LabelSelectorAsSelector(cluster.Spec.WorkloadPools.Selector)
-		if err != nil {
-			return nil, err
-		}
-
-		workloadPools := &unikornv1.KubernetesWorkloadPoolList{}
-
-		if err := c.List(ctx, workloadPools, &client.ListOptions{LabelSelector: selector}); err != nil {
-			return nil, err
-		}
-
-		// The inherent problem here is a race condition, with us picking something up
-		// even though it's marked for deletion, so it stays around.
-		filtered := &unikornv1.KubernetesWorkloadPoolList{}
-
-		for _, pool := range workloadPools.Items {
-			if pool.DeletionTimestamp == nil {
-				filtered.Items = append(filtered.Items, pool)
-			}
-		}
-
-		return filtered, nil
-	}
-
-	// Otherwise we are using inline pools.
-	workloadPools := &unikornv1.KubernetesWorkloadPoolList{}
-
-	for _, pool := range cluster.Spec.WorkloadPools.Pools {
-		workloadPool := unikornv1.KubernetesWorkloadPool{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: pool.Name,
-			},
-			Spec: pool.KubernetesWorkloadPoolSpec,
-		}
-
-		workloadPools.Items = append(workloadPools.Items, workloadPool)
-	}
-
-	return workloadPools, nil
-}
-
 // generateWorkloadPoolHelmValues translates the API's idea of a workload pool into
 // what's expected by the underlying Helm chart.
 func (p *Provisioner) generateWorkloadPoolHelmValues() map[string]interface{} {
 	workloadPools := map[string]interface{}{}
 
-	for i := range p.workloadPools.Items {
-		workloadPool := &p.workloadPools.Items[i]
+	for i := range p.cluster.Spec.WorkloadPools.Pools {
+		workloadPool := &p.cluster.Spec.WorkloadPools.Pools[i]
 
 		object := map[string]interface{}{
-			"version":  string(*workloadPool.Spec.Version),
-			"replicas": *workloadPool.Spec.Replicas,
-			"machine":  p.generateMachineHelmValues(&workloadPool.Spec.MachineGeneric, workloadPool.Spec.FailureDomain),
+			"version":  string(*workloadPool.Version),
+			"replicas": *workloadPool.Replicas,
+			"machine":  p.generateMachineHelmValues(&workloadPool.MachineGeneric, workloadPool.FailureDomain),
 		}
 
-		if p.cluster.AutoscalingEnabled() && workloadPool.Spec.Autoscaling != nil {
+		if p.cluster.AutoscalingEnabled() && workloadPool.Autoscaling != nil {
 			object["autoscaling"] = generateWorkloadPoolSchedulerHelmValues(workloadPool)
 		}
 
-		if len(workloadPool.Spec.Labels) != 0 {
+		if len(workloadPool.Labels) != 0 {
 			labels := map[string]interface{}{}
 
-			for key, value := range workloadPool.Spec.Labels {
+			for key, value := range workloadPool.Labels {
 				labels[key] = value
 			}
 
 			object["labels"] = labels
 		}
 
-		if len(workloadPool.Spec.Files) != 0 {
-			files := make([]interface{}, len(workloadPool.Spec.Files))
+		if len(workloadPool.Files) != 0 {
+			files := make([]interface{}, len(workloadPool.Files))
 
-			for i, file := range workloadPool.Spec.Files {
+			for i, file := range workloadPool.Files {
 				files[i] = map[string]interface{}{
 					"path":    *file.Path,
 					"content": base64.StdEncoding.EncodeToString(file.Content),
@@ -236,7 +169,7 @@ func (p *Provisioner) generateWorkloadPoolHelmValues() map[string]interface{} {
 			object["files"] = files
 		}
 
-		workloadPools[workloadPool.GetName()] = object
+		workloadPools[workloadPool.Name] = object
 	}
 
 	return workloadPools
@@ -244,29 +177,29 @@ func (p *Provisioner) generateWorkloadPoolHelmValues() map[string]interface{} {
 
 // generateWorkloadPoolSchedulerHelmValues translates from Kubernetes API scheduling
 // parameters into ones acceptable by Helm.
-func generateWorkloadPoolSchedulerHelmValues(p *unikornv1.KubernetesWorkloadPool) map[string]interface{} {
+func generateWorkloadPoolSchedulerHelmValues(p *unikornv1.KubernetesClusterWorkloadPoolsPoolSpec) map[string]interface{} {
 	// When enabled, scaling limits are required.
 	values := map[string]interface{}{
 		"limits": map[string]interface{}{
-			"minReplicas": *p.Spec.Autoscaling.MinimumReplicas,
-			"maxReplicas": *p.Spec.Autoscaling.MaximumReplicas,
+			"minReplicas": *p.Autoscaling.MinimumReplicas,
+			"maxReplicas": *p.Autoscaling.MaximumReplicas,
 		},
 	}
 
 	// When scaler from zero is enabled, you need to provide CPU and memory hints,
 	// the autoscaler cannot guess the flavor attributes.
-	if p.Spec.Autoscaling.Scheduler != nil {
+	if p.Autoscaling.Scheduler != nil {
 		scheduling := map[string]interface{}{
-			"cpu":    *p.Spec.Autoscaling.Scheduler.CPU,
-			"memory": fmt.Sprintf("%dG", p.Spec.Autoscaling.Scheduler.Memory.Value()>>30),
+			"cpu":    *p.Autoscaling.Scheduler.CPU,
+			"memory": fmt.Sprintf("%dG", p.Autoscaling.Scheduler.Memory.Value()>>30),
 		}
 
 		// If the flavor has a GPU, then we also need to inform the autoscaler
 		// about the GPU scheduling information.
-		if p.Spec.Autoscaling.Scheduler.GPU != nil {
+		if p.Autoscaling.Scheduler.GPU != nil {
 			gpu := map[string]interface{}{
-				"type":  *p.Spec.Autoscaling.Scheduler.GPU.Type,
-				"count": *p.Spec.Autoscaling.Scheduler.GPU.Count,
+				"type":  *p.Autoscaling.Scheduler.GPU.Type,
+				"count": *p.Autoscaling.Scheduler.GPU.Count,
 			}
 
 			scheduling["gpu"] = gpu
@@ -349,10 +282,6 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 			},
 			"dnsNameservers": nameservers,
 		},
-	}
-
-	if _, ok := p.cluster.Annotations[constants.ForceClusterNameAnnotation]; ok {
-		values["legacyResourceNames"] = true
 	}
 
 	if p.cluster.Spec.API != nil {

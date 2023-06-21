@@ -34,7 +34,6 @@ func NewCreateCommand(f cmdutil.Factory) *cobra.Command {
 		newCreateProjectCommand(f),
 		newCreateControlPlaneCommand(f),
 		newCreateClusterCommand(f),
-		newCreateWorkloadPoolCommand(f),
 	}
 
 	cmd.AddCommand(commands...)

@@ -17,15 +17,8 @@ limitations under the License.
 package controlplane
 
 import (
-	"context"
-	"fmt"
-
-	"golang.org/x/mod/semver"
-
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/managers/common"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -60,78 +53,6 @@ func (*Factory) RegisterWatches(manager manager.Manager, controller controller.C
 // Upgrade can perform metadata upgrades of all versioned resources on restart/upgrade
 // of the controller.  This must not affect the spec in any way as it causes split brain
 // and potential fail.
-func (*Factory) Upgrade(c client.Client) error {
-	ctx := context.TODO()
-
-	resources := &unikornv1.ControlPlaneList{}
-
-	if err := c.List(ctx, resources, &client.ListOptions{}); err != nil {
-		return err
-	}
-
-	for i := range resources.Items {
-		if err := upgrade(ctx, c, &resources.Items[i]); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// semverLess returns true if a is less than b.
-func semverLess(a, b string) bool {
-	// Note we use un-prefixed tags, the library expects different.
-	return semver.Compare("v"+a, "v"+b) < 0
-}
-
-func upgrade(ctx context.Context, c client.Client, resource *unikornv1.ControlPlane) error {
-	version, ok := resource.Labels[constants.VersionLabel]
-	if !ok {
-		return unikornv1.ErrMissingLabel
-	}
-
-	// Skip development versions.  This may lead to people unwittingly using old
-	// resources that don't match the requirements of a newer version, but it's
-	// better than trying to upgrade to a newer version accidentally when it's
-	// already at that version, and legacy resource selection won't work at all.
-	if version == constants.DeveloperVersion {
-		if constants.IsProduction() {
-			return fmt.Errorf("%w: unexpected developer resource", common.ErrUpgrade)
-		}
-
-		return nil
-	}
-
-	project, ok := resource.Labels[constants.ProjectLabel]
-	if !ok {
-		return unikornv1.ErrMissingLabel
-	}
-
-	newResource := resource.DeepCopy()
-
-	// In 0.3.27, the underlying namespace for a control plane was augmented with the
-	// "unikorn.eschercloud.ai/kind" label to avoid aliasing with project
-	// namespaces as "unikorn.eschercloud.ai/project" was added to them to provide
-	// scoping.
-	if semverLess(version, "0.3.27") {
-		namespace, err := util.GetResourceNamespaceLegacy(ctx, c, constants.ControlPlaneLabel, resource.Name)
-		if err != nil {
-			return err
-		}
-
-		namespace.Labels[constants.KindLabel] = constants.KindLabelValueControlPlane
-		namespace.Labels[constants.ProjectLabel] = project
-
-		if err := c.Update(ctx, namespace, &client.UpdateOptions{}); err != nil {
-			return err
-		}
-
-		newResource.Labels[constants.VersionLabel] = "0.3.27"
-	}
-
-	if err := c.Patch(ctx, newResource, client.MergeFrom(resource)); err != nil {
-		return err
-	}
-
+func (*Factory) Upgrade(_ client.Client) error {
 	return nil
 }

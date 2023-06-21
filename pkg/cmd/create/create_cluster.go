@@ -318,13 +318,6 @@ func (o *createClusterOptions) run() error {
 					DiskSize: o.diskSize.Quantity,
 				},
 			},
-			WorkloadPools: &unikornv1.KubernetesClusterWorkloadPoolsSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						constants.KubernetesClusterLabel: o.name,
-					},
-				},
-			},
 			Features: &unikornv1.KubernetesClusterFeaturesSpec{
 				Autoscaling: &o.autoscaling,
 				Ingress:     &o.ingress,

@@ -437,8 +437,8 @@ func (c *Client) createWorkloadPools(options *generated.KubernetesCluster) (*uni
 		}
 
 		workloadPool := unikornv1.KubernetesClusterWorkloadPoolsPoolSpec{
-			Name: pool.Name,
 			KubernetesWorkloadPoolSpec: unikornv1.KubernetesWorkloadPoolSpec{
+				Name:           pool.Name,
 				MachineGeneric: *machine,
 				FailureDomain:  pool.AvailabilityZone,
 			},

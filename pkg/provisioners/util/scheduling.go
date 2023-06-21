@@ -22,12 +22,6 @@ package util
 // scale to zero.
 func ControlPlaneTolerations() []interface{} {
 	return []interface{}{
-		// TODO: this is legacy and can be updated when all clusters
-		// are purged of "master" references.
-		map[string]interface{}{
-			"key":    "node-role.kubernetes.io/master",
-			"effect": "NoSchedule",
-		},
 		map[string]interface{}{
 			"key":    "node-role.kubernetes.io/control-plane",
 			"effect": "NoSchedule",

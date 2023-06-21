@@ -21,7 +21,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,10 +32,6 @@ import (
 // In older versions we used the name verbatim, that could blow the 63 character limit
 // easily.  In new versions, the chart will hash the pool name to keep it to 8 characters.
 func (p *Provisioner) helmWorkloadPoolName(name string) string {
-	if _, ok := p.cluster.Annotations[constants.ForceClusterNameAnnotation]; ok {
-		return name
-	}
-
 	sum := sha256.Sum256([]byte(name))
 
 	hash := fmt.Sprintf("%x", sum)
@@ -51,10 +46,10 @@ func (p *Provisioner) helmWorkloadPoolName(name string) string {
 // TODO: the new cluster chart in 1.2.o will contain a "pool.eschercloud.ai/name" annotaion
 // that will give a verbatim pool name for use with this once 1.1.0 cluster have gone.
 func (p *Provisioner) getWorkloadPoolMachineDeploymentNames() []string {
-	names := make([]string, len(p.workloadPools.Items))
+	names := make([]string, len(p.cluster.Spec.WorkloadPools.Pools))
 
-	for i, pool := range p.workloadPools.Items {
-		names[i] = fmt.Sprintf("%s-pool-%s", releaseName(p.cluster), p.helmWorkloadPoolName(pool.GetName()))
+	for i, pool := range p.cluster.Spec.WorkloadPools.Pools {
+		names[i] = fmt.Sprintf("%s-pool-%s", releaseName(p.cluster), p.helmWorkloadPoolName(pool.Name))
 	}
 
 	return names
