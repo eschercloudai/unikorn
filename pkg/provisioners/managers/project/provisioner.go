@@ -71,7 +71,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	// Some other error, propagate it back up the stack.
-	if !errors.Is(err, util.ErrNamespaceLookup) {
+	if err != nil && !errors.Is(err, util.ErrNamespaceLookup) {
 		return err
 	}
 
