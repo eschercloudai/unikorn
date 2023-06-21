@@ -64,7 +64,9 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	// Namespace exists, leave it alone.
 	// TODO: race: the status update may have failed, so we need to reset it.
-	if _, err = util.GetResourceNamespace(ctx, p.client, labels); err == nil {
+	if namespace, err := util.GetResourceNamespace(ctx, p.client, labels); err == nil {
+		p.project.Status.Namespace = namespace.Name
+
 		return nil
 	}
 
