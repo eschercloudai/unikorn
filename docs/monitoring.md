@@ -23,7 +23,7 @@ See [`manifests/prometheus.yaml`](https://github.com/eschercloudai/unikorn/blob/
 ### Installing Unikorn Dashboard
 
 There's a rudimentary Grafana dashboard for the Unikorn controller componenets available in tree.
-Run [`grafana/install`](https://github.com/eschercloudai/unikorn/blob/main/grafana/install) with a default `kube-prometheus-stack` to automagically have it appear.
+Run [`dashboards/install`](https://github.com/eschercloudai/unikorn/blob/main/grafana/install) with a default `kube-prometheus-stack` to automagically have it appear.
 
 ## Metrics Server
 
