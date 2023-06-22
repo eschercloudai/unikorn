@@ -21,11 +21,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/eschercloudai/unikorn/pkg/constants"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -42,31 +39,6 @@ func GetResourceNamespace(ctx context.Context, cli client.Client, l labels.Set) 
 
 	if len(namespaces.Items) != 1 {
 		return nil, fmt.Errorf("%w: labels %v", ErrNamespaceLookup, l)
-	}
-
-	return &namespaces.Items[0], nil
-}
-
-func GetResourceNamespaceLegacy(ctx context.Context, cli client.Client, label, name string) (*corev1.Namespace, error) {
-	labelRequirement, err := labels.NewRequirement(label, selection.Equals, []string{name})
-	if err != nil {
-		return nil, err
-	}
-
-	kindRequirement, err := labels.NewRequirement(constants.KindLabel, selection.DoesNotExist, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	selector := labels.Everything().Add(*labelRequirement, *kindRequirement)
-
-	namespaces := &corev1.NamespaceList{}
-	if err := cli.List(ctx, namespaces, &client.ListOptions{LabelSelector: selector}); err != nil {
-		return nil, err
-	}
-
-	if len(namespaces.Items) != 1 {
-		return nil, fmt.Errorf("%w: label %s, name %s", ErrNamespaceLookup, label, name)
 	}
 
 	return &namespaces.Items[0], nil

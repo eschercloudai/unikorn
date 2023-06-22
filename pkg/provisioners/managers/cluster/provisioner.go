@@ -126,7 +126,31 @@ func (p *Provisioner) newClusterAutoscalerOpenStackProvisioner() provisioners.Pr
 	return clusterautoscaleropenstack.New(p.client, p.cluster, p.clusterAutoscalerOpenStackApplication).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 }
 
+// getBootstrapProvisioner installs the remote cluster, cloud controller manager
+// and CNI in parallel with cluster creation.  NOTE: these applications MUST be
+// installable without an worker nodes, thus all deployments must tolerate control
+// plane taints, and select control plane nodes to support zero-sized workload pools
+// correctly.
+func (p *Provisioner) getBootstrapProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
+	remote, err := p.getRemoteClusterGenerator(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	provisioner := serial.New("cluster add-ons",
+		remotecluster.New(p.client, remote),
+		concurrent.New("cluster bootstrap",
+			cilium.New(p.client, p.cluster, p.ciliumApplication).OnRemote(remote).BackgroundDelete(),
+			openstackcloudprovider.New(p.client, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote).BackgroundDelete(),
+		),
+	)
+
+	return provisioner, nil
+}
+
 // getAddonsProvisioner returns a generic provisioner for provisioning and deprovisioning.
+// Unlike bootstrap components, these don't necessarily need to be foreced onto the control
+// plane nodes, and we shouldn't be expected to foot the bill for everything.
 func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
 	remote, err := p.getRemoteClusterGenerator(ctx)
 	if err != nil {
@@ -135,17 +159,7 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 
 	// Provision the remote cluster, then once that's configured, install
 	// the CNI and cloud provider in parallel.
-	// NOTE: that nvidia is installed after the CNI and OCP controllers.
-	// This application depends on the CNI to actually deploy, so while you
-	// can do this in parallel and it'll work, when you deprovision you can
-	// get stuck with the CNI gone, and the nvidia stuff needing the CNI to
-	// uninstall properly.
 	provisioner := serial.New("cluster add-ons",
-		remotecluster.New(p.client, remote),
-		concurrent.New("cluster bootstrap",
-			cilium.New(p.client, p.cluster, p.ciliumApplication).OnRemote(remote).BackgroundDelete(),
-			openstackcloudprovider.New(p.client, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote).BackgroundDelete(),
-		),
 		concurrent.New("cluster add-ons wave 1",
 			openstackplugincindercsi.New(p.client, p.cluster, p.openstackPluginCinderCSIApplication).OnRemote(remote).BackgroundDelete(),
 			metricsserver.New(p.client, p.cluster, p.metricsServerApplication).OnRemote(remote).BackgroundDelete(),
@@ -191,26 +205,33 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 	return provisioner, nil
 }
 
-// Provision implements the Provision interface.
-func (p *Provisioner) Provision(ctx context.Context) error {
+func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
 	clusterProvisioner, err := clusteropenstack.New(ctx, p.client, p.cluster, p.clusterOpenstackApplication)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	// TODO: this is ugly, consider options pattern?
 	clusterProvisioner.OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
+
+	bootstrapProvisioner, err := p.getBootstrapProvisioner(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	addonsProvisioner, err := p.getAddonsProvisioner(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// TODO: you can create with autoscaling on, turn it on, but not remove it.
-	// That would require tracking of some variety.
+	// Create the cluster and the boostrap components in parallel, the cluster will
+	// come up but never reach healthy until the CNI and cloud controller manager
+	// are added.  Follow that up by the autoscaler as some addons may require worker
+	// nodes to schedule onto.
 	provisioner := serial.New("kubernetes cluster",
 		concurrent.New("kubernetes cluster",
 			clusterProvisioner,
-			addonsProvisioner,
+			bootstrapProvisioner,
 		),
 		conditional.New("cluster-autoscaler",
 			p.cluster.AutoscalingEnabled,
@@ -227,7 +248,18 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 				),
 			),
 		),
+		addonsProvisioner,
 	)
+
+	return provisioner, nil
+}
+
+// Provision implements the Provision interface.
+func (p *Provisioner) Provision(ctx context.Context) error {
+	provisioner, err := p.getProvisioner(ctx)
+	if err != nil {
+		return err
+	}
 
 	if err := provisioner.Provision(ctx); err != nil {
 		return err
@@ -238,39 +270,10 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	clusterProvisioner, err := clusteropenstack.New(ctx, p.client, p.cluster, p.clusterOpenstackApplication)
+	provisioner, err := p.getProvisioner(ctx)
 	if err != nil {
 		return err
 	}
-
-	clusterProvisioner.OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
-
-	addonsProvisioner, err := p.getAddonsProvisioner(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Remove the addons first, Argo will probably have a fit if the cluster vanishes
-	// before it has a chance to delete the contained add-on applications.
-	provisioner := serial.New("kubernetes cluster",
-		clusterProvisioner,
-		addonsProvisioner,
-		conditional.New("cluster-autoscaler",
-			p.cluster.AutoscalingEnabled,
-			concurrent.New("cluster-autoscaler",
-				p.newClusterAutoscalerProvisioner(),
-				// TODO: this came in 1.2.0, so is not present in 1.1.0 thus
-				// needs to be optional temporarily otherwise everything will break
-				// on older clusters.
-				conditional.New("cluster-autoscaler-openstack",
-					func() bool {
-						return p.clusterAutoscalerOpenStackApplication != nil
-					},
-					p.newClusterAutoscalerOpenStackProvisioner(),
-				),
-			),
-		),
-	)
 
 	if err := provisioner.Deprovision(ctx); err != nil {
 		return err
