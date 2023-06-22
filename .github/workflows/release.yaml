@@ -32,7 +32,7 @@ jobs:
     - name: Build and Push Images
       run: make touch all images -e RELEASE=1 VERSION=${{ github.ref_name }}
     - name: Build SBOMS
-      rune: go run hack/sbom/main.go
+      run: go run hack/sbom/main.go
     - name: Rename Release Assets
       run: cp bin/unikornctl bin/unikornctl-linux-amd64
     - name: Release
