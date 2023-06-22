@@ -467,13 +467,13 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	resource, err := p.findApplication(ctx)
 	if err != nil {
+		if errors.Is(err, ErrItemNotFound) {
+			log.Info("application does not exist", "application", p.name)
+
+			return nil
+		}
+
 		return err
-	}
-
-	if resource == nil {
-		log.Info("application does not exist", "application", p.name)
-
-		return nil
 	}
 
 	log.Info("adding application finalizer", "application", p.name)
