@@ -63,28 +63,26 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	// Namespace exists, leave it alone.
-	// TODO: race: the status update may have failed, so we need to reset it.
-	if namespace, err := util.GetResourceNamespace(ctx, p.client, labels); err == nil {
-		p.project.Status.Namespace = namespace.Name
-
-		return nil
+	namespace, err := util.GetResourceNamespace(ctx, p.client, labels)
+	if err != nil {
+		// Some other error, propagate it back up the stack.
+		if !errors.Is(err, util.ErrNamespaceLookup) {
+			return err
+		}
 	}
 
-	// Some other error, propagate it back up the stack.
-	if err != nil && !errors.Is(err, util.ErrNamespaceLookup) {
-		return err
-	}
+	if namespace == nil {
+		// Create a new project namespace.
+		namespace = &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "project-",
+				Labels:       labels,
+			},
+		}
 
-	// Create a new project namespace.
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "project-",
-			Labels:       labels,
-		},
-	}
-
-	if err := generic.NewResourceProvisioner(p.client, namespace).Provision(ctx); err != nil {
-		return err
+		if err := generic.NewResourceProvisioner(p.client, namespace).Provision(ctx); err != nil {
+			return err
+		}
 	}
 
 	p.project.Status.Namespace = namespace.Name

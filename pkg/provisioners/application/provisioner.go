@@ -29,7 +29,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -48,6 +47,9 @@ var (
 	// wrong number are returned.  Given we are dealing with unique applications
 	// one or zero are expected.
 	ErrItemLengthMismatch = errors.New("item count not as expected")
+
+	// ErrItemNotFound is raised when we cannot find the droid we are looking for.
+	ErrItemNotFound = errors.New("item not found")
 )
 
 // MutuallyExclusiveResource is a generic interface over all resource types,
@@ -376,40 +378,15 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 		return nil, err
 	}
 
-	// TODO: temportary hack to add "kind" to the labels.
 	if len(resources.Items) == 0 {
-		legacyLabels, err := p.getLabels()
-		if err != nil {
-			return nil, err
-		}
-
-		delete(legacyLabels, constants.KindLabel)
-
-		selector := labels.SelectorFromSet(legacyLabels)
-
-		noKindReq, err := labels.NewRequirement(constants.KindLabel, selection.DoesNotExist, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		selector = selector.Add(*noKindReq)
-
-		if err := p.client.List(ctx, resources, &client.ListOptions{Namespace: namespace, LabelSelector: selector}); err != nil {
-			return nil, err
-		}
+		return nil, ErrItemNotFound
 	}
-
-	var resource *unstructured.Unstructured
 
 	if len(resources.Items) > 1 {
 		return nil, ErrItemLengthMismatch
 	}
 
-	if len(resources.Items) == 1 {
-		resource = &resources.Items[0]
-	}
-
-	return resource, nil
+	return &resources.Items[0], nil
 }
 
 // Provision implements the Provision interface.
@@ -429,7 +406,10 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	// the name so we can perform readiness checks.
 	resource, err := p.findApplication(ctx)
 	if err != nil {
-		return err
+		// Something bad has happened.
+		if !errors.Is(err, ErrItemNotFound) {
+			return err
+		}
 	}
 
 	//nolint:nestif
