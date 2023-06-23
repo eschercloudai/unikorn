@@ -60,7 +60,7 @@ metadata:
 spec:
   repo: https://eschercloudai.github.io/helm-cluster-api
   chart: cluster-api-cluster-openstack
-  version: v0.3.22
+  version: v0.3.23
   createNamespace: true
   interface: 1.0.0
 ---
