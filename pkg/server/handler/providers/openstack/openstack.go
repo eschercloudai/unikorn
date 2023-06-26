@@ -609,7 +609,7 @@ func (o *Openstack) DeleteApplicationCredential(r *http.Request, name string) er
 	return nil
 }
 
-func (o *Openstack) GetServerGroup(r *http.Request, name string) (*generated.OpenstackServerGroup, error) {
+func (o *Openstack) GetServerGroup(r *http.Request, name string) (*servergroups.ServerGroup, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
@@ -628,19 +628,13 @@ func (o *Openstack) GetServerGroup(r *http.Request, name string) (*generated.Ope
 	case 0:
 		return nil, errors.HTTPNotFound()
 	case 1:
-		group := &generated.OpenstackServerGroup{
-			Id:     filtered[0].ID,
-			Name:   filtered[0].Name,
-			Policy: *filtered[0].Policy,
-		}
-
-		return group, nil
+		return &filtered[0], nil
 	default:
 		return nil, errors.OAuth2ServerError("multiple server groups matched name")
 	}
 }
 
-func (o *Openstack) CreateServerGroup(r *http.Request, name string) (*generated.OpenstackServerGroup, error) {
+func (o *Openstack) CreateServerGroup(r *http.Request, name string) (*servergroups.ServerGroup, error) {
 	client, err := o.ComputeClient(r)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
@@ -651,11 +645,5 @@ func (o *Openstack) CreateServerGroup(r *http.Request, name string) (*generated.
 		return nil, errors.OAuth2ServerError("failed get create server group").WithError(err)
 	}
 
-	group := &generated.OpenstackServerGroup{
-		Id:     result.ID,
-		Name:   result.Name,
-		Policy: *result.Policy,
-	}
-
-	return group, nil
+	return result, nil
 }

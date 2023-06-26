@@ -184,14 +184,6 @@ type ClientInterface interface {
 
 	// GetApiV1ProvidersOpenstackProjects request
 	GetApiV1ProvidersOpenstackProjects(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PostApiV1ProvidersOpenstackServergroups request with any body
-	PostApiV1ProvidersOpenstackServergroupsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	PostApiV1ProvidersOpenstackServergroups(ctx context.Context, body PostApiV1ProvidersOpenstackServergroupsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetApiV1ProvidersOpenstackServergroupsServerGroupName request
-	GetApiV1ProvidersOpenstackServergroupsServerGroupName(ctx context.Context, serverGroupName ServerGroupNameParameter, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetApiV1ApplicationBundlesCluster(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -592,42 +584,6 @@ func (c *Client) GetApiV1ProvidersOpenstackKeyPairs(ctx context.Context, reqEdit
 
 func (c *Client) GetApiV1ProvidersOpenstackProjects(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiV1ProvidersOpenstackProjectsRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostApiV1ProvidersOpenstackServergroupsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostApiV1ProvidersOpenstackServergroupsRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostApiV1ProvidersOpenstackServergroups(ctx context.Context, body PostApiV1ProvidersOpenstackServergroupsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostApiV1ProvidersOpenstackServergroupsRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetApiV1ProvidersOpenstackServergroupsServerGroupName(ctx context.Context, serverGroupName ServerGroupNameParameter, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetApiV1ProvidersOpenstackServergroupsServerGroupNameRequest(c.Server, serverGroupName)
 	if err != nil {
 		return nil, err
 	}
@@ -1563,80 +1519,6 @@ func NewGetApiV1ProvidersOpenstackProjectsRequest(server string) (*http.Request,
 	return req, nil
 }
 
-// NewPostApiV1ProvidersOpenstackServergroupsRequest calls the generic PostApiV1ProvidersOpenstackServergroups builder with application/json body
-func NewPostApiV1ProvidersOpenstackServergroupsRequest(server string, body PostApiV1ProvidersOpenstackServergroupsJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPostApiV1ProvidersOpenstackServergroupsRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPostApiV1ProvidersOpenstackServergroupsRequestWithBody generates requests for PostApiV1ProvidersOpenstackServergroups with any type of body
-func NewPostApiV1ProvidersOpenstackServergroupsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/providers/openstack/servergroups")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetApiV1ProvidersOpenstackServergroupsServerGroupNameRequest generates requests for GetApiV1ProvidersOpenstackServergroupsServerGroupName
-func NewGetApiV1ProvidersOpenstackServergroupsServerGroupNameRequest(server string, serverGroupName ServerGroupNameParameter) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "serverGroupName", runtime.ParamLocationPath, serverGroupName)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/providers/openstack/servergroups/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1775,14 +1657,6 @@ type ClientWithResponsesInterface interface {
 
 	// GetApiV1ProvidersOpenstackProjects request
 	GetApiV1ProvidersOpenstackProjectsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1ProvidersOpenstackProjectsResponse, error)
-
-	// PostApiV1ProvidersOpenstackServergroups request with any body
-	PostApiV1ProvidersOpenstackServergroupsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1ProvidersOpenstackServergroupsResponse, error)
-
-	PostApiV1ProvidersOpenstackServergroupsWithResponse(ctx context.Context, body PostApiV1ProvidersOpenstackServergroupsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1ProvidersOpenstackServergroupsResponse, error)
-
-	// GetApiV1ProvidersOpenstackServergroupsServerGroupName request
-	GetApiV1ProvidersOpenstackServergroupsServerGroupNameWithResponse(ctx context.Context, serverGroupName ServerGroupNameParameter, reqEditors ...RequestEditorFn) (*GetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse, error)
 }
 
 type GetApiV1ApplicationBundlesClusterResponse struct {
@@ -2470,52 +2344,6 @@ func (r GetApiV1ProvidersOpenstackProjectsResponse) StatusCode() int {
 	return 0
 }
 
-type PostApiV1ProvidersOpenstackServergroupsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON201      *OpenstackServerGroup
-	JSON500      *Oauth2Error
-}
-
-// Status returns HTTPResponse.Status
-func (r PostApiV1ProvidersOpenstackServergroupsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PostApiV1ProvidersOpenstackServergroupsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *OpenstackServerGroup
-	JSON500      *Oauth2Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 // GetApiV1ApplicationBundlesClusterWithResponse request returning *GetApiV1ApplicationBundlesClusterResponse
 func (c *ClientWithResponses) GetApiV1ApplicationBundlesClusterWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1ApplicationBundlesClusterResponse, error) {
 	rsp, err := c.GetApiV1ApplicationBundlesCluster(ctx, reqEditors...)
@@ -2814,32 +2642,6 @@ func (c *ClientWithResponses) GetApiV1ProvidersOpenstackProjectsWithResponse(ctx
 		return nil, err
 	}
 	return ParseGetApiV1ProvidersOpenstackProjectsResponse(rsp)
-}
-
-// PostApiV1ProvidersOpenstackServergroupsWithBodyWithResponse request with arbitrary body returning *PostApiV1ProvidersOpenstackServergroupsResponse
-func (c *ClientWithResponses) PostApiV1ProvidersOpenstackServergroupsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1ProvidersOpenstackServergroupsResponse, error) {
-	rsp, err := c.PostApiV1ProvidersOpenstackServergroupsWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostApiV1ProvidersOpenstackServergroupsResponse(rsp)
-}
-
-func (c *ClientWithResponses) PostApiV1ProvidersOpenstackServergroupsWithResponse(ctx context.Context, body PostApiV1ProvidersOpenstackServergroupsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1ProvidersOpenstackServergroupsResponse, error) {
-	rsp, err := c.PostApiV1ProvidersOpenstackServergroups(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostApiV1ProvidersOpenstackServergroupsResponse(rsp)
-}
-
-// GetApiV1ProvidersOpenstackServergroupsServerGroupNameWithResponse request returning *GetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse
-func (c *ClientWithResponses) GetApiV1ProvidersOpenstackServergroupsServerGroupNameWithResponse(ctx context.Context, serverGroupName ServerGroupNameParameter, reqEditors ...RequestEditorFn) (*GetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse, error) {
-	rsp, err := c.GetApiV1ProvidersOpenstackServergroupsServerGroupName(ctx, serverGroupName, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse(rsp)
 }
 
 // ParseGetApiV1ApplicationBundlesClusterResponse parses an HTTP response from a GetApiV1ApplicationBundlesClusterWithResponse call
@@ -4040,72 +3842,6 @@ func ParseGetApiV1ProvidersOpenstackProjectsResponse(rsp *http.Response) (*GetAp
 			return nil, err
 		}
 		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePostApiV1ProvidersOpenstackServergroupsResponse parses an HTTP response from a PostApiV1ProvidersOpenstackServergroupsWithResponse call
-func ParsePostApiV1ProvidersOpenstackServergroupsResponse(rsp *http.Response) (*PostApiV1ProvidersOpenstackServergroupsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PostApiV1ProvidersOpenstackServergroupsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest OpenstackServerGroup
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse parses an HTTP response from a GetApiV1ProvidersOpenstackServergroupsServerGroupNameWithResponse call
-func ParseGetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse(rsp *http.Response) (*GetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetApiV1ProvidersOpenstackServergroupsServerGroupNameResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest OpenstackServerGroup
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Oauth2Error

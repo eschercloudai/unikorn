@@ -91,11 +91,10 @@ func convertAPI(in *unikornv1.KubernetesCluster) *generated.KubernetesClusterAPI
 // convertMachine converts from a custom resource into the API definition.
 func convertMachine(in *unikornv1.MachineGeneric) generated.OpenstackMachinePool {
 	machine := generated.OpenstackMachinePool{
-		Replicas:      *in.Replicas,
-		Version:       string(*in.Version),
-		ImageName:     *in.Image,
-		FlavorName:    *in.Flavor,
-		ServerGroupID: in.ServerGroupID,
+		Replicas:   *in.Replicas,
+		Version:    string(*in.Version),
+		ImageName:  *in.Image,
+		FlavorName: *in.Flavor,
 	}
 
 	if in.DiskSize != nil {
@@ -331,11 +330,10 @@ func (c *Client) createMachineGeneric(m *generated.OpenstackMachinePool) (*uniko
 	version := unikornv1.SemanticVersion(m.Version)
 
 	machine := &unikornv1.MachineGeneric{
-		Version:       &version,
-		Replicas:      &m.Replicas,
-		Image:         &m.ImageName,
-		Flavor:        &m.FlavorName,
-		ServerGroupID: m.ServerGroupID,
+		Version:  &version,
+		Replicas: &m.Replicas,
+		Image:    &m.ImageName,
+		Flavor:   &m.FlavorName,
 	}
 
 	if m.Disk != nil {

@@ -519,39 +519,6 @@ paths:
           $ref: '#/components/responses/unauthorizedResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/providers/openstack/servergroups:
-    description: OpenStack server group services.
-    post:
-      description: |-
-        Creates a new server group with the server's default scheduling
-        policy e.g. soft-anti-affinity.
-      security:
-      - oauth2Authentication:
-        - project
-      requestBody:
-        $ref: '#/components/requestBodies/serverGroupRequest'
-      responses:
-        '201':
-          $ref: '#/components/responses/openstackServerGroupResponse'
-        '500':
-          $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/providers/openstack/servergroups/{serverGroupName}:
-    description: OpenStack server group services.
-    parameters:
-    - $ref: '#/components/parameters/serverGroupNameParameter'
-    get:
-      description: |-
-        Gets a server group.
-      security:
-      - oauth2Authentication:
-        - project
-      responses:
-        '200':
-          $ref: '#/components/responses/openstackServerGroupResponse'
-        '404':
-          $ref: '#/components/responses/notFoundResponse'
-        '500':
-          $ref: '#/components/responses/internalServerErrorResponse'
 components:
   parameters:
     controlPlaneNameParameter:
@@ -565,20 +532,6 @@ components:
       name: clusterName
       in: path
       description: The Unikorn cluster name.
-      required: true
-      schema:
-        $ref: '#/components/schemas/stringParameter'
-    applicationCredentialParameter:
-      name: applicationCredential
-      in: path
-      description: Openstack application credential name.
-      required: true
-      schema:
-        $ref: '#/components/schemas/stringParameter'
-    serverGroupNameParameter:
-      name: serverGroupName
-      in: path
-      description: OpenStack server group name.
       required: true
       schema:
         $ref: '#/components/schemas/stringParameter'
@@ -861,9 +814,6 @@ components:
           type: string
         disk:
           $ref: '#/components/schemas/openstackVolume'
-        serverGroupID:
-          description: Openstack server group to provision the machine in.
-          type: string
     kubernetesClusterAutoscaling:
       description: A Kubernetes cluster workload pool autoscaling configuration.
       type: object
@@ -1050,31 +1000,6 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackProject'
-    applicationCredentialOptions:
-      description: Openstack application credential create options.
-      type: object
-      required:
-      - name
-      properties:
-        name:
-          description: Application credential name.
-          type: string
-    openstackApplicationCredential:
-      description: An Openstack application credential.
-      type: object
-      required:
-      - id
-      - name
-      properties:
-        id:
-          description: Application credential ID.
-          type: string
-        name:
-          description: Application credential name.
-          type: string
-        secret:
-          description: Application credential secret, this is only present on creation.
-          type: string
     openstackImage:
       description: And Openstack image.
       type: object
@@ -1192,32 +1117,6 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/openstackAvailabilityZone'
-    serverGroupOptions:
-      description: OpenStack server group parameters.
-      type: object
-      required:
-      - name
-      properties:
-        name:
-          description: A server group name.
-          type: string
-    openstackServerGroup:
-      description: An OpenStack server group.
-      type: object
-      required:
-      - id
-      - name
-      - policy
-      properties:
-        id:
-          description: A globally unique server group identifier.
-          type: string
-        name:
-          description: A server group name.
-          type: string
-        policy:
-          description: The policy applied to the server group.
-          type: string
   requestBodies:
     tokenRequest:
       description: oauth2 token endpoint.
@@ -1233,20 +1132,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/tokenScope'
-    applicationCredentialRequest:
-      description: Openstack application credential parameters.
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/applicationCredentialOptions'
-    serverGroupRequest:
-      description: Openstack server group parameters.
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/serverGroupOptions'
     createControlPlaneRequest:
       description: Unikorn control plane parameters.
       required: true
@@ -1361,12 +1246,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackProjects'
-    openstackApplicationCredentialResponse:
-      description: An Openstack application credential.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/openstackApplicationCredential'
     openstackImagesResponse:
       description: A list of Openstack images that are compatible with this platform.
       content:
@@ -1403,12 +1282,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackAvailabilityZones'
-    openstackServerGroupResponse:
-      description: A server group.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/openstackServerGroup'
   securitySchemes:
     httpBasicAuthentication:
       description: Operation requires HTTP basic authentication.
