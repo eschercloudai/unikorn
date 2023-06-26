@@ -318,44 +318,6 @@ func (h *Handler) GetApiV1ApplicationBundlesCluster(w http.ResponseWriter, r *ht
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
-func (h *Handler) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
-	result, err := h.openstack.GetApplicationCredential(r, applicationCredential)
-	if err != nil {
-		errors.HandleError(w, r, err)
-		return
-	}
-
-	h.setUncacheable(w)
-	util.WriteJSONResponse(w, r, http.StatusOK, result)
-}
-
-func (h *Handler) PostApiV1ProvidersOpenstackApplicationCredentials(w http.ResponseWriter, r *http.Request) {
-	options := &generated.ApplicationCredentialOptions{}
-
-	if err := util.ReadJSONBody(r, options); err != nil {
-		errors.HandleError(w, r, err)
-		return
-	}
-
-	result, err := h.openstack.CreateApplicationCredential(r, options, h.options.applicationCredentialRoles)
-	if err != nil {
-		errors.HandleError(w, r, err)
-		return
-	}
-
-	h.setUncacheable(w)
-	util.WriteJSONResponse(w, r, http.StatusOK, result)
-}
-
-func (h *Handler) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(w http.ResponseWriter, r *http.Request, applicationCredential generated.ApplicationCredentialParameter) {
-	if err := h.openstack.DeleteApplicationCredential(r, applicationCredential); err != nil {
-		errors.HandleError(w, r, err)
-		return
-	}
-
-	h.setUncacheable(w)
-}
-
 func (h *Handler) GetApiV1ProvidersOpenstackAvailabilityZonesCompute(w http.ResponseWriter, r *http.Request) {
 	result, err := h.openstack.ListAvailabilityZonesCompute(r)
 	if err != nil {

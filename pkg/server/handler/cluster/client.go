@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/gophercloud/utils/openstack/clientconfig"
+
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
@@ -29,12 +31,14 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/providers/openstack"
+	"github.com/eschercloudai/unikorn/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 // Client wraps up cluster related management handling.
@@ -167,6 +171,51 @@ func (c *Client) GetKubeconfig(ctx context.Context, controlPlaneName generated.C
 	return secret.Data["value"], nil
 }
 
+// createClientConfig creates an Openstack client configuration from the API.
+func (c *Client) createClientConfig(controlPlane *controlplane.Meta, name string) ([]byte, string, error) {
+	// Name is fully qualified to avoid namespace clashes with control planes sharing
+	// the same project.
+	applicationCredentialName := controlPlane.Name + "-" + name
+
+	// Find and delete and existing credential.
+	if _, err := c.openstack.GetApplicationCredential(c.request, applicationCredentialName); err != nil {
+		if !errors.IsHTTPNotFound(err) {
+			return nil, "", err
+		}
+	} else {
+		if err := c.openstack.DeleteApplicationCredential(c.request, applicationCredentialName); err != nil {
+			return nil, "", err
+		}
+	}
+
+	ac, err := c.openstack.CreateApplicationCredential(c.request, applicationCredentialName, c.openstack.ApplicationCredentialRoles())
+	if err != nil {
+		return nil, "", err
+	}
+
+	cloud := "cloud"
+
+	clientConfig := &clientconfig.Clouds{
+		Clouds: map[string]clientconfig.Cloud{
+			cloud: {
+				AuthType: clientconfig.AuthV3ApplicationCredential,
+				AuthInfo: &clientconfig.AuthInfo{
+					AuthURL:                     c.authenticator.Keystone.Endpoint(),
+					ApplicationCredentialID:     ac.ID,
+					ApplicationCredentialSecret: ac.Secret,
+				},
+			},
+		},
+	}
+
+	clientConfigYAML, err := yaml.Marshal(clientConfig)
+	if err != nil {
+		return nil, "", errors.OAuth2ServerError("unable to create cloud config").WithError(err)
+	}
+
+	return clientConfigYAML, cloud, nil
+}
+
 // Create creates the implicit cluster indentified by the JTW claims.
 func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, options *generated.KubernetesCluster) error {
 	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
@@ -182,6 +231,20 @@ func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlP
 	if err != nil {
 		return err
 	}
+
+	ca, err := util.GetURLCACertificate(c.authenticator.Keystone.Endpoint())
+	if err != nil {
+		return errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
+	}
+
+	clientConfig, cloud, err := c.createClientConfig(controlPlane, options.Name)
+	if err != nil {
+		return err
+	}
+
+	cluster.Spec.Openstack.CACert = &ca
+	cluster.Spec.Openstack.Cloud = &cloud
+	cluster.Spec.Openstack.CloudConfig = &clientConfig
 
 	if err := c.client.Create(ctx, cluster); err != nil {
 		// TODO: we can do a cached lookup to save the API traffic.

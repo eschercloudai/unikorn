@@ -164,17 +164,6 @@ type ClientInterface interface {
 	// PostApiV1Project request
 	PostApiV1Project(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostApiV1ProvidersOpenstackApplicationCredentials request with any body
-	PostApiV1ProvidersOpenstackApplicationCredentialsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	PostApiV1ProvidersOpenstackApplicationCredentials(ctx context.Context, body PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential request
-	DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(ctx context.Context, applicationCredential ApplicationCredentialParameter, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential request
-	GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(ctx context.Context, applicationCredential ApplicationCredentialParameter, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage request
 	GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -519,54 +508,6 @@ func (c *Client) GetApiV1Project(ctx context.Context, reqEditors ...RequestEdito
 
 func (c *Client) PostApiV1Project(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiV1ProjectRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostApiV1ProvidersOpenstackApplicationCredentialsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostApiV1ProvidersOpenstackApplicationCredentialsRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostApiV1ProvidersOpenstackApplicationCredentials(ctx context.Context, body PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostApiV1ProvidersOpenstackApplicationCredentialsRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(ctx context.Context, applicationCredential ApplicationCredentialParameter, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialRequest(c.Server, applicationCredential)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(ctx context.Context, applicationCredential ApplicationCredentialParameter, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialRequest(c.Server, applicationCredential)
 	if err != nil {
 		return nil, err
 	}
@@ -1433,114 +1374,6 @@ func NewPostApiV1ProjectRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewPostApiV1ProvidersOpenstackApplicationCredentialsRequest calls the generic PostApiV1ProvidersOpenstackApplicationCredentials builder with application/json body
-func NewPostApiV1ProvidersOpenstackApplicationCredentialsRequest(server string, body PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPostApiV1ProvidersOpenstackApplicationCredentialsRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPostApiV1ProvidersOpenstackApplicationCredentialsRequestWithBody generates requests for PostApiV1ProvidersOpenstackApplicationCredentials with any type of body
-func NewPostApiV1ProvidersOpenstackApplicationCredentialsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/providers/openstack/application-credentials")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewDeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialRequest generates requests for DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential
-func NewDeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialRequest(server string, applicationCredential ApplicationCredentialParameter) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "applicationCredential", runtime.ParamLocationPath, applicationCredential)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/providers/openstack/application-credentials/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialRequest generates requests for GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential
-func NewGetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialRequest(server string, applicationCredential ApplicationCredentialParameter) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "applicationCredential", runtime.ParamLocationPath, applicationCredential)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/providers/openstack/application-credentials/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewGetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageRequest generates requests for GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage
 func NewGetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageRequest(server string) (*http.Request, error) {
 	var err error
@@ -1921,17 +1754,6 @@ type ClientWithResponsesInterface interface {
 
 	// PostApiV1Project request
 	PostApiV1ProjectWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostApiV1ProjectResponse, error)
-
-	// PostApiV1ProvidersOpenstackApplicationCredentials request with any body
-	PostApiV1ProvidersOpenstackApplicationCredentialsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1ProvidersOpenstackApplicationCredentialsResponse, error)
-
-	PostApiV1ProvidersOpenstackApplicationCredentialsWithResponse(ctx context.Context, body PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1ProvidersOpenstackApplicationCredentialsResponse, error)
-
-	// DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential request
-	DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialWithResponse(ctx context.Context, applicationCredential ApplicationCredentialParameter, reqEditors ...RequestEditorFn) (*DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse, error)
-
-	// GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential request
-	GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialWithResponse(ctx context.Context, applicationCredential ApplicationCredentialParameter, reqEditors ...RequestEditorFn) (*GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse, error)
 
 	// GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorage request
 	GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageResponse, error)
@@ -2473,81 +2295,6 @@ func (r PostApiV1ProjectResponse) StatusCode() int {
 	return 0
 }
 
-type PostApiV1ProvidersOpenstackApplicationCredentialsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *OpenstackApplicationCredential
-	JSON400      *Oauth2Error
-	JSON401      *Oauth2Error
-	JSON500      *Oauth2Error
-}
-
-// Status returns HTTPResponse.Status
-func (r PostApiV1ProvidersOpenstackApplicationCredentialsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PostApiV1ProvidersOpenstackApplicationCredentialsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON400      *Oauth2Error
-	JSON401      *Oauth2Error
-	JSON500      *Oauth2Error
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *OpenstackApplicationCredential
-	JSON400      *Oauth2Error
-	JSON401      *Oauth2Error
-	JSON403      *Oauth2Error
-	JSON500      *Oauth2Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3004,41 +2751,6 @@ func (c *ClientWithResponses) PostApiV1ProjectWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParsePostApiV1ProjectResponse(rsp)
-}
-
-// PostApiV1ProvidersOpenstackApplicationCredentialsWithBodyWithResponse request with arbitrary body returning *PostApiV1ProvidersOpenstackApplicationCredentialsResponse
-func (c *ClientWithResponses) PostApiV1ProvidersOpenstackApplicationCredentialsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1ProvidersOpenstackApplicationCredentialsResponse, error) {
-	rsp, err := c.PostApiV1ProvidersOpenstackApplicationCredentialsWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostApiV1ProvidersOpenstackApplicationCredentialsResponse(rsp)
-}
-
-func (c *ClientWithResponses) PostApiV1ProvidersOpenstackApplicationCredentialsWithResponse(ctx context.Context, body PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1ProvidersOpenstackApplicationCredentialsResponse, error) {
-	rsp, err := c.PostApiV1ProvidersOpenstackApplicationCredentials(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostApiV1ProvidersOpenstackApplicationCredentialsResponse(rsp)
-}
-
-// DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialWithResponse request returning *DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse
-func (c *ClientWithResponses) DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialWithResponse(ctx context.Context, applicationCredential ApplicationCredentialParameter, reqEditors ...RequestEditorFn) (*DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse, error) {
-	rsp, err := c.DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(ctx, applicationCredential, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse(rsp)
-}
-
-// GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialWithResponse request returning *GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse
-func (c *ClientWithResponses) GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialWithResponse(ctx context.Context, applicationCredential ApplicationCredentialParameter, reqEditors ...RequestEditorFn) (*GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse, error) {
-	rsp, err := c.GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredential(ctx, applicationCredential, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse(rsp)
 }
 
 // GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageWithResponse request returning *GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageResponse
@@ -3999,147 +3711,6 @@ func ParsePostApiV1ProjectResponse(rsp *http.Response) (*PostApiV1ProjectRespons
 			return nil, err
 		}
 		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePostApiV1ProvidersOpenstackApplicationCredentialsResponse parses an HTTP response from a PostApiV1ProvidersOpenstackApplicationCredentialsWithResponse call
-func ParsePostApiV1ProvidersOpenstackApplicationCredentialsResponse(rsp *http.Response) (*PostApiV1ProvidersOpenstackApplicationCredentialsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PostApiV1ProvidersOpenstackApplicationCredentialsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest OpenstackApplicationCredential
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseDeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse parses an HTTP response from a DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialWithResponse call
-func ParseDeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse(rsp *http.Response) (*DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse parses an HTTP response from a GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialWithResponse call
-func ParseGetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse(rsp *http.Response) (*GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetApiV1ProvidersOpenstackApplicationCredentialsApplicationCredentialResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest OpenstackApplicationCredential
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Oauth2Error

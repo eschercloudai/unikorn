@@ -378,8 +378,7 @@ type MachineGeneric struct {
 	Replicas *int `json:"replicas,omitempty"`
 	// ServerGroupID sets the server group of the control plane in
 	// order to maintain anti-affinity rules.
-	// TODO: make this a required field on the control plane.
-	ServerGroupID *string `json:"serverGroupId,omitempty"`
+	ServerGroupID *string `json:"serverGroupId"`
 }
 
 // File is a file that can be deployed to a cluster node on creation.
@@ -573,6 +572,8 @@ type KubernetesClusterFeaturesSpec struct {
 	FileStorage *bool `json:"fileStorage,omitempty"`
 	// Prometheus, if true, installs the Prometheus Operator.
 	Prometheus *bool `json:"prometheus,omitempty"`
+	// NvidiaOperator, if true install the Nvidia Operator.
+	NvidiaOperator *bool `json:"nvidiaOperator,omitempty"`
 }
 
 type KubernetesClusterControlPlaneSpec struct {
