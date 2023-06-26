@@ -378,7 +378,7 @@ type MachineGeneric struct {
 	Replicas *int `json:"replicas,omitempty"`
 	// ServerGroupID sets the server group of the control plane in
 	// order to maintain anti-affinity rules.
-	ServerGroupID *string `json:"serverGroupId"`
+	ServerGroupID *string `json:"serverGroupId,omitempty"`
 }
 
 // File is a file that can be deployed to a cluster node on creation.

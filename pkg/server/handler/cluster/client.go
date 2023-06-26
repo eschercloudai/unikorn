@@ -216,6 +216,29 @@ func (c *Client) createClientConfig(controlPlane *controlplane.Meta, name string
 	return clientConfigYAML, cloud, nil
 }
 
+// createServerGroup creates an OpenStack server group.
+func (c *Client) createServerGroup(controlPlane *controlplane.Meta, name, kind string) (string, error) {
+	// Name is fully qualified to avoid namespace clashes with control planes sharing
+	// the same project.
+	serverGroupName := controlPlane.Name + "-" + name + "-" + kind
+
+	// Reuse the server group if it exists, otherwise create a new one.
+	sg, err := c.openstack.GetServerGroup(c.request, serverGroupName)
+	if err != nil {
+		if !errors.IsHTTPNotFound(err) {
+			return "", err
+		}
+	}
+
+	if sg == nil {
+		if sg, err = c.openstack.CreateServerGroup(c.request, serverGroupName); err != nil {
+			return "", err
+		}
+	}
+
+	return sg.ID, nil
+}
+
 // Create creates the implicit cluster indentified by the JTW claims.
 func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, options *generated.KubernetesCluster) error {
 	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
@@ -242,9 +265,16 @@ func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlP
 		return err
 	}
 
+	serverGroupID, err := c.createServerGroup(controlPlane, options.Name, "control-plane")
+	if err != nil {
+		return err
+	}
+
 	cluster.Spec.Openstack.CACert = &ca
 	cluster.Spec.Openstack.Cloud = &cloud
 	cluster.Spec.Openstack.CloudConfig = &clientConfig
+
+	cluster.Spec.ControlPlane.ServerGroupID = &serverGroupID
 
 	if err := c.client.Create(ctx, cluster); err != nil {
 		// TODO: we can do a cached lookup to save the API traffic.
@@ -316,6 +346,8 @@ func (c *Client) Update(ctx context.Context, controlPlaneName generated.ControlP
 	temp.Spec.Openstack.CACert = resource.Spec.Openstack.CACert
 	temp.Spec.Openstack.Cloud = resource.Spec.Openstack.Cloud
 	temp.Spec.Openstack.CloudConfig = resource.Spec.Openstack.CloudConfig
+
+	temp.Spec.ControlPlane.ServerGroupID = resource.Spec.ControlPlane.ServerGroupID
 
 	if err := c.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
 		return errors.OAuth2ServerError("failed to patch cluster").WithError(err)
