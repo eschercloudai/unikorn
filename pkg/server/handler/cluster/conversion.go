@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/gophercloud/utils/openstack/clientconfig"
-
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
@@ -30,29 +28,18 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/common"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
-	"github.com/eschercloudai/unikorn/pkg/util"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"sigs.k8s.io/yaml"
-)
-
-const (
-	// It's not easy to extract this from the Kubernetes API, so
-	// give out a value, so we can submit the cluster via the REST API.
-	applicationCredentialSentinel = "unknown"
 )
 
 // convertOpenstack converts from a custom resource into the API definition.
 func convertOpenstack(in *unikornv1.KubernetesCluster) generated.KubernetesClusterOpenstack {
 	openstack := generated.KubernetesClusterOpenstack{
-		ApplicationCredentialID:     applicationCredentialSentinel,
-		ApplicationCredentialSecret: applicationCredentialSentinel,
-		ComputeAvailabilityZone:     *in.Spec.Openstack.FailureDomain,
-		VolumeAvailabilityZone:      *in.Spec.Openstack.VolumeFailureDomain,
-		ExternalNetworkID:           *in.Spec.Openstack.ExternalNetworkID,
-		SshKeyName:                  in.Spec.Openstack.SSHKeyName,
+		ComputeAvailabilityZone: *in.Spec.Openstack.FailureDomain,
+		VolumeAvailabilityZone:  *in.Spec.Openstack.VolumeFailureDomain,
+		ExternalNetworkID:       *in.Spec.Openstack.ExternalNetworkID,
+		SshKeyName:              in.Spec.Openstack.SSHKeyName,
 	}
 
 	return openstack
@@ -229,62 +216,19 @@ func (c *Client) convertList(ctx context.Context, in *unikornv1.KubernetesCluste
 	return out, nil
 }
 
-// createClientConfig creates an Openstack client configuration from the API.
-func (c *Client) createClientConfig(options *generated.KubernetesCluster) ([]byte, string, error) {
-	cloud := "cloud"
-
-	clientConfig := &clientconfig.Clouds{
-		Clouds: map[string]clientconfig.Cloud{
-			cloud: {
-				AuthType: clientconfig.AuthV3ApplicationCredential,
-				AuthInfo: &clientconfig.AuthInfo{
-					AuthURL:                     c.authenticator.Keystone.Endpoint(),
-					ApplicationCredentialID:     options.Openstack.ApplicationCredentialID,
-					ApplicationCredentialSecret: options.Openstack.ApplicationCredentialSecret,
-				},
-			},
-		},
-	}
-
-	clientConfigYAML, err := yaml.Marshal(clientConfig)
-	if err != nil {
-		return nil, "", errors.OAuth2ServerError("unable to create cloud config").WithError(err)
-	}
-
-	return clientConfigYAML, cloud, nil
-}
-
 // createOpenstack creates the Openstack configuration part of a cluster.
-func (c *Client) createOpenstack(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterOpenstackSpec, error) {
+func createOpenstack(options *generated.KubernetesCluster) *unikornv1.KubernetesClusterOpenstackSpec {
 	openstack := &unikornv1.KubernetesClusterOpenstackSpec{
 		FailureDomain:       &options.Openstack.ComputeAvailabilityZone,
 		VolumeFailureDomain: &options.Openstack.VolumeAvailabilityZone,
 		ExternalNetworkID:   &options.Openstack.ExternalNetworkID,
 	}
 
-	// TODO: ignore this jazz when doing a read, we don't want to expose
-	// app cred secrets.
-	if options.Openstack.ApplicationCredentialID != applicationCredentialSentinel {
-		ca, err := util.GetURLCACertificate(c.authenticator.Keystone.Endpoint())
-		if err != nil {
-			return nil, errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
-		}
-
-		clientConfig, cloud, err := c.createClientConfig(options)
-		if err != nil {
-			return nil, err
-		}
-
-		openstack.CACert = &ca
-		openstack.CloudConfig = &clientConfig
-		openstack.Cloud = &cloud
-	}
-
 	if options.Openstack.SshKeyName != nil {
 		openstack.SSHKeyName = options.Openstack.SshKeyName
 	}
 
-	return openstack, nil
+	return openstack
 }
 
 // createNetwork creates the network part of a cluster.
@@ -502,11 +446,6 @@ func createFeatures(options *generated.KubernetesCluster) *unikornv1.KubernetesC
 
 // createCluster creates the full cluster custom resource.
 func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generated.KubernetesCluster) (*unikornv1.KubernetesCluster, error) {
-	openstack, err := c.createOpenstack(options)
-	if err != nil {
-		return nil, err
-	}
-
 	network, err := createNetwork(options)
 	if err != nil {
 		return nil, err
@@ -540,7 +479,7 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 		Spec: unikornv1.KubernetesClusterSpec{
 			ApplicationBundle:            &options.ApplicationBundle.Name,
 			ApplicationBundleAutoUpgrade: common.CreateApplicationBundleAutoUpgrade(options.ApplicationBundleAutoUpgrade),
-			Openstack:                    openstack,
+			Openstack:                    createOpenstack(options),
 			Network:                      network,
 			API:                          api,
 			ControlPlane:                 kubernetesCcontrolPlane,

@@ -56,12 +56,6 @@ type ApplicationBundleAutoUpgrade struct {
 // ApplicationBundles A list of application bundles.
 type ApplicationBundles = []ApplicationBundle
 
-// ApplicationCredentialOptions Openstack application credential create options.
-type ApplicationCredentialOptions struct {
-	// Name Application credential name.
-	Name string `json:"name"`
-}
-
 // AutoUpgradeDaysOfWeek Days of the week and time windows that permit operations to be performed in.
 type AutoUpgradeDaysOfWeek struct {
 	// Friday A time window that wraps into the next day if required.
@@ -204,12 +198,6 @@ type KubernetesClusterNetwork struct {
 
 // KubernetesClusterOpenstack Unikorn Kubernetes cluster creation Openstack parameters.
 type KubernetesClusterOpenstack struct {
-	// ApplicationCredentialID Application credential ID.
-	ApplicationCredentialID string `json:"applicationCredentialID"`
-
-	// ApplicationCredentialSecret Application credential secret.
-	ApplicationCredentialSecret string `json:"applicationCredentialSecret"`
-
 	// ComputeAvailabilityZone Compute availability zone for control plane, and workload pool default.
 	ComputeAvailabilityZone string `json:"computeAvailabilityZone"`
 
@@ -273,18 +261,6 @@ type Oauth2Error struct {
 
 // Oauth2ErrorError A terse error string expaning on the HTTP error code.
 type Oauth2ErrorError string
-
-// OpenstackApplicationCredential An Openstack application credential.
-type OpenstackApplicationCredential struct {
-	// Id Application credential ID.
-	Id string `json:"id"`
-
-	// Name Application credential name.
-	Name string `json:"name"`
-
-	// Secret Application credential secret, this is only present on creation.
-	Secret *string `json:"secret,omitempty"`
-}
 
 // OpenstackAvailabilityZone An Openstack availability zone.
 type OpenstackAvailabilityZone struct {
@@ -507,9 +483,6 @@ type TokenScopeProject struct {
 	Id string `json:"id"`
 }
 
-// ApplicationCredentialParameter A basic string parameter.
-type ApplicationCredentialParameter = StringParameter
-
 // ClusterNameParameter A basic string parameter.
 type ClusterNameParameter = StringParameter
 
@@ -531,9 +504,6 @@ type ControlPlaneResponse = ControlPlane
 // ControlPlanesResponse A list of Unikorn control planes.
 type ControlPlanesResponse = ControlPlanes
 
-// ForbiddenResponse Generic error message.
-type ForbiddenResponse = Oauth2Error
-
 // InternalServerErrorResponse Generic error message.
 type InternalServerErrorResponse = Oauth2Error
 
@@ -548,9 +518,6 @@ type KubernetesClustersResponse = KubernetesClusters
 
 // NullResponse defines model for nullResponse.
 type NullResponse = map[string]interface{}
-
-// OpenstackApplicationCredentialResponse An Openstack application credential.
-type OpenstackApplicationCredentialResponse = OpenstackApplicationCredential
 
 // OpenstackBlockStorageAvailabilityZonesResponse A list of Openstack availability zones.
 type OpenstackBlockStorageAvailabilityZonesResponse = OpenstackAvailabilityZones
@@ -585,9 +552,6 @@ type TokenResponse = Token
 // UnauthorizedResponse Generic error message.
 type UnauthorizedResponse = Oauth2Error
 
-// ApplicationCredentialRequest Openstack application credential create options.
-type ApplicationCredentialRequest = ApplicationCredentialOptions
-
 // CreateControlPlaneRequest A Unikorn control plane.
 type CreateControlPlaneRequest = ControlPlane
 
@@ -617,9 +581,6 @@ type PostApiV1ControlplanesControlPlaneNameClustersJSONRequestBody = KubernetesC
 
 // PutApiV1ControlplanesControlPlaneNameClustersClusterNameJSONRequestBody defines body for PutApiV1ControlplanesControlPlaneNameClustersClusterName for application/json ContentType.
 type PutApiV1ControlplanesControlPlaneNameClustersClusterNameJSONRequestBody = KubernetesCluster
-
-// PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody defines body for PostApiV1ProvidersOpenstackApplicationCredentials for application/json ContentType.
-type PostApiV1ProvidersOpenstackApplicationCredentialsJSONRequestBody = ApplicationCredentialOptions
 
 // PostApiV1ProvidersOpenstackServergroupsJSONRequestBody defines body for PostApiV1ProvidersOpenstackServergroups for application/json ContentType.
 type PostApiV1ProvidersOpenstackServergroupsJSONRequestBody = ServerGroupOptions

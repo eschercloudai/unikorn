@@ -411,64 +411,6 @@ paths:
           $ref: '#/components/responses/unauthorizedResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/providers/openstack/application-credentials:
-    post:
-      description: |-
-        Creates a new Openstack application credential scoped to the project.
-      security:
-      - oauth2Authentication:
-        - project
-      requestBody:
-        $ref: '#/components/requestBodies/applicationCredentialRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/openstackApplicationCredentialResponse'
-        '400':
-          $ref: '#/components/responses/badRequestResponse'
-        '401':
-          $ref: '#/components/responses/unauthorizedResponse'
-        '500':
-          $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/providers/openstack/application-credentials/{applicationCredential}:
-    description: Openstack application credential services.
-    parameters:
-    - $ref: '#/components/parameters/applicationCredentialParameter'
-    get:
-      description: |-
-        Get an Openstack application credential.
-      security:
-      - oauth2Authentication:
-        - project
-      responses:
-        '200':
-          $ref: '#/components/responses/openstackApplicationCredentialResponse'
-        '400':
-          $ref: '#/components/responses/badRequestResponse'
-        '401':
-          $ref: '#/components/responses/unauthorizedResponse'
-        '403':
-          $ref: '#/components/responses/forbiddenResponse'
-        '404':
-          $ref: '#/components/responses/notFoundResponse'
-        '500':
-          $ref: '#/components/responses/internalServerErrorResponse'
-    delete:
-      description: |-
-        Deletes an Openstack application credential scoped to the project.
-      security:
-      - oauth2Authentication:
-        - project
-      responses:
-        '200':
-          $ref: '#/components/responses/okResponse'
-        '400':
-          $ref: '#/components/responses/badRequestResponse'
-        '401':
-          $ref: '#/components/responses/unauthorizedResponse'
-        '404':
-          $ref: '#/components/responses/notFoundResponse'
-        '500':
-          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/flavors:
     description: OpenStack compute flavor services.
     get:
@@ -828,18 +770,10 @@ components:
       description: Unikorn Kubernetes cluster creation Openstack parameters.
       type: object
       required:
-      - applicationCredentialID
-      - applicationCredentialSecret
       - computeAvailabilityZone
       - volumeAvailabilityZone
       - externalNetworkID
       properties:
-        applicationCredentialID:
-          description: Application credential ID.
-          type: string
-        applicationCredentialSecret:
-          description: Application credential secret.
-          type: string
         computeAvailabilityZone:
           description: Compute availability zone for control plane, and workload pool default.
           type: string

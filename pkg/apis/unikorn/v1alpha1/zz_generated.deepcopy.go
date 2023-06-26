@@ -765,6 +765,11 @@ func (in *KubernetesClusterFeaturesSpec) DeepCopyInto(out *KubernetesClusterFeat
 		*out = new(bool)
 		**out = **in
 	}
+	if in.NvidiaOperator != nil {
+		in, out := &in.NvidiaOperator, &out.NvidiaOperator
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

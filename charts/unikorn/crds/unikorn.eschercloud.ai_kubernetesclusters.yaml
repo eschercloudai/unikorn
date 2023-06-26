@@ -288,9 +288,8 @@ spec:
                     minimum: 0
                     type: integer
                   serverGroupId:
-                    description: 'ServerGroupID sets the server group of the control
-                      plane in order to maintain anti-affinity rules. TODO: make this
-                      a required field on the control plane.'
+                    description: ServerGroupID sets the server group of the control
+                      plane in order to maintain anti-affinity rules.
                     type: string
                   version:
                     description: Version is the Kubernetes version to install.  For
@@ -305,6 +304,7 @@ spec:
                 required:
                 - flavor
                 - image
+                - serverGroupId
                 - version
                 type: object
               features:
@@ -329,6 +329,9 @@ spec:
                     description: KubernetesDashboard, if true, provisions the kubernetes
                       dashboard. Clients must also enable the Ingress and CertManager
                       features.
+                    type: boolean
+                  nvidiaOperator:
+                    description: NvidiaOperator, if true install the Nvidia Operator.
                     type: boolean
                   prometheus:
                     description: Prometheus, if true, installs the Prometheus Operator.
@@ -540,9 +543,8 @@ spec:
                           minimum: 0
                           type: integer
                         serverGroupId:
-                          description: 'ServerGroupID sets the server group of the
+                          description: ServerGroupID sets the server group of the
                             control plane in order to maintain anti-affinity rules.
-                            TODO: make this a required field on the control plane.'
                           type: string
                         version:
                           description: Version is the Kubernetes version to install.  For
@@ -558,6 +560,7 @@ spec:
                       - flavor
                       - image
                       - name
+                      - serverGroupId
                       - version
                       type: object
                     type: array
