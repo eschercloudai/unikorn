@@ -317,6 +317,11 @@ func (c *KubernetesCluster) PrometheusEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.Prometheus != nil && *c.Spec.Features.Prometheus
 }
 
+// NvidiaOperatorEnabled indicates whether to install the Nvidia GPU operator.
+func (c *KubernetesCluster) NvidiaOperatorEnabled() bool {
+	return c.Spec.Features != nil && c.Spec.Features.NvidiaOperator != nil && *c.Spec.Features.NvidiaOperator
+}
+
 // Ensure type is sortable for stable deterministic output.
 var _ sort.Interface = &ProjectList{}
 

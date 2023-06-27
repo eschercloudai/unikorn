@@ -163,42 +163,19 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 		concurrent.New("cluster add-ons wave 1",
 			openstackplugincindercsi.New(p.client, p.cluster, p.openstackPluginCinderCSIApplication).OnRemote(remote).BackgroundDelete(),
 			metricsserver.New(p.client, p.cluster, p.metricsServerApplication).OnRemote(remote).BackgroundDelete(),
-			nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote).BackgroundDelete(),
-			conditional.New("nginx-ingress",
-				func() bool {
-					return p.nginxIngressApplication != nil && p.cluster.IngressEnabled()
-				},
-				nginxingress.New(p.client, p.cluster, p.nginxIngressApplication).OnRemote(remote).BackgroundDelete(),
-			),
-			conditional.New("cert-manager",
-				func() bool {
-					return p.certManagerApplication != nil && p.cluster.CertManagerEnabled()
-				},
+			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote).BackgroundDelete()),
+			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New(p.client, p.cluster, p.nginxIngressApplication).OnRemote(remote).BackgroundDelete()),
+			conditional.New("cert-manager", p.cluster.CertManagerEnabled,
 				serial.New("cert-manager",
 					certmanager.New(p.client, p.cluster, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
 					certmanagerissuers.New(p.client, p.cluster, p.certManagerIssuersApplication).OnRemote(remote).BackgroundDelete(),
 				),
 			),
-			conditional.New("longhorn",
-				func() bool {
-					return p.longhornApplication != nil && p.cluster.FileStorageEnabled()
-				},
-				longhorn.New(p.client, p.cluster, p.longhornApplication).OnRemote(remote).BackgroundDelete(),
-			),
-			conditional.New("prometheus",
-				func() bool {
-					return p.prometheusApplication != nil && p.cluster.PrometheusEnabled()
-				},
-				prometheus.New(p.client, p.cluster, p.prometheusApplication).OnRemote(remote).BackgroundDelete(),
-			),
+			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(p.client, p.cluster, p.longhornApplication).OnRemote(remote).BackgroundDelete()),
+			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(p.client, p.cluster, p.prometheusApplication).OnRemote(remote).BackgroundDelete()),
 		),
 		concurrent.New("cluster add-ons wave 2",
-			conditional.New("kubernetes-dashboard",
-				func() bool {
-					return p.kubernetesDashboardApplication != nil && p.cluster.KubernetesDashboardEnabled()
-				},
-				kubernetesdashboard.New(p.client, p.cluster, p.kubernetesDashboardApplication, remote).OnRemote(remote).BackgroundDelete(),
-			),
+			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(p.client, p.cluster, p.kubernetesDashboardApplication, remote).OnRemote(remote).BackgroundDelete()),
 		),
 	)
 

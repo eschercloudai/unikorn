@@ -177,6 +177,9 @@ type KubernetesClusterFeatures struct {
 	// KubernetesDashboard Enable the Kubernetes dashboard.  Requires ingress and certManager to be enabled.
 	KubernetesDashboard *bool `json:"kubernetesDashboard,omitempty"`
 
+	// NvidiaOperator Enable the Nvidia GPU operator.
+	NvidiaOperator *bool `json:"nvidiaOperator,omitempty"`
+
 	// Prometheus Enable Prometheus.
 	Prometheus *bool `json:"prometheus,omitempty"`
 }
