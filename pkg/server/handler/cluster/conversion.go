@@ -152,6 +152,7 @@ func convertFeatures(in *unikornv1.KubernetesCluster) *generated.KubernetesClust
 		KubernetesDashboard: in.Spec.Features.KubernetesDashboard,
 		FileStorage:         in.Spec.Features.FileStorage,
 		Prometheus:          in.Spec.Features.Prometheus,
+		NvidiaOperator:      in.Spec.Features.NvidiaOperator,
 	}
 
 	return features
@@ -437,6 +438,7 @@ func createFeatures(options *generated.KubernetesCluster) *unikornv1.KubernetesC
 		KubernetesDashboard: options.Features.KubernetesDashboard,
 		FileStorage:         options.Features.FileStorage,
 		Prometheus:          options.Features.Prometheus,
+		NvidiaOperator:      options.Features.NvidiaOperator,
 	}
 
 	return features

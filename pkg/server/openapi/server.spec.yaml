@@ -877,6 +877,9 @@ components:
         prometheus:
           description: Enable Prometheus.
           type: boolean
+        nvidiaOperator:
+          description: Enable the Nvidia GPU operator.
+          type: boolean
     kubernetesCluster:
       description: Unikorn Kubernetes cluster creation parameters.
       type: object
