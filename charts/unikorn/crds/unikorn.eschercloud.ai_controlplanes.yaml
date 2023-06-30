@@ -10,7 +10,6 @@ spec:
   group: unikorn.eschercloud.ai
   names:
     categories:
-    - all
     - unikorn
     kind: ControlPlane
     listKind: ControlPlaneList
