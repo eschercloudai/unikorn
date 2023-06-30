@@ -127,6 +127,9 @@ type UnikornClaims struct {
 	// This effectively caches the unique user ID so we don't have to translate
 	// between names in the scope of the token, and what Openstack APIs expect.
 	User string `json:"userId,omitempty"`
+
+	// Federated is used to give a hint as to which login type was used.
+	Federated bool `json:"federated,omitempty"`
 }
 
 // Claims is an application specific set of claims.

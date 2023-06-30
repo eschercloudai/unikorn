@@ -637,8 +637,9 @@ func (a *Authenticator) Token(w http.ResponseWriter, r *http.Request) (*generate
 	}
 
 	claims := &UnikornClaims{
-		Token: code.KeystoneToken,
-		User:  code.KeystoneUserID,
+		Token:     code.KeystoneToken,
+		User:      code.KeystoneUserID,
+		Federated: true,
 	}
 
 	accessToken, err := Issue(a.issuer, r, code.Email, claims, nil, code.Expiry)

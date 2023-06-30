@@ -85,6 +85,7 @@ func (v *PublicKeyVar) Type() string {
 type Options struct {
 	key               PublicKeyVar
 	serverGroupPolicy string
+
 	// applicationCredentialRoles sets the roles an application credential
 	// is granted on creation.
 	applicationCredentialRoles []string

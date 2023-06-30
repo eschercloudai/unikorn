@@ -160,6 +160,9 @@ spec:
         - name: unikorn-server-jose-tls
           mountPath: /var/lib/secrets/unikorn.eschercloud.ai/jose
           readOnly: true
+        - name: unikorn-service-account
+          mountPath: /var/lib/secrets/unikorn.eschercloud.ai/keystone
+          readOnly: true
         ports:
         - name: http
           containerPort: 6080
@@ -183,6 +186,9 @@ spec:
       - name: unikorn-server-jose-tls
         secret:
           secretName: unikorn-server-jose-tls
+      - name: unikorn-service-account
+        secret:
+          secretName: {{ .Values.server.serviceAccountSecretName }}
 ---
 apiVersion: v1
 kind: Service

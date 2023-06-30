@@ -41,6 +41,43 @@ type Provider interface {
 	Client() (*gophercloud.ProviderClient, error)
 }
 
+// BasicProvider allows use of username and password.
+// Think long and hard before you use this from a security perspective.
+type BasicProvider struct {
+	// endpoint is the Keystone endpoint to hit to get access to tokens
+	// and the service catalog.
+	endpoint string
+
+	userID    string
+	password  string
+	projectID string
+}
+
+// Ensure the interface is implemented.
+var _ Provider = &BasicProvider{}
+
+func NewBasicProvider(endpoint, userID, password, projectID string) *BasicProvider {
+	return &BasicProvider{
+		endpoint:  endpoint,
+		userID:    userID,
+		password:  password,
+		projectID: projectID,
+	}
+}
+
+func (p *BasicProvider) Client() (*gophercloud.ProviderClient, error) {
+	options := gophercloud.AuthOptions{
+		IdentityEndpoint: p.endpoint,
+		UserID:           p.userID,
+		Password:         p.password,
+		Scope: &gophercloud.AuthScope{
+			ProjectID: p.projectID,
+		},
+	}
+
+	return authenticatedClient(options)
+}
+
 // TokenProvider creates a client from an endpoint and token.
 type TokenProvider struct {
 	// endpoint is the Keystone endpoint to hit to get access to tokens

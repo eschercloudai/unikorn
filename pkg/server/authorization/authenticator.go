@@ -84,9 +84,10 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (*ge
 	}
 
 	uClaims := &oauth2.UnikornClaims{
-		Token:   keystoneToken.ID,
-		User:    user.ID,
-		Project: scope.Project.Id,
+		Token:     keystoneToken.ID,
+		User:      user.ID,
+		Project:   scope.Project.Id,
+		Federated: tokenClaims.UnikornClaims.Federated,
 	}
 
 	// Add some scope to the claims to allow the token to do more.

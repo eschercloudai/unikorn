@@ -47,6 +47,11 @@ server:
   # Allows override of the global default image.
   image:
 
+  # Allows the use of an explicit service account for certain OpenStack operations
+  # e.g. application credentials with federated users. Must contain "username" and
+  # "password" keys.
+  serviceAccountSecretName: unikorn-service-account
+
   ingress:
     # Sets the ingress class to use.
     ingressClass: nginx
