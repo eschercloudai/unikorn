@@ -163,7 +163,7 @@ type ProjectList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:scope=Cluster,categories=all;unikorn
+// +kubebuilder:resource:scope=Cluster,categories=unikorn
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
@@ -255,7 +255,7 @@ type ControlPlaneList struct {
 // resources.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
+// +kubebuilder:resource:scope=Namespaced,categories=unikorn
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="bundle",type="string",JSONPath=".spec.applicationBundle"
 // +kubebuilder:printcolumn:name="namespace",type="string",JSONPath=".status.namespace"
@@ -464,7 +464,7 @@ type KubernetesClusterList struct {
 // some other new starlet.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:scope=Namespaced,categories=all;unikorn
+// +kubebuilder:resource:scope=Namespaced,categories=unikorn
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="bundle",type="string",JSONPath=".spec.applicationBundle"
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.controlPlane.version"
@@ -670,7 +670,7 @@ type HelmApplicationList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:scope=Cluster,categories=all;unikorn
+// +kubebuilder:resource:scope=Cluster,categories=unikorn
 // +kubebuilder:printcolumn:name="repo",type="string",JSONPath=".spec.repo"
 // +kubebuilder:printcolumn:name="chart",type="string",JSONPath=".spec.chart"
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.version"
@@ -739,7 +739,7 @@ type ApplicationBundleList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:resource:scope=Cluster,categories=all;unikorn
+// +kubebuilder:resource:scope=Cluster,categories=unikorn
 // +kubebuilder:printcolumn:name="kind",type="string",JSONPath=".spec.kind"
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.version"
 // +kubebuilder:printcolumn:name="preview",type="string",JSONPath=".spec.preview"
