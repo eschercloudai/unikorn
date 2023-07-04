@@ -43,6 +43,25 @@ var (
 	ErrContextError = errors.New("value missing from context")
 )
 
+const (
+	tlsKeyPathDefault  = "/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.key"
+	tlsCertPathDefault = "/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.crt"
+)
+
+type Options struct {
+	// TLSKeyPath identifies where to get the JWE/JWS private key from.
+	TLSKeyPath string
+
+	// TLSCertPath identifies where to get the JWE/JWS public key from.
+	TLSCertPath string
+}
+
+// AddFlags registers flags with the provided flag set.
+func (o *Options) AddFlags(f *pflag.FlagSet) {
+	f.StringVar(&o.TLSKeyPath, "jose-tls-key", tlsKeyPathDefault, "TLS key used to sign JWS and decrypt JWE.")
+	f.StringVar(&o.TLSCertPath, "jose-tls-cert", tlsCertPathDefault, "TLS cert used to verify JWS and encrypt JWE.")
+}
+
 // JWTIssuer is in charge of API token issue and verification.
 // It is expected that the keys come from a mounted kubernetes.io/tls
 // secret, and that is managed by cert-manager.  As a result the keys
@@ -53,27 +72,14 @@ var (
 // cache the certificate load, it will need to be coordinated between
 // all instances.
 type JWTIssuer struct {
-	// tLSKeyPath identifies where to get the JWE/JWS private key from.
-	tLSKeyPath string
-
-	// tLSCertPath identifies where to get the JWE/JWS public key from.
-	tLSCertPath string
+	options *Options
 }
 
 // NewJWTIssuer returns a new JWT issuer and validator.
-func NewJWTIssuer() *JWTIssuer {
-	return &JWTIssuer{}
-}
-
-const (
-	tlsKeyPathDefault  = "/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.key"
-	tlsCertPathDefault = "/var/lib/secrets/unikorn.eschercloud.ai/jose/tls.crt"
-)
-
-// AddFlags registers flags with the provided flag set.
-func (i *JWTIssuer) AddFlags(f *pflag.FlagSet) {
-	f.StringVar(&i.tLSKeyPath, "jose-tls-key", tlsKeyPathDefault, "TLS key used to sign JWS and decrypt JWE.")
-	f.StringVar(&i.tLSCertPath, "jose-tls-cert", tlsCertPathDefault, "TLS cert used to verify JWS and encrypt JWE.")
+func NewJWTIssuer(options *Options) *JWTIssuer {
+	return &JWTIssuer{
+		options: options,
+	}
 }
 
 // GetKeyPair returns the public key, private key and key id from the configuration data.
@@ -81,7 +87,7 @@ func (i *JWTIssuer) AddFlags(f *pflag.FlagSet) {
 // key info.
 func (i *JWTIssuer) GetKeyPair() (any, crypto.PrivateKey, string, error) {
 	// See JWTIssuer documentation for notes on caching.
-	tlsCertificate, err := tls.LoadX509KeyPair(i.tLSCertPath, i.tLSKeyPath)
+	tlsCertificate, err := tls.LoadX509KeyPair(i.options.TLSCertPath, i.options.TLSKeyPath)
 	if err != nil {
 		return nil, nil, "", err
 	}

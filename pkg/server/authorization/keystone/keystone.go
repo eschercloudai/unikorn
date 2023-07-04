@@ -36,41 +36,57 @@ var (
 	ErrTokenExchange = errors.New("keystone token exchange failed")
 )
 
-// Authenticator provides Keystone authentication functionality.
-type Authenticator struct {
-	// endpoint is the Keystone endpoint.
-	endpoint string
+type Options struct {
+	// Endpoint is the Keystone Endpoint.
+	Endpoint string
 
-	// domain is the default domain users live under.
-	domain string
+	// CACertificate is ONLY used in testing, in production we simply Dial the
+	// endpoint and extract it as this will actually pickup CA rotations.
+	// Having this set will inhibit that behaviour.  This is a PEM encoded
+	// certificate if you were to every use it...
+	CACertificate []byte
+
+	// Domain is the default domain users live under.
+	Domain string
 
 	// keystoneFederationTokenEndpoint is where we can exchange an OpenID
 	// id_token for a Keystone API token.
 	keystoneFederationTokenEndpoint string
 }
 
-// New returns a new authenticator with required fields populated.
-// You must call AddFlags after this.
-func New() *Authenticator {
-	return &Authenticator{}
+// AddFlags to the specified flagset.
+func (o *Options) AddFlags(f *pflag.FlagSet) {
+	f.StringVar(&o.Endpoint, "keystone-endpoint", "https://nl1.eschercloud.com:5000", "Keystone endpoint to use for authn/authz.")
+	f.StringVar(&o.keystoneFederationTokenEndpoint, "keystone-federation-token-endpoint", "https://nl1.eschercloud.com:5000/v3/OS-FEDERATION/identity_providers/onelogindev/protocols/openid/auth", "Where we can exchange an OpenID identity for an API token.")
+	f.StringVar(&o.Domain, "keystone-user-domain-name", "Default", "Keystone user domain name for password authentication.")
 }
 
-// AddFlags to the specified flagset.
-func (a *Authenticator) AddFlags(f *pflag.FlagSet) {
-	f.StringVar(&a.endpoint, "keystone-endpoint", "https://nl1.eschercloud.com:5000", "Keystone endpoint to use for authn/authz.")
-	f.StringVar(&a.keystoneFederationTokenEndpoint, "keystone-federation-token-endpoint", "https://nl1.eschercloud.com:5000/v3/OS-FEDERATION/identity_providers/onelogindev/protocols/openid/auth", "Where we can exchange an OpenID identity for an API token.")
-	f.StringVar(&a.domain, "keystone-user-domain-name", "Default", "Keystone user domain name for password authentication.")
+// Authenticator provides Keystone authentication functionality.
+type Authenticator struct {
+	options *Options
+}
+
+// New returns a new authenticator with required fields populated.
+// You must call AddFlags after this.
+func New(options *Options) *Authenticator {
+	return &Authenticator{
+		options: options,
+	}
 }
 
 // Endpoint returns the endpoint host.
 func (a *Authenticator) Endpoint() string {
-	return a.endpoint
+	return a.options.Endpoint
 }
 
 // Domain returns the default user domain.
 // TODO: It stands to reason that the user should supply this in future.
 func (a *Authenticator) Domain() string {
-	return a.domain
+	return a.options.Domain
+}
+
+func (a *Authenticator) CACertificate() []byte {
+	return a.options.CACertificate
 }
 
 // OIDCTokenExchangeResult is what's returned by Keystone when we give it an OIDC
@@ -129,7 +145,7 @@ type OIDCTokenExchangeResult struct {
 // OIDCTokenExchange sends the OIDC ID token to keystone, which will then
 // map that to a shadow user and group, and return an unscoped API token.
 func (a *Authenticator) OIDCTokenExchange(ctx context.Context, token string) (string, *OIDCTokenExchangeResult, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.keystoneFederationTokenEndpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.options.keystoneFederationTokenEndpoint, nil)
 	if err != nil {
 		return "", nil, err
 	}
@@ -172,12 +188,12 @@ func (a *Authenticator) OIDCTokenExchange(ctx context.Context, token string) (st
 
 // Basic does basic authentication, please rethink your life before using this.
 func (a *Authenticator) Basic(ctx context.Context, username, password string) (*tokens.Token, *tokens.User, error) {
-	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.endpoint))
+	identity, err := openstack.NewIdentityClient(openstack.NewUnauthenticatedProvider(a.options.Endpoint))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	token, user, err := identity.CreateToken(ctx, openstack.NewCreateTokenOptionsUnscopedPassword(a.domain, username, password))
+	token, user, err := identity.CreateToken(ctx, openstack.NewCreateTokenOptionsUnscopedPassword(a.options.Domain, username, password))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -187,7 +203,7 @@ func (a *Authenticator) Basic(ctx context.Context, username, password string) (*
 
 // GetUser returns user details.
 func (a *Authenticator) GetUser(ctx context.Context, token, userID string) (*users.User, error) {
-	identity, err := openstack.NewIdentityClient(openstack.NewTokenProvider(a.endpoint, token))
+	identity, err := openstack.NewIdentityClient(openstack.NewTokenProvider(a.options.Endpoint, token))
 	if err != nil {
 		return nil, err
 	}

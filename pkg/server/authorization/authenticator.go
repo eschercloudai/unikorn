@@ -20,8 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/spf13/pflag"
-
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization/keystone"
@@ -44,21 +42,12 @@ type Authenticator struct {
 
 // NewAuthenticator returns a new authenticator with required fields populated.
 // You must call AddFlags after this.
-func NewAuthenticator(issuer *jose.JWTIssuer) *Authenticator {
-	keystone := keystone.New()
-	oauth2 := oauth2.New(issuer, keystone)
-
+func NewAuthenticator(issuer *jose.JWTIssuer, oauth2 *oauth2.Authenticator, keystone *keystone.Authenticator) *Authenticator {
 	return &Authenticator{
 		issuer:   issuer,
 		OAuth2:   oauth2,
 		Keystone: keystone,
 	}
-}
-
-// AddFlags to the specified flagset.
-func (a *Authenticator) AddFlags(f *pflag.FlagSet) {
-	a.OAuth2.AddFlags(f)
-	a.Keystone.AddFlags(f)
 }
 
 // Token performs token based authentication against Keystone with a scope, and returns a new token.

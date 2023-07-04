@@ -29,6 +29,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// NewScheme returns a scheme with all types that are required by unikorn.
+func NewScheme() (*runtime.Scheme, error) {
+	// Create a scheme and ensure it knows about Kubernetes and Unikorn
+	// resource types.
+	scheme := runtime.NewScheme()
+
+	if err := kubernetesscheme.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+
+	if err := unikornscheme.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+
+	return scheme, nil
+}
+
 // New returns a new controller runtime caching client, initialized with core and
 // unikorn resources for typed operation.
 func New(ctx context.Context) (client.Client, error) {
@@ -39,13 +56,8 @@ func New(ctx context.Context) (client.Client, error) {
 
 	// Create a scheme and ensure it knows about Kubernetes and Unikorn
 	// resource types.
-	scheme := runtime.NewScheme()
-
-	if err := kubernetesscheme.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-
-	if err := unikornscheme.AddToScheme(scheme); err != nil {
+	scheme, err := NewScheme()
+	if err != nil {
 		return nil, err
 	}
 

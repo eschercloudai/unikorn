@@ -62,8 +62,8 @@ func OpenstackExternalNetworkCompletionFunc(cloud *string) func(*cobra.Command, 
 		var matches []string
 
 		for _, network := range results {
-			if network.External && strings.HasPrefix(network.Network.ID, toComplete) {
-				matches = append(matches, network.Network.ID)
+			if strings.HasPrefix(network.ID, toComplete) {
+				matches = append(matches, network.ID)
 			}
 		}
 
@@ -114,7 +114,7 @@ func OpenstackFlavorCompletionFunc(cloud *string) func(*cobra.Command, []string,
 		var matches []string
 
 		for _, flavor := range results {
-			if strings.HasPrefix(flavor.Name, toComplete) {
+			if strings.HasPrefix(flavor.Flavor.Name, toComplete) {
 				matches = append(matches, flavor.Name)
 			}
 		}

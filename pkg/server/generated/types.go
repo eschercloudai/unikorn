@@ -495,9 +495,6 @@ type KubernetesClusterResponse = KubernetesCluster
 // KubernetesClustersResponse A list of Unikorn Kubernetes clusters.
 type KubernetesClustersResponse = KubernetesClusters
 
-// NullResponse defines model for nullResponse.
-type NullResponse = map[string]interface{}
-
 // OpenstackBlockStorageAvailabilityZonesResponse A list of Openstack availability zones.
 type OpenstackBlockStorageAvailabilityZonesResponse = OpenstackAvailabilityZones
 

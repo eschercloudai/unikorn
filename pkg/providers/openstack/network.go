@@ -18,10 +18,10 @@ package openstack
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
@@ -53,68 +53,25 @@ func NewNetworkClient(provider Provider) (*NetworkClient, error) {
 	return c, nil
 }
 
-// Network allows us to extend gophercloud to get access to more interesting
-// fields not available in the standard data types.
-type Network struct {
-	// Network is the gophercloud network type.  This needs to be a field,
-	// not an embedded type, lest its UnmarshalJSON function get promoted...
-	Network networks.Network
-
-	// External is the bit we care about, is it an external network ID?
-	External bool `json:"router:external"`
-}
-
-// UnmarshalJSON does magic quite frankly.  We unmarshal directly into the
-// gophercloud network type, easy peasy.  When un marshalling into our network
-// type, we need to define a temporary type to avoid an infinite loop...
-func (n *Network) UnmarshalJSON(b []byte) error {
-	if err := json.Unmarshal(b, &n.Network); err != nil {
-		return err
-	}
-
-	type tmp Network
-
-	var s struct {
-		tmp
-	}
-
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-
-	n.External = s.tmp.External
-
-	return nil
-}
-
 // ExternalNetworks returns a list of external networks.
-func (c *NetworkClient) ExternalNetworks(ctx context.Context) ([]Network, error) {
+func (c *NetworkClient) ExternalNetworks(ctx context.Context) ([]networks.Network, error) {
 	tracer := otel.GetTracerProvider().Tracer(constants.Application)
 
 	_, span := tracer.Start(ctx, "/networking/v2.0/networks", trace.WithSpanKind(trace.SpanKindClient))
 	defer span.End()
 
-	// This sucks, you cannot directly query for external networks...
-	page, err := networks.List(c.client, &networks.ListOpts{}).AllPages()
+	affirmative := true
+
+	page, err := networks.List(c.client, &external.ListOptsExt{ListOptsBuilder: &networks.ListOpts{}, External: &affirmative}).AllPages()
 	if err != nil {
 		return nil, err
 	}
 
-	var results []Network
+	var results []networks.Network
 
 	if err := networks.ExtractNetworksInto(page, &results); err != nil {
 		return nil, err
 	}
 
-	filtered := []Network{}
-
-	for _, result := range results {
-		if !result.External {
-			continue
-		}
-
-		filtered = append(filtered, result)
-	}
-
-	return filtered, nil
+	return results, nil
 }

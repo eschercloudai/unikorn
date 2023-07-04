@@ -22,10 +22,8 @@ import (
 	"strings"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/applicationcredentials"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
@@ -90,7 +88,7 @@ func New(options *Options, authenticator *authorization.Authenticator) (*Opensta
 }
 
 func (o *Openstack) ApplicationCredentialRoles() []string {
-	return o.options.applicationCredentialRoles
+	return o.options.ApplicationCredentialRoles
 }
 
 func getToken(r *http.Request) (string, error) {
@@ -273,15 +271,15 @@ func (o *Openstack) ListExternalNetworks(r *http.Request) (interface{}, error) {
 	externalNetworks := make(generated.OpenstackExternalNetworks, len(result))
 
 	for i, externalNetwork := range result {
-		externalNetworks[i].Id = externalNetwork.Network.ID
-		externalNetworks[i].Name = externalNetwork.Network.Name
+		externalNetworks[i].Id = externalNetwork.ID
+		externalNetworks[i].Name = externalNetwork.Name
 	}
 
 	return externalNetworks, nil
 }
 
 // convertFlavor traslates from Openstack's mess into our API types.
-func convertFlavor(flavor *flavors.Flavor, extraSpecs map[string]string) (*generated.OpenstackFlavor, error) {
+func convertFlavor(flavor *openstack.Flavor) (*generated.OpenstackFlavor, error) {
 	f := &generated.OpenstackFlavor{
 		Id:   flavor.ID,
 		Name: flavor.Name,
@@ -291,7 +289,7 @@ func convertFlavor(flavor *flavors.Flavor, extraSpecs map[string]string) (*gener
 		Memory: flavor.RAM >> 10,
 	}
 
-	gpu, ok, err := openstack.FlavorGPUs(flavor, extraSpecs)
+	gpu, ok, err := openstack.FlavorGPUs(flavor, flavor.ExtraSpecs)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("unable to get GPU flavor metadata").WithError(err)
 	}
@@ -355,39 +353,19 @@ func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, er
 
 	// Get rid of baremetal flavors.
 	// TODO: reject based on an expression of some kind?
-	result = util.Filter(result, func(f flavors.Flavor) bool {
+	result = util.Filter(result, func(f openstack.Flavor) bool {
 		return !strings.Contains(f.Name, "baremetal")
 	})
 
 	flavors := make(generated.OpenstackFlavors, len(result))
 
-	// Openstack sucks at this, so we need to fan out and run concurrently.
-	// Be careful to preserve the order here.
-	group, gctx := errgroup.WithContext(r.Context())
-
 	for i := range result {
-		index := i
-		f := &result[i]
+		flavor, err := convertFlavor(&result[i])
+		if err != nil {
+			return nil, err
+		}
 
-		group.Go(func() error {
-			extraSpecs, err := client.FlavorExtraSpecs(gctx, f)
-			if err != nil {
-				return errors.OAuth2ServerError("failed list flavor extra specs").WithError(err)
-			}
-
-			flavor, err := convertFlavor(f, extraSpecs)
-			if err != nil {
-				return err
-			}
-
-			flavors[index] = *flavor
-
-			return nil
-		})
-	}
-
-	if err := group.Wait(); err != nil {
-		return nil, err
+		flavors[i] = *flavor
 	}
 
 	w := flavorSortWrapper{
@@ -421,7 +399,7 @@ func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, erro
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
 	}
 
-	result, err := client.Images(r.Context(), o.options.key.key)
+	result, err := client.Images(r.Context(), o.options.Key.key)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed list images").WithError(err)
 	}
@@ -640,7 +618,7 @@ func (o *Openstack) CreateServerGroup(r *http.Request, name string) (*servergrou
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
 	}
 
-	result, err := client.CreateServerGroup(r.Context(), name, o.options.serverGroupPolicy)
+	result, err := client.CreateServerGroup(r.Context(), name, o.options.ServerGroupPolicy)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get create server group").WithError(err)
 	}
