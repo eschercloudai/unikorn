@@ -20,7 +20,9 @@ import (
 	"strings"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackcloudprovider"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
@@ -109,7 +111,20 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 		yamls[i] = string(y)
 	}
 
+	cloudConfig, err := openstackcloudprovider.GenerateCloudConfig(p.cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	cloudConfigHash, err := util.GetConfigurationHash(cloudConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	values := map[string]interface{}{
+		"commonAnnotations": map[string]interface{}{
+			constants.ConfigurationHashAnnotation: cloudConfigHash,
+		},
 		// Allow scale to zero.
 		"csi": map[string]interface{}{
 			"plugin": map[string]interface{}{

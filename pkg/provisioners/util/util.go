@@ -18,6 +18,8 @@ package util
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -42,4 +44,17 @@ func GetResourceNamespace(ctx context.Context, cli client.Client, l labels.Set) 
 	}
 
 	return &namespaces.Items[0], nil
+}
+
+// GetConfigurationHash is used to restart badly behaved apps that don't respect configuration
+// changes.
+func GetConfigurationHash(config any) (string, error) {
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return "", err
+	}
+
+	configHash := sha256.Sum256(configJSON)
+
+	return fmt.Sprintf("%x", configHash), nil
 }
