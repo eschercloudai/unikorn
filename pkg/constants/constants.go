@@ -94,6 +94,11 @@ const (
 	// IngressEndpointAnnotation helps us find the ingress IP address.
 	IngressEndpointAnnotation = "unikorn.eschercloud.ai/ingress-endpoint"
 
+	// ConfigurationHashAnnotation is used where application owners refuse to
+	// poll configuration updates and we (and all other users) are forced into
+	// manually restarting services based on a Deployment/DaemonSet changing.
+	ConfigurationHashAnnotation = "unikorn.eschercloud.ai/config-hash"
+
 	// Finalizer is applied to resources that need to be deleted manually
 	// and do other complex logic.
 	Finalizer = "unikorn"

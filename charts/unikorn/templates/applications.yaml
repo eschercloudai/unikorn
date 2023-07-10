@@ -71,7 +71,7 @@ metadata:
 spec:
   repo: https://kubernetes.github.io/cloud-provider-openstack
   chart: openstack-cloud-controller-manager
-  version: 1.4.0
+  version: 2.28.0-alpha.4
   createNamespace: true
   interface: 1.0.0
 ---
@@ -82,7 +82,7 @@ metadata:
 spec:
   repo: https://kubernetes.github.io/cloud-provider-openstack
   chart: openstack-cinder-csi
-  version: 2.3.0
+  version: 2.28.0-alpha.4
   createNamespace: true
   interface: 1.0.0
   parameters:
@@ -91,6 +91,8 @@ spec:
     value: 'true'
   - name: secret.name
     value: cloud-config
+  - name: secret.hostMount
+    value: 'false'
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
