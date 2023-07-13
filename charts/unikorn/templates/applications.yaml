@@ -140,6 +140,8 @@ spec:
     value: 5m
   - name: extraArgs.scale-down-unneeded-time
     value: 5m
+  - name: extraArgs.enforce-node-group-min-size
+    value: 'true'
   - name: image.tag
     value: v1.27.1
   - name: rbac.serviceAccount.name
