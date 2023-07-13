@@ -147,7 +147,7 @@ func HTTPForbidden(description string) *HTTPError {
 }
 
 func HTTPNotFound() *HTTPError {
-	return newHTTPError(http.StatusNotFound, "", "")
+	return newHTTPError(http.StatusNotFound, "", "resource not found")
 }
 
 func IsHTTPNotFound(err error) bool {

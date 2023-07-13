@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -29,6 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
+	"github.com/gophercloud/gophercloud/pagination"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -83,8 +85,54 @@ func (c *ComputeClient) KeyPairs(ctx context.Context) ([]keypairs.KeyPair, error
 	return keypairs.ExtractKeyPairs(page)
 }
 
+// Flavor defines an extended set of flavor information not included
+// by default in gophercloud.
+type Flavor struct {
+	flavors.Flavor
+
+	ExtraSpecs map[string]string
+}
+
+// UnmarshalJSON is required because "flavors.Flavor" already defines
+// this, and it will undergo method promotion.
+func (f *Flavor) UnmarshalJSON(b []byte) error {
+	// Unmarshal the native type using its UnmarshalJSON.
+	if err := json.Unmarshal(b, &f.Flavor); err != nil {
+		return err
+	}
+
+	// Create a new anonymous structure, and unmarshal the custom fields
+	// into that, so we don't end up in an infinite loop.
+	var s struct {
+		//nolint:tagliatelle
+		ExtraSpecs map[string]string `json:"extra_specs"`
+	}
+
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+
+	// Copy from the anonymous struct to our flavor definition.
+	f.ExtraSpecs = s.ExtraSpecs
+
+	return nil
+}
+
+// ExtractFlavors takes raw JSON and decodes it into our custom
+// flavour struct.
+func ExtractFlavors(r pagination.Page) ([]Flavor, error) {
+	var s struct {
+		Flavors []Flavor `json:"flavors"`
+	}
+
+	//nolint:forcetypeassert
+	err := (r.(flavors.FlavorPage)).ExtractInto(&s)
+
+	return s.Flavors, err
+}
+
 // Flavors returns a list of flavors.
-func (c *ComputeClient) Flavors(ctx context.Context) ([]flavors.Flavor, error) {
+func (c *ComputeClient) Flavors(ctx context.Context) ([]Flavor, error) {
 	tracer := otel.GetTracerProvider().Tracer(constants.Application)
 
 	_, span := tracer.Start(ctx, "/compute/v2/flavors", trace.WithSpanKind(trace.SpanKindClient))
@@ -95,11 +143,11 @@ func (c *ComputeClient) Flavors(ctx context.Context) ([]flavors.Flavor, error) {
 		return nil, err
 	}
 
-	return flavors.ExtractFlavors(page)
+	return ExtractFlavors(page)
 }
 
 // Flavor returns a single flavor.
-func (c *ComputeClient) Flavor(ctx context.Context, name string) (*flavors.Flavor, error) {
+func (c *ComputeClient) Flavor(ctx context.Context, name string) (*Flavor, error) {
 	// Arse, OS only deals in IDs, we deal in human readable names.
 	flavors, err := c.Flavors(ctx)
 	if err != nil {
@@ -117,21 +165,6 @@ func (c *ComputeClient) Flavor(ctx context.Context, name string) (*flavors.Flavo
 	return nil, fmt.Errorf("%w: unable to find flavor %s", ErrResourceNotFound, name)
 }
 
-// FlavorExtraSpecs returns extra metadata for a flavor.
-func (c *ComputeClient) FlavorExtraSpecs(ctx context.Context, flavor *flavors.Flavor) (map[string]string, error) {
-	tracer := otel.GetTracerProvider().Tracer(constants.Application)
-
-	_, span := tracer.Start(ctx, "/compute/v2/flavors/"+flavor.ID+"/os-extra_specs", trace.WithSpanKind(trace.SpanKindClient))
-	defer span.End()
-
-	result := flavors.ListExtraSpecs(c.client, flavor.ID)
-	if result.Err != nil {
-		return nil, result.Err
-	}
-
-	return result.Extract()
-}
-
 // GPUMeta describes GPUs.
 type GPUMeta struct {
 	// GPUs is the number of GPUs, this may be the total number
@@ -144,7 +177,7 @@ type GPUMeta struct {
 // or the number of virtual GPUs.  Sadly there is absolutely no way of assiging
 // metadata to flavors without having to add those same values to your host aggregates,
 // so we have to have knowledge of flavors built in somewhere.
-func FlavorGPUs(flavor *flavors.Flavor, extraSpecs map[string]string) (*GPUMeta, bool, error) {
+func FlavorGPUs(flavor *Flavor, extraSpecs map[string]string) (*GPUMeta, bool, error) {
 	// There are some well known extra specs defined in:
 	// https://docs.openstack.org/nova/latest/configuration/extra-specs.html
 	//

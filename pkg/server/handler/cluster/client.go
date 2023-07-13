@@ -255,9 +255,15 @@ func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlP
 		return err
 	}
 
-	ca, err := util.GetURLCACertificate(c.authenticator.Keystone.Endpoint())
-	if err != nil {
-		return errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
+	// NOTE: this is a testing hack, we expect the inner code to be executed all the time.
+	ca := c.authenticator.Keystone.CACertificate()
+	if ca == nil {
+		dynamicCA, err := util.GetURLCACertificate(c.authenticator.Keystone.Endpoint())
+		if err != nil {
+			return errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
+		}
+
+		ca = dynamicCA
 	}
 
 	clientConfig, cloud, err := c.createClientConfig(controlPlane, options.Name)

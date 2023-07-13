@@ -41,13 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// Authenticator provides Keystone authentication functionality.
-type Authenticator struct {
-	// issuer allows creation and validation of JWT bearer tokens.
-	issuer *jose.JWTIssuer
-
-	keystone *keystone.Authenticator
-
+type Options struct {
 	// oidcClientID is the client ID for the backend IdP this server
 	// is prozying for.
 	oidcClientID string
@@ -75,24 +69,35 @@ type Authenticator struct {
 	redirectURI string
 }
 
+// AddFlags to the specified flagset.
+func (o *Options) AddFlags(f *pflag.FlagSet) {
+	f.StringVar(&o.oidcClientID, "oidc-client-id", "93455590-c733-013b-e155-02ce91db9a85225246", "OIDC client ID.")
+	f.StringVar(&o.oidcIssuer, "oidc-issuer", "https://eschercloud-dev.onelogin.com/oidc/2", "Expected OIDC issuer name.")
+	f.StringVar(&o.oidcAuthorizationEndpoint, "oidc-autorization-endpoint", "https://eschercloud-dev.onelogin.com/oidc/2/auth", "OIDC authorization endpoint.")
+	f.StringVar(&o.oidcTokenEndpoint, "oidc-token-endpoint", "https://eschercloud-dev.onelogin.com/oidc/2/token", "OIDC token endpoint.")
+	f.StringVar(&o.oidcJwksURL, "oidc-jwks-url", "https://eschercloud-dev.onelogin.com/oidc/2/certs", "OIDC JWKS endpoint.")
+	f.StringVar(&o.clientID, "oauth2-client-id", "9a719e1e-aa85-4a21-a221-324e787efd78", "OAuth2 client ID of server clients.")
+	f.StringVar(&o.redirectURI, "oauth2-redirect-uri", "https://kubernetes.eschercloud.com/oauth2/callback", "Exprected redirect URI for the client ID.")
+}
+
+// Authenticator provides Keystone authentication functionality.
+type Authenticator struct {
+	options *Options
+
+	// issuer allows creation and validation of JWT bearer tokens.
+	issuer *jose.JWTIssuer
+
+	keystone *keystone.Authenticator
+}
+
 // New returns a new authenticator with required fields populated.
 // You must call AddFlags after this.
-func New(issuer *jose.JWTIssuer, keystone *keystone.Authenticator) *Authenticator {
+func New(options *Options, issuer *jose.JWTIssuer, keystone *keystone.Authenticator) *Authenticator {
 	return &Authenticator{
+		options:  options,
 		issuer:   issuer,
 		keystone: keystone,
 	}
-}
-
-// AddFlags to the specified flagset.
-func (a *Authenticator) AddFlags(f *pflag.FlagSet) {
-	f.StringVar(&a.oidcClientID, "oidc-client-id", "93455590-c733-013b-e155-02ce91db9a85225246", "OIDC client ID.")
-	f.StringVar(&a.oidcIssuer, "oidc-issuer", "https://eschercloud-dev.onelogin.com/oidc/2", "Expected OIDC issuer name.")
-	f.StringVar(&a.oidcAuthorizationEndpoint, "oidc-autorization-endpoint", "https://eschercloud-dev.onelogin.com/oidc/2/auth", "OIDC authorization endpoint.")
-	f.StringVar(&a.oidcTokenEndpoint, "oidc-token-endpoint", "https://eschercloud-dev.onelogin.com/oidc/2/token", "OIDC token endpoint.")
-	f.StringVar(&a.oidcJwksURL, "oidc-jwks-url", "https://eschercloud-dev.onelogin.com/oidc/2/certs", "OIDC JWKS endpoint.")
-	f.StringVar(&a.clientID, "oauth2-client-id", "9a719e1e-aa85-4a21-a221-324e787efd78", "OAuth2 client ID of server clients.")
-	f.StringVar(&a.redirectURI, "oauth2-redirect-uri", "https://kubernetes.eschercloud.com/oauth2/callback", "Exprected redirect URI for the client ID.")
 }
 
 type Error string
@@ -236,11 +241,11 @@ func (a *Authenticator) authorizationValidateNonRedirecting(w http.ResponseWrite
 	switch {
 	case !query.Has("client_id"):
 		description = "client_id is not specified"
-	case query.Get("client_id") != a.clientID:
+	case query.Get("client_id") != a.options.clientID:
 		description = "client_id is invalid"
 	case !query.Has("redirect_uri"):
 		description = "redirect_uri is not specified"
-	case query.Get("redirect_uri") != a.redirectURI:
+	case query.Get("redirect_uri") != a.options.redirectURI:
 		description = "redirect_uri is invalid"
 	default:
 		return true
@@ -283,10 +288,10 @@ func (a *Authenticator) authorizationValidateRedirecting(w http.ResponseWriter, 
 // oidcConfig returns a oauth2 configuration for the OIDC backend.
 func (a *Authenticator) oidcConfig(r *http.Request) *oauth2.Config {
 	return &oauth2.Config{
-		ClientID: a.oidcClientID,
+		ClientID: a.options.oidcClientID,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  a.oidcAuthorizationEndpoint,
-			TokenURL: a.oidcTokenEndpoint,
+			AuthURL:  a.options.oidcAuthorizationEndpoint,
+			TokenURL: a.options.oidcTokenEndpoint,
 		},
 		// TODO: the ingress converts this all into a relative URL
 		// and adds an X-Forwardered-Host, X-Forwarded-Proto.  You should
@@ -403,11 +408,11 @@ func (a *Authenticator) oidcExtractIDToken(ctx context.Context, token string) (*
 	// Verify the ID token, and then extract information required by the client
 	// e.g. email addresses etc.
 	oidcConfig := &oidc.Config{
-		ClientID: a.oidcClientID,
+		ClientID: a.options.oidcClientID,
 	}
 
-	remoteKeySet := oidc.NewRemoteKeySet(ctx, a.oidcJwksURL)
-	idTokenVerifier := oidc.NewVerifier(a.oidcIssuer, remoteKeySet, oidcConfig)
+	remoteKeySet := oidc.NewRemoteKeySet(ctx, a.options.oidcJwksURL)
+	idTokenVerifier := oidc.NewVerifier(a.options.oidcIssuer, remoteKeySet, oidcConfig)
 
 	idToken, err := idTokenVerifier.Verify(ctx, token)
 	if err != nil {

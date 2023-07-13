@@ -62,7 +62,7 @@ paths:
       requestBody:
         $ref: '#/components/requestBodies/tokenScopeRequest'
       responses:
-        '200':
+        '201':
           $ref: '#/components/responses/tokenResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
@@ -227,7 +227,7 @@ paths:
       - oauth2Authentication:
         - project
       responses:
-        '200':
+        '202':
           $ref: '#/components/responses/nullResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
@@ -329,7 +329,7 @@ paths:
       - oauth2Authentication:
         - project
       responses:
-        '200':
+        '202':
           $ref: '#/components/responses/nullResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
@@ -806,12 +806,15 @@ components:
         version:
           description: Kubernetes version.
           type: string
+          minLength: 1
         imageName:
           description: Openstack image name.
           type: string
+          minLength: 1
         flavorName:
           description: Openstack flavor name.
           type: string
+          minLength: 1
         disk:
           $ref: '#/components/schemas/openstackVolume'
     kubernetesClusterAutoscaling:
@@ -1149,16 +1152,9 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/kubernetesCluster'
-    nullRequest:
-      description: Delete me
-      content: {}
   responses:
     nullResponse:
       description: Delete Me
-      content:
-        application/json:
-          schema:
-            type: object
     okResponse:
       description: Request is ok with no body.
     acceptedResponse:

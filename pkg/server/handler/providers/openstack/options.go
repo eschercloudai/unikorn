@@ -83,15 +83,15 @@ func (v *PublicKeyVar) Type() string {
 }
 
 type Options struct {
-	key               PublicKeyVar
-	serverGroupPolicy string
+	Key               PublicKeyVar
+	ServerGroupPolicy string
 	// applicationCredentialRoles sets the roles an application credential
 	// is granted on creation.
-	applicationCredentialRoles []string
+	ApplicationCredentialRoles []string
 }
 
 func (o *Options) AddFlags(f *pflag.FlagSet) {
-	f.Var(&o.key, "image-signing-key", "Key used to verify valid images for use with the platform")
-	f.StringVar(&o.serverGroupPolicy, "server-group-policy", "soft-anti-affinity", "Scheduling policy to use for server groups")
-	f.StringSliceVar(&o.applicationCredentialRoles, "application-credential-roles", nil, "A role to be added to application credentials on creation.  May be specified more than once.")
+	f.Var(&o.Key, "image-signing-key", "Key used to verify valid images for use with the platform")
+	f.StringVar(&o.ServerGroupPolicy, "server-group-policy", "soft-anti-affinity", "Scheduling policy to use for server groups")
+	f.StringSliceVar(&o.ApplicationCredentialRoles, "application-credential-roles", nil, "A role to be added to application credentials on creation.  May be specified more than once.")
 }

@@ -129,11 +129,11 @@ func getScopedToken(token *oauth2.Token, projectID string) (*generated.Token, er
 		return nil, err
 	}
 
-	if response.StatusCode() != 200 {
+	if response.StatusCode() != 201 {
 		return nil, fmt.Errorf("%w: unable to scope token", ErrAPI)
 	}
 
-	return response.JSON200, nil
+	return response.JSON201, nil
 }
 
 func main() {

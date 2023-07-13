@@ -50,7 +50,7 @@ type Handler struct {
 }
 
 func New(client client.Client, authenticator *authorization.Authenticator, options *Options) (*Handler, error) {
-	o, err := openstack.New(options.openstack, authenticator)
+	o, err := openstack.New(&options.Openstack, authenticator)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func New(client client.Client, authenticator *authorization.Authenticator, optio
 }
 
 func (h *Handler) setCacheable(w http.ResponseWriter) {
-	w.Header().Add("Cache-Control", fmt.Sprintf("max-age=%d", h.options.cacheMaxAge/time.Second))
+	w.Header().Add("Cache-Control", fmt.Sprintf("max-age=%d", h.options.CacheMaxAge/time.Second))
 	w.Header().Add("Cache-Control", "private")
 }
 
@@ -108,7 +108,7 @@ func (h *Handler) PostApiV1AuthTokensToken(w http.ResponseWriter, r *http.Reques
 	}
 
 	h.setUncacheable(w)
-	util.WriteJSONResponse(w, r, http.StatusOK, result)
+	util.WriteJSONResponse(w, r, http.StatusCreated, result)
 }
 
 func (h *Handler) GetApiV1AuthJwks(w http.ResponseWriter, r *http.Request) {

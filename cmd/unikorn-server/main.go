@@ -26,110 +26,25 @@ import (
 	"syscall"
 	"time"
 
-	chi "github.com/go-chi/chi/v5"
-	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/server/authorization"
-	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
-	"github.com/eschercloudai/unikorn/pkg/server/generated"
-	"github.com/eschercloudai/unikorn/pkg/server/handler"
-	"github.com/eschercloudai/unikorn/pkg/server/middleware"
+	"github.com/eschercloudai/unikorn/pkg/server"
 	"github.com/eschercloudai/unikorn/pkg/util/client"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
-
-// serverOptions allows server options to be overridden.
-type serverOptions struct {
-	// listenAddress tells the server what to listen on, you shouldn't
-	// need to change this, its already non-privileged and the default
-	// should be modified to avoid clashes with other services e.g prometheus.
-	listenAddress string
-
-	// readTimeout defines how long before we give up on the client,
-	// this should be fairly short.
-	readTimeout time.Duration
-
-	// readHeaderTimeout defines how long before we give up on the client,
-	// this should be fairly short.
-	readHeaderTimeout time.Duration
-
-	// writeTimeout defines how long we take to respond before we give up.
-	// Ideally we'd like this to be short, but Openstack in general sucks
-	// for performance.
-	writeTimeout time.Duration
-
-	// otlpEndpoint defines whether to ship spans to an OTLP consumer or
-	// not, and where to send them to.
-	otlpEndpoint string
-}
-
-// addFlags allows server options to be modified.
-func (o *serverOptions) addFlags(f *pflag.FlagSet) {
-	f.StringVar(&o.listenAddress, "server-listen-address", ":6080", "API listener address.")
-	f.DurationVar(&o.readTimeout, "server-read-timeout", time.Second, "How long to wait for the client to send the request body.")
-	f.DurationVar(&o.readHeaderTimeout, "server-read-header-timeout", time.Second, "How long to wait for the client to send headers.")
-	f.DurationVar(&o.writeTimeout, "server-write-timeout", 10*time.Second, "How long to wait for the API to respond to the client.")
-	f.StringVar(&o.otlpEndpoint, "otlp-endpoint", "", "An optional OTLP endpoint to ship spans to.")
-}
-
-// setupOpenTelemetry adds a span processor that will print root spans to the
-// logs by default, and optionally ship the spans to an OTLP listener.
-func (o *serverOptions) setupOpenTelemetry(ctx context.Context, logger logr.Logger) error {
-	otel.SetLogger(logger)
-
-	opts := []trace.TracerProviderOption{
-		trace.WithSpanProcessor(&middleware.LoggingSpanProcessor{}),
-	}
-
-	if o.otlpEndpoint != "" {
-		exporter, err := otlptracehttp.New(ctx,
-			otlptracehttp.WithEndpoint(o.otlpEndpoint),
-			otlptracehttp.WithInsecure(),
-		)
-
-		if err != nil {
-			return err
-		}
-
-		opts = append(opts, trace.WithBatcher(exporter))
-	}
-
-	otel.SetTracerProvider(trace.NewTracerProvider(opts...))
-
-	return nil
-}
 
 // start is the entry point to server.
 func start() {
-	// Initialize components with legacy flags.
-	zapOptions := &zap.Options{}
-	zapOptions.BindFlags(flag.CommandLine)
-
-	// Initialize components with flags, then parse them.
-	serverOptions := &serverOptions{}
-	serverOptions.addFlags(pflag.CommandLine)
-
-	issuer := jose.NewJWTIssuer()
-	issuer.AddFlags(pflag.CommandLine)
-
-	authenticator := authorization.NewAuthenticator(issuer)
-	authenticator.AddFlags(pflag.CommandLine)
-
-	handlerOptions := &handler.Options{}
-	handlerOptions.AddFlags(pflag.CommandLine)
+	s := &server.Server{}
+	s.AddFlags(pflag.CommandLine)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
 	// Get logging going first, log sinks will expect JSON formatted output for everything.
-	log.SetLogger(zap.New(zap.UseFlagOptions(zapOptions)))
+	s.SetupLogging()
 
 	logger := log.Log.WithName(constants.Application)
 
@@ -140,6 +55,12 @@ func start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	if err := s.SetupOpenTelemetry(ctx); err != nil {
+		logger.Error(err, "failed to setup OpenTelemetry")
+
+		return
+	}
+
 	client, err := client.New(ctx)
 	if err != nil {
 		logger.Error(err, "failed to create client")
@@ -147,52 +68,11 @@ func start() {
 		return
 	}
 
-	if err := serverOptions.setupOpenTelemetry(ctx, logger); err != nil {
-		logger.Error(err, "failed to setup OpenTelemetry")
-
-		return
-	}
-
-	// Middleware specified here is applied to all requests pre-routing.
-	router := chi.NewRouter()
-	router.Use(middleware.Logger())
-	router.NotFound(http.HandlerFunc(handler.NotFound))
-	router.MethodNotAllowed(http.HandlerFunc(handler.MethodNotAllowed))
-
-	authorizer := middleware.NewAuthorizer(issuer)
-
-	openapi, err := middleware.NewOpenAPI()
+	server, err := s.GetServer(client)
 	if err != nil {
-		logger.Error(err, "failed to create openapi")
+		logger.Error(err, "failed to setup Handler")
 
 		return
-	}
-
-	// Middleware specified here is applied to all requests post-routing.
-	// NOTE: these are applied in reverse order!!
-	chiServerOptions := generated.ChiServerOptions{
-		BaseRouter:       router,
-		ErrorHandlerFunc: handler.HandleError,
-		Middlewares: []generated.MiddlewareFunc{
-			middleware.OpenAPIValidatorMiddlewareFactory(authorizer, openapi),
-		},
-	}
-
-	handlerInterface, err := handler.New(client, authenticator, handlerOptions)
-	if err != nil {
-		logger.Error(err, "failed to handler")
-
-		return
-	}
-
-	chiServerhandler := generated.HandlerWithOptions(handlerInterface, chiServerOptions)
-
-	server := &http.Server{
-		Addr:              serverOptions.listenAddress,
-		ReadTimeout:       serverOptions.readTimeout,
-		ReadHeaderTimeout: serverOptions.readHeaderTimeout,
-		WriteTimeout:      serverOptions.writeTimeout,
-		Handler:           chiServerhandler,
 	}
 
 	// Register a signal handler to trigger a graceful shutdown.
