@@ -278,6 +278,10 @@ func (o *Openstack) ListExternalNetworks(r *http.Request) (interface{}, error) {
 	return externalNetworks, nil
 }
 
+func (o *Openstack) FlavorGPUs(flavor *openstack.Flavor) (*openstack.GPUMeta, error) {
+	return openstack.FlavorGPUs(flavor)
+}
+
 // convertFlavor traslates from Openstack's mess into our API types.
 func convertFlavor(flavor *openstack.Flavor) (*generated.OpenstackFlavor, error) {
 	f := &generated.OpenstackFlavor{
@@ -289,12 +293,12 @@ func convertFlavor(flavor *openstack.Flavor) (*generated.OpenstackFlavor, error)
 		Memory: flavor.RAM >> 10,
 	}
 
-	gpu, ok, err := openstack.FlavorGPUs(flavor, flavor.ExtraSpecs)
+	gpu, err := openstack.FlavorGPUs(flavor)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("unable to get GPU flavor metadata").WithError(err)
 	}
 
-	if ok {
+	if gpu != nil {
 		f.Gpus = &gpu.GPUs
 	}
 

@@ -173,54 +173,54 @@ type GPUMeta struct {
 	GPUs int
 }
 
-// FlavorGPUs returns metadata about GPUs, whether it has any, the number of GPUs
-// or the number of virtual GPUs.  Sadly there is absolutely no way of assiging
-// metadata to flavors without having to add those same values to your host aggregates,
-// so we have to have knowledge of flavors built in somewhere.
-func FlavorGPUs(flavor *Flavor, extraSpecs map[string]string) (*GPUMeta, bool, error) {
+// FlavorGPUs returns metadata about GPUs, e.g. the number of GPUs.  Sadly there is absolutely
+// no way of assiging metadata to flavors without having to add those same values to your host
+// aggregates, so we have to have knowledge of flavors built in somewhere.
+func FlavorGPUs(flavor *Flavor) (*GPUMeta, error) {
 	// There are some well known extra specs defined in:
 	// https://docs.openstack.org/nova/latest/configuration/extra-specs.html
 	//
 	// MIG instances will have specs that look like:
 	//   "resources:VGPU": "1", "trait:CUSTOM_A100D_2_20C": "required"
-	if value, ok := extraSpecs["resources:VGPU"]; ok {
+	if value, ok := flavor.ExtraSpecs["resources:VGPU"]; ok {
 		gpus, err := strconv.Atoi(value)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 
 		meta := &GPUMeta{
 			GPUs: gpus,
 		}
 
-		return meta, true, nil
+		return meta, nil
 	}
 
 	// Full GPUs will be totally different, luckily the
 	//   "pci_passthrough:alias": "a100:2"
-	if value, ok := extraSpecs["pci_passthrough:alias"]; ok {
+	if value, ok := flavor.ExtraSpecs["pci_passthrough:alias"]; ok {
 		parts := strings.Split(value, ":")
 		if len(parts) != 2 {
-			return nil, false, fmt.Errorf("%w: GPU flavor %s metadata malformed", ErrParseError, flavor.Name)
+			return nil, fmt.Errorf("%w: GPU flavor %s metadata malformed", ErrParseError, flavor.Name)
 		}
 
 		if parts[0] != "a100" {
-			return nil, false, fmt.Errorf("%w: unknown PCI device class %s", ErrParseError, parts[0])
+			return nil, fmt.Errorf("%w: unknown PCI device class %s", ErrParseError, parts[0])
 		}
 
 		gpus, err := strconv.Atoi(parts[1])
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 
 		meta := &GPUMeta{
 			GPUs: gpus,
 		}
 
-		return meta, true, nil
+		return meta, nil
 	}
 
-	return nil, false, nil
+	//nolint:nilnil
+	return nil, nil
 }
 
 // AvailabilityZones returns a list of availability zones.
