@@ -152,7 +152,6 @@ func convertFeatures(in *unikornv1.KubernetesCluster) *generated.KubernetesClust
 		KubernetesDashboard: in.Spec.Features.KubernetesDashboard,
 		FileStorage:         in.Spec.Features.FileStorage,
 		Prometheus:          in.Spec.Features.Prometheus,
-		NvidiaOperator:      in.Spec.Features.NvidiaOperator,
 	}
 
 	return features
@@ -368,7 +367,7 @@ func (c *Client) createControlPlane(options *generated.KubernetesCluster) (*unik
 }
 
 // createWorkloadPools creates the workload pools part of a cluster.
-func (c *Client) createWorkloadPools(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterWorkloadPoolsSpec, error) {
+func (c *Client) createWorkloadPools(clusterContext *createClusterContext, options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterWorkloadPoolsSpec, error) {
 	workloadPools := &unikornv1.KubernetesClusterWorkloadPoolsSpec{}
 
 	for i := range options.WorkloadPools {
@@ -377,6 +376,10 @@ func (c *Client) createWorkloadPools(options *generated.KubernetesCluster) (*uni
 		machine, flavor, err := c.createMachineGeneric(&pool.Machine)
 		if err != nil {
 			return nil, err
+		}
+
+		if flavor.Gpus != nil {
+			clusterContext.hasGPUWorkloadPool = true
 		}
 
 		workloadPool := unikornv1.KubernetesClusterWorkloadPoolsPoolSpec{
@@ -438,14 +441,19 @@ func createFeatures(options *generated.KubernetesCluster) *unikornv1.KubernetesC
 		KubernetesDashboard: options.Features.KubernetesDashboard,
 		FileStorage:         options.Features.FileStorage,
 		Prometheus:          options.Features.Prometheus,
-		NvidiaOperator:      options.Features.NvidiaOperator,
 	}
 
 	return features
 }
 
+type createClusterContext struct {
+	hasGPUWorkloadPool bool
+}
+
 // createCluster creates the full cluster custom resource.
 func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generated.KubernetesCluster) (*unikornv1.KubernetesCluster, error) {
+	var clusterContext createClusterContext
+
 	network, err := createNetwork(options)
 	if err != nil {
 		return nil, err
@@ -461,7 +469,7 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 		return nil, err
 	}
 
-	kubernetesWorkloadPools, err := c.createWorkloadPools(options)
+	kubernetesWorkloadPools, err := c.createWorkloadPools(&clusterContext, options)
 	if err != nil {
 		return nil, err
 	}
@@ -487,6 +495,14 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 			Features:                     createFeatures(options),
 		},
 	}
+
+	// Automatically install the nvidia operator if a workload pool has GPUs.
+	// TODO: provide a way to opt-out... if anyone ever asks for it.
+	if cluster.Spec.Features == nil {
+		cluster.Spec.Features = &unikornv1.KubernetesClusterFeaturesSpec{}
+	}
+
+	cluster.Spec.Features.NvidiaOperator = &clusterContext.hasGPUWorkloadPool
 
 	return cluster, nil
 }
