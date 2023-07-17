@@ -35,7 +35,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -117,11 +116,9 @@ func getController(o *options.Options, manager manager.Manager, f ControllerFact
 	recoverPanic := true
 
 	controllerOptions := controller.Options{
-		Controller: config.Controller{
-			MaxConcurrentReconciles: o.MaxConcurrentReconciles,
-			RecoverPanic:            &recoverPanic,
-		},
-		Reconciler: f.Reconciler(manager),
+		MaxConcurrentReconciles: o.MaxConcurrentReconciles,
+		RecoverPanic:            &recoverPanic,
+		Reconciler:              f.Reconciler(manager),
 	}
 
 	c, err := controller.New(constants.Application, manager, controllerOptions)
