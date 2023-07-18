@@ -452,7 +452,7 @@ type KubernetesClusterSpec struct {
 
 type KubernetesClusterOpenstackSpec struct {
 	// CACert is the CA used to trust the Openstack endpoint.
-	CACert *[]byte `json:"caCert"`
+	CACert *[]byte `json:"caCert,omitempty"`
 	// CloudConfig is a base64 encoded minimal clouds.yaml file for
 	// use by the ControlPlane to provision the IaaS bits.
 	CloudConfig *[]byte `json:"cloudConfig"`

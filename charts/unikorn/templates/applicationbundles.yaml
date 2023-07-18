@@ -17,7 +17,7 @@ spec:
   - name: cluster-api
     reference:
       kind: HelmApplication
-      name: cluster-api-0.1.8-1
+      name: cluster-api-0.1.9-1
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ApplicationBundle
@@ -28,18 +28,18 @@ spec:
   version: 1.2.0
   preview: true
   applications:
-    - name: vcluster
-      reference:
-        kind: HelmApplication
-        name: vcluster-0.15.7-1
-    - name: cert-manager
-      reference:
-        kind: HelmApplication
-        name: cert-manager-1.12.4-1
-    - name: cluster-api
-      reference:
-        kind: HelmApplication
-        name: cluster-api-0.1.8-1
+  - name: vcluster
+    reference:
+      kind: HelmApplication
+      name: vcluster-0.15.7-1
+  - name: cert-manager
+    reference:
+      kind: HelmApplication
+      name: cert-manager-1.12.4-1
+  - name: cluster-api
+    reference:
+      kind: HelmApplication
+      name: cluster-api-0.1.9-1
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ApplicationBundle
@@ -52,7 +52,7 @@ spec:
   - name: cluster-openstack
     reference:
       kind: HelmApplication
-      name: cluster-openstack-0.3.25-1
+      name: cluster-openstack-0.3.26-1
   - name: cilium
     reference:
       kind: HelmApplication
@@ -126,7 +126,7 @@ spec:
   - name: cluster-openstack
     reference:
       kind: HelmApplication
-      name: cluster-openstack-0.3.25-1
+      name: cluster-openstack-0.3.26-1
   - name: cilium
     reference:
       kind: HelmApplication

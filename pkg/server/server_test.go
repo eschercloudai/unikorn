@@ -256,7 +256,6 @@ func mustSetupUnikornServer(t *testing.T, openstack net.Addr, client client.With
 
 	// Override any flag defaults we need to.
 	s.Options.RequestTimeout = 0
-	s.KeystoneOptions.CACertificate = []byte("it's fake mon")
 
 	if debug {
 		s.SetupLogging()

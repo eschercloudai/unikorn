@@ -18,13 +18,10 @@ package util
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 )
 
 // natPrefix provides a cache/memoization for GetNATPrefix, be nice to our
@@ -70,32 +67,6 @@ func GetNATPrefix(ctx context.Context) (string, error) {
 	natPrefix = fmt.Sprintf("%s/32", natAddress.IP)
 
 	return natPrefix, nil
-}
-
-// GetURLCACertificate works out the CA certificate for a HTTPS endpoint.
-func GetURLCACertificate(host string) ([]byte, error) {
-	authURL, err := url.Parse(host)
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := tls.Dial("tcp", authURL.Host, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	defer conn.Close()
-
-	chains := conn.ConnectionState().VerifiedChains
-	chain := chains[0]
-	ca := chain[len(chain)-1]
-
-	pemBlock := &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: ca.Raw,
-	}
-
-	return pem.EncodeToMemory(pemBlock), nil
 }
 
 // Keys returns the keys from a string map.

@@ -65,15 +65,13 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: cluster-api-0.1.8-1
+  name: cluster-api-0.1.9-1
 spec:
+  repo: https://github.com/eschercloudai/helm-cluster-api
   repo: https://eschercloudai.github.io/helm-cluster-api
   chart: cluster-api
-  version: v0.1.8
+  version: v0.1.9
   interface: 1.0.0
-  parameters:
-  - name: cluster-api-provider-openstack.image
-    value: spjmurray/capi-openstack-controller-amd64:v0.7.3-simon7
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
@@ -110,11 +108,12 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: cluster-openstack-0.3.25-1
+  name: cluster-openstack-0.3.26-1
 spec:
+  repo: https://github.com/eschercloudai/helm-cluster-api
   repo: https://eschercloudai.github.io/helm-cluster-api
   chart: cluster-api-cluster-openstack
-  version: v0.3.25
+  version: v0.3.26
   createNamespace: true
   interface: 1.0.0
 ---
