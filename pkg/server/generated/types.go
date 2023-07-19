@@ -288,6 +288,9 @@ type OpenstackFlavor struct {
 	// Cpus The number of CPUs.
 	Cpus int `json:"cpus"`
 
+	// Disk The amount of ephemeral disk in GB.
+	Disk int `json:"disk"`
+
 	// Gpus The number of GPUs, if not set there are none.
 	Gpus *int `json:"gpus,omitempty"`
 

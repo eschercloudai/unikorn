@@ -306,25 +306,34 @@ func RegisterImageV2Images(tc *TestContext) {
 }
 
 // NOTE: Extra specs are available in microversion 2.61 onward.
-const flavorsDetail = `{
+const flavorCpus = 2
+const flavorMemory = 8 << 10
+const flavorDisk = 20
+
+func flavorsDetail() string {
+	return fmt.Sprintf(`{
 	"first": "/flavors/detail",
 	"flavors": [
 		{
 			"id": "f547e5e4-5d9e-4434-bb78-d43cabcce79c",
 			"name": "strawberry",
+			"vcpus": %d,
+			"ram": %d,
+			"disk": %d,
 			"extra_specs": {
 				"resources:VGPU": "1",
 				"trait:CUSTOM_A100D_3_40C": "required"
 			}
 		}
 	]
-}`
+}`, flavorCpus, flavorMemory, flavorDisk)
+}
 
 func RegisterComputeV2FlavorsDetail(tc *TestContext) {
 	tc.OpenstackRouter().Get("/compute/flavors/detail", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(flavorsDetail)); err != nil {
+		if _, err := w.Write([]byte(flavorsDetail())); err != nil {
 			if debug {
 				fmt.Println(err)
 			}

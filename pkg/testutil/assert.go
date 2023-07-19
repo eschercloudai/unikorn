@@ -49,6 +49,15 @@ func AssertNilError(t *testing.T, err error) {
 	}
 }
 
+// AssertNotNil is a terse way of crapping out if a pointer is nil.
+func AssertNotNil[T any](t *testing.T, v *T) {
+	t.Helper()
+
+	if v == nil {
+		t.Fatalf("assertion failure: nil pointer")
+	}
+}
+
 // AssertError is a terse way of crapping out if an error didn't occur.
 func AssertError(t *testing.T, expected, err error) {
 	t.Helper()
