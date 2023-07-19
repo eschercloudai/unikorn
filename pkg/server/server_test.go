@@ -48,12 +48,6 @@ import (
 )
 
 const (
-	// userID is the mocked user ID.
-	userID = "5e6bb9d8-03a1-4d26-919c-6884ff574a31"
-
-	// projectID is the mocked project.
-	projectID = "d09544ac-be0e-428b-8834-697c796b48a5"
-
 	// privKey is the signing key used for JOSE operations.
 	privKey = `-----BEGIN PRIVATE KEY-----
 MIHuAgEAMBAGByqGSM49AgEGBSuBBAAjBIHWMIHTAgEBBEIB0k3++pOE0i6sEYVE
@@ -92,7 +86,7 @@ var (
 	debug bool
 )
 
-func projectName(projectID string) string {
+func projectNameFromID(projectID string) string {
 	return "unikorn-server-" + projectID
 }
 
@@ -432,14 +426,14 @@ func TestApiV1ProjectCreateAndDelete(t *testing.T) {
 
 	var project unikornv1.Project
 
-	testutil.AssertNilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectName(projectID)}, &project))
+	testutil.AssertNilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
 
 	deleteResponse, err := unikornClient.DeleteApiV1Project(context.TODO())
 	testutil.AssertHTTPResponse(t, deleteResponse, http.StatusAccepted, err)
 
 	defer deleteResponse.Body.Close()
 
-	testutil.AssertKubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectName(projectID)}, &project))
+	testutil.AssertKubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
 }
 
 // TestApiV1ControlPlaneCreateAndDelete tests that a control plane can be created
@@ -568,6 +562,13 @@ func TestApiV1ProvidersOpenstackProjects(t *testing.T) {
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackProjectsWithResponse(context.TODO())
 	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, projectID, results[0].Id)
+	testutil.AssertEqual(t, projectName, results[0].Name)
 }
 
 // TestApiV1ProvidersOpenstackFlavors tests OpenStack flavors can be listed.
@@ -586,12 +587,14 @@ func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
 	testutil.AssertNotNil(t, response.JSON200)
 
-	flavors := *response.JSON200
+	results := *response.JSON200
 
-	testutil.AssertEqual(t, len(flavors), 1)
-	testutil.AssertEqual(t, flavors[0].Cpus, flavorCpus)
-	testutil.AssertEqual(t, flavors[0].Memory, flavorMemory>>10)
-	testutil.AssertEqual(t, flavors[0].Disk, flavorDisk)
+	// NOTE: server converts from MiB to GiB of memory.
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, flavorID, results[0].Id)
+	testutil.AssertEqual(t, flavorCpus, results[0].Cpus)
+	testutil.AssertEqual(t, flavorMemory>>10, results[0].Memory)
+	testutil.AssertEqual(t, flavorDisk, results[0].Disk)
 }
 
 // TestApiV1ProvidersOpenstackImages tests OpenStack images can be listed.
@@ -608,6 +611,22 @@ func TestApiV1ProvidersOpenstackImages(t *testing.T) {
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackImagesWithResponse(context.TODO())
 	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	ts, err := time.Parse(time.RFC3339, imageTimestamp)
+	testutil.AssertNilError(t, err)
+
+	// NOTE: server converts kubernetes version to a proper semver so it's compatible
+	// with the CAPI kubeadm controller.
+	testutil.AssertEqual(t, 2, len(results))
+	testutil.AssertEqual(t, imageID, results[0].Id)
+	testutil.AssertEqual(t, imageName, results[0].Name)
+	testutil.AssertEqual(t, ts, results[0].Created)
+	testutil.AssertEqual(t, ts, results[0].Modified)
+	testutil.AssertEqual(t, "v"+imageK8sVersion, results[0].Versions.Kubernetes)
+	testutil.AssertEqual(t, imageGpuVersion, results[0].Versions.NvidiaDriver)
 }
 
 // TestApiV1ProvidersOpenstackAvailabilityZonesCompute tests OpenStack compute AZscan be listed.
@@ -624,6 +643,12 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesCompute(t *testing.T) {
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesComputeWithResponse(context.TODO())
 	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, computeAvailabilityZoneName, results[0].Name)
 }
 
 // TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage tests OpenStack block storage AZscan be listed.
@@ -640,6 +665,12 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(t *testing.T) {
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageWithResponse(context.TODO())
 	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, blockStorageAvailabilityZone, results[0].Name)
 }
 
 // TestApiV1ProvidersOpenstackExternalNetworks tests OpenStack external networks can be listed.
@@ -656,6 +687,12 @@ func TestApiV1ProvidersOpenstackExternalNetworks(t *testing.T) {
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackExternalNetworksWithResponse(context.TODO())
 	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, externalNetworkID, results[0].Id)
 }
 
 // TestApiV1ProvidersOpenstackKeyPairs tests OpenStack key pairs can be listed.
@@ -672,4 +709,10 @@ func TestApiV1ProvidersOpenstackKeyPairs(t *testing.T) {
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackKeyPairsWithResponse(context.TODO())
 	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, keyPairName, results[0].Name)
 }

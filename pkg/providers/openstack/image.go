@@ -120,6 +120,10 @@ func (c *ImageClient) Images(ctx context.Context, key *ecdsa.PublicKey) ([]image
 	for i := range result {
 		image := result[i]
 
+		if image.Status != "active" {
+			continue
+		}
+
 		if !verifyImage(&image, key) {
 			continue
 		}

@@ -40,7 +40,7 @@ func mustCreateProjectFixture(t *testing.T, tc *TestContext, projectID string) *
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "project-",
 			Labels: map[string]string{
-				constants.ProjectLabel: projectName(projectID),
+				constants.ProjectLabel: projectNameFromID(projectID),
 			},
 		},
 	}
@@ -49,7 +49,7 @@ func mustCreateProjectFixture(t *testing.T, tc *TestContext, projectID string) *
 
 	project := &unikornv1.Project{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: projectName(projectID),
+			Name: projectNameFromID(projectID),
 		},
 		Status: unikornv1.ProjectStatus{
 			Namespace: namespace.Name,
@@ -78,7 +78,7 @@ func mustCreateControlPlaneFixture(t *testing.T, tc *TestContext, projectNamespa
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "controlplane-",
 			Labels: map[string]string{
-				constants.ProjectLabel:      projectName(projectID),
+				constants.ProjectLabel:      projectNameFromID(projectID),
 				constants.ControlPlaneLabel: name,
 			},
 		},
