@@ -184,17 +184,21 @@ func RegisterIdentityHandler(tc *TestContext) {
 	})
 }
 
+const userID = "5e6bb9d8-03a1-4d26-919c-6884ff574a31"
+
 // userInfo returns user information based on the token.
 // Only email is considered by Unikorn server at present.
-const userInfo = `{
+func userInfo() []byte {
+	return []byte(fmt.Sprintf(`{
 	"user": {
 		"domain_id": "default",
 		"enabled": true,
-		"id": "` + userID + `",
+		"id": "%s",
 		"name": "foo",
 		"email": "foo@bar.com"
 	}
-}`
+}`, userID))
+}
 
 // RegisterIdentityV3User allows Unikorn to lookup a user in oder to issue
 // an access token.
@@ -202,7 +206,7 @@ func RegisterIdentityV3User(tc *TestContext) {
 	tc.OpenstackRouter().Get("/identity/v3/users/{user_id}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(userInfo)); err != nil {
+		if _, err := w.Write(userInfo()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -250,16 +254,26 @@ func RegisterIdentityV3UserApplicationCredentials(tc *TestContext) {
 	})
 }
 
-const projects = `{
-	"projects": [],
+const projectID = "63051c2c-4d9e-40c0-bf57-93907a61b738"
+const projectName = "foo"
+
+func projects() []byte {
+	return []byte(fmt.Sprintf(`{
+	"projects": [
+		{
+			"id": "%s",
+			"name": "%s"
+		}
+	],
 	"links": {}
-}`
+}`, projectID, projectName))
+}
 
 func RegisterIdentityV3AuthProjects(tc *TestContext) {
 	tc.OpenstackRouter().Get("/identity/v3/auth/projects", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(projects)); err != nil {
+		if _, err := w.Write(projects()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -278,26 +292,52 @@ func RegisterIdentityHandlers(tc *TestContext) {
 	RegisterIdentityV3AuthProjects(tc)
 }
 
-const images = `{
+const imageID = "aa21abae-5743-442c-bb69-39a6411558a7"
+const imageName = "ubuntu-22.04-lts"
+const imageK8sVersion = "1.28.0"
+const imageGpuVersion = "525.85.05"
+const imageTimestamp = "2019-01-01T00:00:00Z"
+
+// Note the first entry should be filtered out due to lack of a digest,
+// then we should be presented with the third image first then the second
+// as they are time ordered.
+func images() []byte {
+	return []byte(fmt.Sprintf(`{
 	"first": "/images/v2/images",
 	"images": [
+		{
+			"id": "6876460a-64be-40d1-8520-a3dad947cfba",
+			"name": "foo"
+		},
 		{
 			"id": "6daa3bee-63b8-48a3-a082-52ad680dd3c0",
 			"name": "ubuntu-24.04-lts",
 			"status": "active",
 			"created_at": "2020-01-01T00:00:00Z",
+			"updated_at": "2020-01-01T00:00:00Z",
 			"k8s": "1.28.0",
 			"gpu": "525.85.05",
 			"digest": "MGYCMQD9kCkukyFePyvNbKe8/DLC4BZAyNJb6e5EvEqf1guR63qBr7E55/GKTVFoWBPS/v0CMQD9AK4aLdRhzWNoAC/IPT7lKQ6k20A/l/CN3cH9x8Qq9y7kfzPUOP1C15nJZsinpzk="
+		},
+		{
+			"id": "%s",
+			"name": "%s",
+			"status": "active",
+                        "created_at": "%s",
+			"updated_at": "%s",
+                        "k8s": "%s",
+                        "gpu": "%s",
+                        "digest": "MGYCMQDTPrcsaQJvsbc+hAFSuU6keI5Cf+jjGWPHs3qRkPegMAtjfABvrZNFl3ZMWkR76ygCMQCyLm2+xhAr92DgKs7IEOcG3rbax5Ye/C2MfKPGSiUFQYBD4kMT9XQZ+GMz/jpLUYw="
 		}
 	]
-}`
+}`, imageID, imageName, imageTimestamp, imageTimestamp, imageK8sVersion, imageGpuVersion))
+}
 
 func RegisterImageV2Images(tc *TestContext) {
 	tc.OpenstackRouter().Get("/image/v2/images", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(images)); err != nil {
+		if _, err := w.Write(images()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -305,18 +345,20 @@ func RegisterImageV2Images(tc *TestContext) {
 	})
 }
 
-// NOTE: Extra specs are available in microversion 2.61 onward.
+const flavorID = "f547e5e4-5d9e-4434-bb78-d43cabcce79c"
+const flavorName = "strawberry"
 const flavorCpus = 2
 const flavorMemory = 8 << 10
 const flavorDisk = 20
 
-func flavorsDetail() string {
-	return fmt.Sprintf(`{
+// NOTE: Extra specs are available in microversion 2.61 onward.
+func flavorsDetail() []byte {
+	return []byte(fmt.Sprintf(`{
 	"first": "/flavors/detail",
 	"flavors": [
 		{
-			"id": "f547e5e4-5d9e-4434-bb78-d43cabcce79c",
-			"name": "strawberry",
+			"id": "%s",
+			"name": "%s",
 			"vcpus": %d,
 			"ram": %d,
 			"disk": %d,
@@ -326,14 +368,14 @@ func flavorsDetail() string {
 			}
 		}
 	]
-}`, flavorCpus, flavorMemory, flavorDisk)
+}`, flavorID, flavorName, flavorCpus, flavorMemory, flavorDisk))
 }
 
 func RegisterComputeV2FlavorsDetail(tc *TestContext) {
 	tc.OpenstackRouter().Get("/compute/flavors/detail", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(flavorsDetail())); err != nil {
+		if _, err := w.Write(flavorsDetail()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -377,15 +419,25 @@ func RegisterComputeV2ServerGroups(tc *TestContext) {
 	})
 }
 
-const keyPairs = `{
-	"keypairs": []
-}`
+const keyPairName = "chubb"
+
+func keyPairs() []byte {
+	return []byte(fmt.Sprintf(`{
+	"keypairs": [
+		{
+			"keypair": {
+				"name": "%s"
+			}
+		}
+	]
+}`, keyPairName))
+}
 
 func RegisterComputeV2Keypairs(tc *TestContext) {
 	tc.OpenstackRouter().Get("/compute/os-keypairs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(keyPairs)); err != nil {
+		if _, err := w.Write(keyPairs()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -393,15 +445,26 @@ func RegisterComputeV2Keypairs(tc *TestContext) {
 	})
 }
 
-const computeAvailabilityZones = `{
-	"availabilityZoneInfo": []
-}`
+const computeAvailabilityZoneName = "danger_nova"
+
+func computeAvailabilityZones() []byte {
+	return []byte(fmt.Sprintf(`{
+	"availabilityZoneInfo": [
+		{
+			"zoneName": "%s",
+			"zoneState": {
+                                "available": true
+                        }
+		}
+	]
+}`, computeAvailabilityZoneName))
+}
 
 func RegisterComputeV2AvailabilityZone(tc *TestContext) {
 	tc.OpenstackRouter().Get("/compute/os-availability-zone", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(computeAvailabilityZones)); err != nil {
+		if _, err := w.Write(computeAvailabilityZones()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -409,15 +472,26 @@ func RegisterComputeV2AvailabilityZone(tc *TestContext) {
 	})
 }
 
-const blockStorageAvailabilityZones = `{
-        "availabilityZoneInfo": []
-}`
+const blockStorageAvailabilityZone = "ceph"
+
+func blockStorageAvailabilityZones() []byte {
+	return []byte(fmt.Sprintf(`{
+        "availabilityZoneInfo": [
+		{
+			"zoneName": "%s",
+			"zoneState": {
+				"available": true
+			}
+		}
+	]
+}`, blockStorageAvailabilityZone))
+}
 
 func RegisterBlockStorageV3AvailabilityZone(tc *TestContext) {
 	tc.OpenstackRouter().Get("/blockstorage/os-availability-zone", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(blockStorageAvailabilityZones)); err != nil {
+		if _, err := w.Write(blockStorageAvailabilityZones()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -425,15 +499,23 @@ func RegisterBlockStorageV3AvailabilityZone(tc *TestContext) {
 	})
 }
 
-const externalNetworks = `{
-	"networks": []
-}`
+const externalNetworkID = "605eddb9-39e1-4309-972f-c62ced50f40f"
+
+func externalNetworks() []byte {
+	return []byte(fmt.Sprintf(`{
+	"networks": [
+		{
+			"id": "%s"
+		}
+	]
+}`, externalNetworkID))
+}
 
 func RegisterNetworkV2Networks(tc *TestContext) {
 	tc.OpenstackRouter().Get("/network/v2.0/networks", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(externalNetworks)); err != nil {
+		if _, err := w.Write(externalNetworks()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
