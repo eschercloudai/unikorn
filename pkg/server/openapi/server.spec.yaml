@@ -1053,6 +1053,7 @@ components:
       - name
       - cpus
       - memory
+      - disk
       properties:
         id:
           description: The unique flavor ID.
@@ -1065,6 +1066,9 @@ components:
           type: integer
         memory:
           description: The amount of memory in GiB.
+          type: integer
+        disk:
+          description: The amount of ephemeral disk in GB.
           type: integer
         gpus:
           description: The number of GPUs, if not set there are none.

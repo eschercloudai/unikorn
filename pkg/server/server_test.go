@@ -584,6 +584,14 @@ func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackFlavorsWithResponse(context.TODO())
 	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	flavors := *response.JSON200
+
+	testutil.AssertEqual(t, len(flavors), 1)
+	testutil.AssertEqual(t, flavors[0].Cpus, flavorCpus)
+	testutil.AssertEqual(t, flavors[0].Memory, flavorMemory>>10)
+	testutil.AssertEqual(t, flavors[0].Disk, flavorDisk)
 }
 
 // TestApiV1ProvidersOpenstackImages tests OpenStack images can be listed.

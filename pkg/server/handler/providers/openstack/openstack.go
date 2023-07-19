@@ -285,12 +285,11 @@ func (o *Openstack) FlavorGPUs(flavor *openstack.Flavor) (*openstack.GPUMeta, er
 // convertFlavor traslates from Openstack's mess into our API types.
 func convertFlavor(flavor *openstack.Flavor) (*generated.OpenstackFlavor, error) {
 	f := &generated.OpenstackFlavor{
-		Id:   flavor.ID,
-		Name: flavor.Name,
-		Cpus: flavor.VCPUs,
-		// Convert MiB to GiB
-		// TODO: Should probably specify units too to disambiguate.
-		Memory: flavor.RAM >> 10,
+		Id:     flavor.ID,
+		Name:   flavor.Name,
+		Cpus:   flavor.VCPUs,
+		Memory: flavor.RAM >> 10, // Convert MiB to GiB
+		Disk:   flavor.Disk,
 	}
 
 	gpu, err := openstack.FlavorGPUs(flavor)
