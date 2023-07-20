@@ -48,12 +48,6 @@ import (
 )
 
 const (
-	// userID is the mocked user ID.
-	userID = "5e6bb9d8-03a1-4d26-919c-6884ff574a31"
-
-	// projectID is the mocked project.
-	projectID = "d09544ac-be0e-428b-8834-697c796b48a5"
-
 	// privKey is the signing key used for JOSE operations.
 	privKey = `-----BEGIN PRIVATE KEY-----
 MIHuAgEAMBAGByqGSM49AgEGBSuBBAAjBIHWMIHTAgEBBEIB0k3++pOE0i6sEYVE
@@ -92,312 +86,8 @@ var (
 	debug bool
 )
 
-func projectName(projectID string) string {
+func projectNameFromID(projectID string) string {
 	return "unikorn-server-" + projectID
-}
-
-// v3AuthTokensSuccessResponse defines how we mock the OpenStack API.  Basically we'll
-// multiplex all services through a single endpoint for simplicity.
-// Important parts to pay attention to (in the context of gophercloud):
-// * token.catalog.type is used to look for the service.
-// * token.catalog.endpoints.interface is used to look a service endpoint, "public" is the default.
-// * token.user.id is used by Unikorn for identity information in its access token.
-func v3AuthTokensSuccessResponse(tc *TestContext) string {
-	return `{
-	"token": {
-		"catalog": [
-			{
-				"name": "keystone",
-				"type": "identity",
-				"endpoints": [
-					{
-						"interface": "public",
-						"region": "RegionOne",
-						"region_id": "RegionOne",
-						"url": "http://` + tc.OpenstackServerEndpoint() + `/identity"
-					}
-				]
-			},
-			{
-				"name": "nova",
-				"type": "compute",
-				"endpoints": [
-					{
-						"interface": "public",
-						"region": "RegionOne",
-                                                "region_id": "RegionOne",
-                                                "url": "http://` + tc.OpenstackServerEndpoint() + `/compute"
-					}
-				]
-			},
-			{
-				"name": "glance",
-				"type": "image",
-				"endpoints": [
-                                        {
-                                                "interface": "public",
-                                                "region": "RegionOne",
-                                                "region_id": "RegionOne",
-                                                "url": "http://` + tc.OpenstackServerEndpoint() + `/image"
-                                        }
-                                ]
-                        }
-		],
-		"domain": {
-			"id": "default",
-			"name": "Default"
-		},
-		"methods": [
-			"password"
-		],
-		"expires_at": "` + time.Now().Add(time.Hour).Format(time.RFC3339) + `",
-		"user": {
-			"domain": {
-				"id": "default",
-				"name": "Default"
-			},
-			"id": "` + userID + `",
-			"name": "foo"
-		}
-	}
-}`
-}
-
-// RegisterIdentityV3AuthTokensPostSuccessHandler is called when we want to login, or do a
-// token exchange/rescoping.
-func RegisterIdentityV3AuthTokensPostSuccessHandler(tc *TestContext) {
-	tc.OpenstackRouter().Post("/identity/v3/auth/tokens", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-Subject-Token", "ImAToken")
-		w.WriteHeader(http.StatusCreated)
-		if _, err := w.Write([]byte(v3AuthTokensSuccessResponse(tc))); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-}
-
-// RegisterIdentityV3AuthTokensGetSuccessHandler is called by gophercloud to validate a
-// token and to get the service catalog.
-func RegisterIdentityV3AuthTokensGetSuccessHandler(tc *TestContext) {
-	tc.OpenstackRouter().Get("/identity/v3/auth/tokens", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-Subject-Token", "ImAToken")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(v3AuthTokensSuccessResponse(tc))); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-}
-
-// identityMetadata returns versioned endpoint information for the identity service.
-// Gophercloud will check the links and preferentially select v3 over v2_0.
-func identityMetadata(tc *TestContext) string {
-	return `{
-	"versions": {
-		"values": [
-			{
-				"id": "v3.14",
-				"status": "stable",
-				"links": [
-					{
-						"rel": "self",
-						"href": "http://` + tc.OpenstackServerEndpoint() + `/identity/v3"
-					}
-				],
-				"media-types": [
-					{
-						"base": "application/json",
-						"type": "application/vnd.openstack.identity-v3+json"
-					}
-				]
-			}
-		]
-	}
-}`
-}
-
-// RegisterIdentityHandler allows gophercloud to derive the correct base path to
-// use for identity operations.
-func RegisterIdentityHandler(tc *TestContext) {
-	tc.OpenstackRouter().Get("/identity/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(identityMetadata(tc))); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-}
-
-// userInfo returns user information based on the token.
-// Only email is considered by Unikorn server at present.
-const userInfo = `{
-	"user": {
-		"domain_id": "default",
-		"enabled": true,
-		"id": "` + userID + `",
-		"name": "foo",
-		"email": "foo@bar.com"
-	}
-}`
-
-// RegisterIdentityV3User allows Unikorn to lookup a user in oder to issue
-// an access token.
-func RegisterIdentityV3User(tc *TestContext) {
-	tc.OpenstackRouter().Get("/identity/v3/users/{user_id}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(userInfo)); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-}
-
-// emptyApplicationCredentials is what you get when you list credentials and
-// there are none.
-//
-//nolint:gosec
-const emptyApplicationCredentials = `{
-	"links": {},
-	"application_credentials": []
-}`
-
-// applicationCredentialCreate is what you get when you create an application
-// credential.  Please note this is the ONLY time it will return the secret.
-const applicationCredentialCreate = `{
-	"application_credential": {
-		"id": "69a5f849-5112-44b7-9424-64ee0f30c23d",
-		"name": "foo",
-		"secret": "shhhh"
-	}
-}`
-
-func RegisterIdentityV3UserApplicationCredentials(tc *TestContext) {
-	tc.OpenstackRouter().Get("/identity/v3/users/{user_id}/application_credentials", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(emptyApplicationCredentials)); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-	tc.OpenstackRouter().Post("/identity/v3/users/{user_id}/application_credentials", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if _, err := w.Write([]byte(applicationCredentialCreate)); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-}
-
-// RegisterIdentityHandlers adds all the basic handlers required for token
-// acquisition.
-func RegisterIdentityHandlers(tc *TestContext) {
-	RegisterIdentityHandler(tc)
-	RegisterIdentityV3AuthTokensPostSuccessHandler(tc)
-	RegisterIdentityV3AuthTokensGetSuccessHandler(tc)
-	RegisterIdentityV3User(tc)
-	RegisterIdentityV3UserApplicationCredentials(tc)
-}
-
-const images = `{
-	"first": "/images/v2/images",
-	"images": [
-		{
-			"id": "6daa3bee-63b8-48a3-a082-52ad680dd3c0",
-			"name": "ubuntu-24.04-lts",
-			"status": "active",
-			"created_at": "2020-01-01T00:00:00Z",
-			"k8s": "1.28.0",
-			"gpu": "525.85.05",
-			"digest": "MGYCMQD9kCkukyFePyvNbKe8/DLC4BZAyNJb6e5EvEqf1guR63qBr7E55/GKTVFoWBPS/v0CMQD9AK4aLdRhzWNoAC/IPT7lKQ6k20A/l/CN3cH9x8Qq9y7kfzPUOP1C15nJZsinpzk="
-		}
-	]
-}`
-
-func RegisterImageV2Images(tc *TestContext) {
-	tc.OpenstackRouter().Get("/image/v2/images", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(images)); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-}
-
-// NOTE: Extra specs are available in microversion 2.61 onward.
-const flavorsDetail = `{
-	"first": "/flavors/detail",
-	"flavors": [
-		{
-			"id": "f547e5e4-5d9e-4434-bb78-d43cabcce79c",
-			"name": "strawberry",
-			"extra_specs": {
-				"resources:VGPU": "1",
-				"trait:CUSTOM_A100D_3_40C": "required"
-			}
-		}
-	]
-}`
-
-func RegisterComputeV2FlavorsDetail(tc *TestContext) {
-	tc.OpenstackRouter().Get("/compute/flavors/detail", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(flavorsDetail)); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-}
-
-const serverGroupsEmpty = `{
-	"first": "/os-server-groups",
-	"server_groups": []
-}`
-
-const serverGroup = `{
-	"server_group": {
-		"id": "51ec3d7e-c52b-4b47-aa82-c99bc374ea23",
-		"name": "foo",
-		"policies": [
-			"soft-anti-affinity"
-		]
-	}
-}`
-
-func RegisterComputeV2ServerGroups(tc *TestContext) {
-	tc.OpenstackRouter().Get("/compute/os-server-groups", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(serverGroupsEmpty)); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
-	tc.OpenstackRouter().Post("/compute/os-server-groups", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(serverGroup)); err != nil {
-			if debug {
-				fmt.Println(err)
-			}
-		}
-	})
 }
 
 // writeFile creates the named file and writes the data to it.
@@ -736,14 +426,14 @@ func TestApiV1ProjectCreateAndDelete(t *testing.T) {
 
 	var project unikornv1.Project
 
-	testutil.AssertNilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectName(projectID)}, &project))
+	testutil.AssertNilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
 
 	deleteResponse, err := unikornClient.DeleteApiV1Project(context.TODO())
 	testutil.AssertHTTPResponse(t, deleteResponse, http.StatusAccepted, err)
 
 	defer deleteResponse.Body.Close()
 
-	testutil.AssertKubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectName(projectID)}, &project))
+	testutil.AssertKubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
 }
 
 // TestApiV1ControlPlaneCreateAndDelete tests that a control plane can be created
@@ -857,4 +547,172 @@ func TestApiV1ClustersCreateAndDelete(t *testing.T) {
 	defer deleteResponse.Body.Close()
 
 	testutil.AssertKubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &clusterResource))
+}
+
+// TestApiV1ProvidersOpenstackProjects tests OpenStack projects can be listed.
+func TestApiV1ProvidersOpenstackProjects(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackProjectsWithResponse(context.TODO())
+	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, projectID, results[0].Id)
+	testutil.AssertEqual(t, projectName, results[0].Name)
+}
+
+// TestApiV1ProvidersOpenstackFlavors tests OpenStack flavors can be listed.
+func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackFlavorsWithResponse(context.TODO())
+	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	// NOTE: server converts from MiB to GiB of memory.
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, flavorID, results[0].Id)
+	testutil.AssertEqual(t, flavorCpus, results[0].Cpus)
+	testutil.AssertEqual(t, flavorMemory>>10, results[0].Memory)
+	testutil.AssertEqual(t, flavorDisk, results[0].Disk)
+}
+
+// TestApiV1ProvidersOpenstackImages tests OpenStack images can be listed.
+func TestApiV1ProvidersOpenstackImages(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackImagesWithResponse(context.TODO())
+	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	ts, err := time.Parse(time.RFC3339, imageTimestamp)
+	testutil.AssertNilError(t, err)
+
+	// NOTE: server converts kubernetes version to a proper semver so it's compatible
+	// with the CAPI kubeadm controller.
+	testutil.AssertEqual(t, 2, len(results))
+	testutil.AssertEqual(t, imageID, results[0].Id)
+	testutil.AssertEqual(t, imageName, results[0].Name)
+	testutil.AssertEqual(t, ts, results[0].Created)
+	testutil.AssertEqual(t, ts, results[0].Modified)
+	testutil.AssertEqual(t, "v"+imageK8sVersion, results[0].Versions.Kubernetes)
+	testutil.AssertEqual(t, imageGpuVersion, results[0].Versions.NvidiaDriver)
+}
+
+// TestApiV1ProvidersOpenstackAvailabilityZonesCompute tests OpenStack compute AZscan be listed.
+func TestApiV1ProvidersOpenstackAvailabilityZonesCompute(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterComputeV2AvailabilityZone(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesComputeWithResponse(context.TODO())
+	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, computeAvailabilityZoneName, results[0].Name)
+}
+
+// TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage tests OpenStack block storage AZscan be listed.
+func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterBlockStorageV3AvailabilityZone(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageWithResponse(context.TODO())
+	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, blockStorageAvailabilityZone, results[0].Name)
+}
+
+// TestApiV1ProvidersOpenstackExternalNetworks tests OpenStack external networks can be listed.
+func TestApiV1ProvidersOpenstackExternalNetworks(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterNetworkV2Networks(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackExternalNetworksWithResponse(context.TODO())
+	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, externalNetworkID, results[0].Id)
+}
+
+// TestApiV1ProvidersOpenstackKeyPairs tests OpenStack key pairs can be listed.
+func TestApiV1ProvidersOpenstackKeyPairs(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterComputeV2Keypairs(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackKeyPairsWithResponse(context.TODO())
+	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	testutil.AssertNotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	testutil.AssertEqual(t, 1, len(results))
+	testutil.AssertEqual(t, keyPairName, results[0].Name)
 }

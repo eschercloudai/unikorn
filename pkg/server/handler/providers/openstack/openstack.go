@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -285,12 +286,11 @@ func (o *Openstack) FlavorGPUs(flavor *openstack.Flavor) (*openstack.GPUMeta, er
 // convertFlavor traslates from Openstack's mess into our API types.
 func convertFlavor(flavor *openstack.Flavor) (*generated.OpenstackFlavor, error) {
 	f := &generated.OpenstackFlavor{
-		Id:   flavor.ID,
-		Name: flavor.Name,
-		Cpus: flavor.VCPUs,
-		// Convert MiB to GiB
-		// TODO: Should probably specify units too to disambiguate.
-		Memory: flavor.RAM >> 10,
+		Id:     flavor.ID,
+		Name:   flavor.Name,
+		Cpus:   flavor.VCPUs,
+		Memory: flavor.RAM >> 10, // Convert MiB to GiB
+		Disk:   flavor.Disk,
 	}
 
 	gpu, err := openstack.FlavorGPUs(flavor)
@@ -397,6 +397,23 @@ func (o *Openstack) GetFlavor(r *http.Request, name string) (*generated.Openstac
 	return nil, errors.HTTPNotFound()
 }
 
+// imageSortWrapper sorts images by age.
+type imageSortWrapper struct {
+	images []generated.OpenstackImage
+}
+
+func (w imageSortWrapper) Len() int {
+	return len(w.images)
+}
+
+func (w imageSortWrapper) Less(i, j int) bool {
+	return w.images[i].Created.Before(w.images[j].Created)
+}
+
+func (w imageSortWrapper) Swap(i, j int) {
+	w.images[i], w.images[j] = w.images[j], w.images[i]
+}
+
 func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, error) {
 	client, err := o.ImageClient(r)
 	if err != nil {
@@ -430,7 +447,13 @@ func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, erro
 		images[i].Versions.NvidiaDriver = nvidiaDriverVersion
 	}
 
-	return images, nil
+	w := imageSortWrapper{
+		images: images,
+	}
+
+	sort.Stable(w)
+
+	return w.images, nil
 }
 
 // GetImage does a list and find, while inefficient, it does do image filtering.
@@ -486,6 +509,8 @@ func (o *Openstack) ListKeyPairs(r *http.Request) (generated.OpenstackKeyPairs, 
 		return nil, errors.OAuth2ServerError("failed list key pairs").WithError(err)
 	}
 
+	fmt.Println(result)
+
 	keyPairs := generated.OpenstackKeyPairs{}
 
 	for _, keyPair := range result {
@@ -502,6 +527,8 @@ func (o *Openstack) ListKeyPairs(r *http.Request) (generated.OpenstackKeyPairs, 
 
 		keyPairs = append(keyPairs, k)
 	}
+
+	fmt.Println(keyPairs)
 
 	return keyPairs, nil
 }
