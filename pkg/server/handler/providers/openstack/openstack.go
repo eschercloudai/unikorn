@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	goerrors "errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -32,6 +33,10 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/util"
+)
+
+var (
+	ErrResourceNotFound = goerrors.New("resource not found")
 )
 
 // Openstack provides an HTTP handler for Openstack resources.
@@ -394,7 +399,7 @@ func (o *Openstack) GetFlavor(r *http.Request, name string) (*generated.Openstac
 		}
 	}
 
-	return nil, errors.HTTPNotFound()
+	return nil, errors.HTTPNotFound().WithError(fmt.Errorf("%w: flavor %s", ErrResourceNotFound, name))
 }
 
 // imageSortWrapper sorts images by age.
@@ -469,7 +474,7 @@ func (o *Openstack) GetImage(r *http.Request, name string) (*generated.Openstack
 		}
 	}
 
-	return nil, errors.HTTPNotFound()
+	return nil, errors.HTTPNotFound().WithError(fmt.Errorf("%w: image %s", ErrResourceNotFound, name))
 }
 
 // ListAvailableProjects lists projects that the token has roles associated with.
@@ -509,8 +514,6 @@ func (o *Openstack) ListKeyPairs(r *http.Request) (generated.OpenstackKeyPairs, 
 		return nil, errors.OAuth2ServerError("failed list key pairs").WithError(err)
 	}
 
-	fmt.Println(result)
-
 	keyPairs := generated.OpenstackKeyPairs{}
 
 	for _, keyPair := range result {
@@ -528,8 +531,6 @@ func (o *Openstack) ListKeyPairs(r *http.Request) (generated.OpenstackKeyPairs, 
 		keyPairs = append(keyPairs, k)
 	}
 
-	fmt.Println(keyPairs)
-
 	return keyPairs, nil
 }
 
@@ -542,7 +543,7 @@ func findApplicationCredential(in []applicationcredentials.ApplicationCredential
 		}
 	}
 
-	return nil, errors.HTTPNotFound()
+	return nil, errors.HTTPNotFound().WithError(fmt.Errorf("%w: application credential %s", ErrResourceNotFound, name))
 }
 
 func (o *Openstack) GetApplicationCredential(r *http.Request, name string) (*applicationcredentials.ApplicationCredential, error) {
@@ -635,7 +636,7 @@ func (o *Openstack) GetServerGroup(r *http.Request, name string) (*servergroups.
 
 	switch len(filtered) {
 	case 0:
-		return nil, errors.HTTPNotFound()
+		return nil, errors.HTTPNotFound().WithError(fmt.Errorf("%w: server group %s", ErrResourceNotFound, name))
 	case 1:
 		return &filtered[0], nil
 	default:

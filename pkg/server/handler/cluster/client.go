@@ -94,7 +94,7 @@ func (c *Client) get(ctx context.Context, namespace, name string) (*unikornv1.Ku
 
 	if err := c.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, result); err != nil {
 		if kerrors.IsNotFound(err) {
-			return nil, errors.HTTPNotFound()
+			return nil, errors.HTTPNotFound().WithError(err)
 		}
 
 		return nil, errors.OAuth2ServerError("unable to get cluster").WithError(err)
@@ -150,7 +150,7 @@ func (c *Client) GetKubeconfig(ctx context.Context, controlPlaneName generated.C
 	cluster := &unikornv1.KubernetesCluster{}
 
 	if err := c.client.Get(ctx, clusterObjectKey, cluster); err != nil {
-		return nil, errors.HTTPNotFound()
+		return nil, errors.HTTPNotFound().WithError(err)
 	}
 
 	objectKey := client.ObjectKey{
@@ -314,7 +314,7 @@ func (c *Client) Delete(ctx context.Context, controlPlaneName generated.ControlP
 
 	if err := c.client.Delete(ctx, cluster); err != nil {
 		if kerrors.IsNotFound(err) {
-			return errors.HTTPNotFound()
+			return errors.HTTPNotFound().WithError(err)
 		}
 
 		return errors.OAuth2ServerError("failed to delete cluster").WithError(err)
