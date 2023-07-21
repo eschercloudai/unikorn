@@ -123,7 +123,7 @@ func (c *Client) get(ctx context.Context, name string) (*unikornv1.Project, erro
 
 	if err := c.client.Get(ctx, client.ObjectKey{Name: name}, result); err != nil {
 		if kerrors.IsNotFound(err) {
-			return nil, errors.HTTPNotFound()
+			return nil, errors.HTTPNotFound().WithError(err)
 		}
 
 		return nil, errors.OAuth2ServerError("failed to get project").WithError(err)
@@ -207,7 +207,7 @@ func (c *Client) Delete(ctx context.Context) error {
 
 	if err := c.client.Delete(ctx, project); err != nil {
 		if kerrors.IsNotFound(err) {
-			return errors.HTTPNotFound()
+			return errors.HTTPNotFound().WithError(err)
 		}
 
 		return errors.OAuth2ServerError("failed to delete project").WithError(err)

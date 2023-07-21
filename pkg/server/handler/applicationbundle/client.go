@@ -83,7 +83,7 @@ func (c *Client) Get(ctx context.Context, name string) (*generated.ApplicationBu
 	result := &unikornv1.ApplicationBundle{}
 
 	if err := c.client.Get(ctx, client.ObjectKey{Name: name}, result); err != nil {
-		return nil, errors.HTTPNotFound()
+		return nil, errors.HTTPNotFound().WithError(err)
 	}
 
 	return convert(result), nil
