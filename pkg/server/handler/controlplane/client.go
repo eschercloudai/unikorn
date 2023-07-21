@@ -193,7 +193,7 @@ func (c *Client) get(ctx context.Context, namespace, name string) (*unikornv1.Co
 
 	if err := c.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, result); err != nil {
 		if kerrors.IsNotFound(err) {
-			return nil, errors.HTTPNotFound()
+			return nil, errors.HTTPNotFound().WithError(err)
 		}
 
 		return nil, errors.OAuth2ServerError("failed to get control plane").WithError(err)
@@ -288,7 +288,7 @@ func (c *Client) Delete(ctx context.Context, name generated.ControlPlaneNamePara
 
 	if err := c.client.Delete(ctx, controlPlane); err != nil {
 		if kerrors.IsNotFound(err) {
-			return errors.HTTPNotFound()
+			return errors.HTTPNotFound().WithError(err)
 		}
 
 		return errors.OAuth2ServerError("failed to delete control plane").WithError(err)

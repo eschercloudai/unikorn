@@ -88,6 +88,27 @@ func (e *HTTPError) Error() string {
 
 // Write returns the error code and description to the client.
 func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
+	// Log out any detail from the error that shouldn't be
+	// reported to the client.  Do it before things can error
+	// and return.
+	log := log.FromContext(r.Context())
+
+	var details []interface{}
+
+	if e.description != "" {
+		details = append(details, "detail", e.description)
+	}
+
+	if e.err != nil {
+		details = append(details, "error", e.err)
+	}
+
+	if e.values != nil {
+		details = append(details, e.values...)
+	}
+
+	log.Info("error detail", details...)
+
 	// Emit the response to the client.
 	w.Header().Add("Cache-Control", "no-cache")
 
@@ -100,27 +121,6 @@ func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(e.status)
-
-	// Log out any detail from the error that shouldn't be
-	// reported to the client.  Do it before things can error
-	// and return.
-	log := log.FromContext(r.Context())
-
-	details := []interface{}{
-		"detail", e.description,
-	}
-
-	if e.err != nil {
-		details = append(details, "error", e.err)
-	}
-
-	if e.values != nil {
-		details = append(details, e.values...)
-	}
-
-	if details != nil {
-		log.Info("error detail", details...)
-	}
 
 	// Emit the response body.
 	ge := &generated.Oauth2Error{
@@ -225,13 +225,13 @@ func toHTTPError(err error) *HTTPError {
 // HandleError is the top level error handler that should be called from all
 // path handlers on error.
 func HandleError(w http.ResponseWriter, r *http.Request, err error) {
+	log := log.FromContext(r.Context())
+
 	if httpError := toHTTPError(err); httpError != nil {
 		httpError.Write(w, r)
 
 		return
 	}
-
-	log := log.FromContext(r.Context())
 
 	log.Error(err, "unhandled error")
 

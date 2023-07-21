@@ -34,11 +34,12 @@ import (
 	"golang.org/x/oauth2"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization/keystone"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
-	"github.com/eschercloudai/unikorn/pkg/testutil"
+	"github.com/eschercloudai/unikorn/pkg/testutil/assert"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -333,8 +334,8 @@ func MustNewUnscopedToken(t *testing.T, tc *TestContext) string {
 	}
 
 	token, err := config.PasswordCredentialsToken(context.TODO(), "foo", "bar")
-	testutil.AssertNilError(t, err)
-	testutil.AssertNotEqual(t, token.AccessToken, "")
+	assert.NilError(t, err)
+	assert.NotEqual(t, token.AccessToken, "")
 
 	return token.AccessToken
 }
@@ -353,7 +354,7 @@ func MustNewClient(t *testing.T, tc *TestContext, token string) *generated.Clien
 	t.Helper()
 
 	client, err := generated.NewClientWithResponses("http://"+tc.UnikornServerEndpoint(), generated.WithRequestEditorFn(bearerTokenInjector(token)))
-	testutil.AssertNilError(t, err)
+	assert.NilError(t, err)
 
 	return client
 }
@@ -378,7 +379,7 @@ func MustNewScopedClient(t *testing.T, tc *TestContext) *generated.ClientWithRes
 	}
 
 	response, err := MustNewUnscopedClient(t, tc).PostApiV1AuthTokensTokenWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(scope))
-	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusCreated, err)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusCreated, err)
 
 	return MustNewClient(t, tc, response.JSON201.AccessToken)
 }
@@ -420,25 +421,26 @@ func TestApiV1ProjectCreateAndDelete(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	createResponse, err := unikornClient.PostApiV1Project(context.TODO())
-	testutil.AssertHTTPResponse(t, createResponse, http.StatusAccepted, err)
+	assert.HTTPResponse(t, createResponse, http.StatusAccepted, err)
 
 	defer createResponse.Body.Close()
 
 	var project unikornv1.Project
 
-	testutil.AssertNilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
+	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
+	assert.MapSet(t, project.Labels, constants.VersionLabel)
 
 	deleteResponse, err := unikornClient.DeleteApiV1Project(context.TODO())
-	testutil.AssertHTTPResponse(t, deleteResponse, http.StatusAccepted, err)
+	assert.HTTPResponse(t, deleteResponse, http.StatusAccepted, err)
 
 	defer deleteResponse.Body.Close()
 
-	testutil.AssertKubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
+	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
 }
 
-// TestApiV1ControlPlaneCreateAndDelete tests that a control plane can be created
-// in a project, and then deleted.
-func TestApiV1ControlPlanesCreateAndDelete(t *testing.T) {
+// TestApiV1ControlPlaneCreate tests that a control plane can be created
+// in a project.
+func TestApiV1ControlPlanesCreate(t *testing.T) {
 	t.Parallel()
 
 	tc, cleanup := MustNewTestContext(t)
@@ -452,35 +454,115 @@ func TestApiV1ControlPlanesCreateAndDelete(t *testing.T) {
 	// Create the control plane...
 	unikornClient := MustNewScopedClient(t, tc)
 
-	controlPlaneRequest := &generated.ControlPlane{
+	request := &generated.ControlPlane{
 		Name: "foo",
 		ApplicationBundle: generated.ApplicationBundle{
 			Name: "foo",
 		},
 	}
 
-	createResponse, err := unikornClient.PostApiV1ControlplanesWithBody(context.TODO(), "application/json", NewJSONReader(controlPlaneRequest))
-	testutil.AssertHTTPResponse(t, createResponse, http.StatusAccepted, err)
+	response, err := unikornClient.PostApiV1ControlplanesWithBody(context.TODO(), "application/json", NewJSONReader(request))
+	assert.HTTPResponse(t, response, http.StatusAccepted, err)
 
-	defer createResponse.Body.Close()
+	defer response.Body.Close()
 
 	// Check it exists in the project namespace.
-	// TODO: check the required metadata has been added by server.
-	var controlPlaneResource unikornv1.ControlPlane
+	var resource unikornv1.ControlPlane
 
-	testutil.AssertNilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &controlPlaneResource))
-
-	deleteResponse, err := unikornClient.DeleteApiV1ControlplanesControlPlaneName(context.TODO(), "foo")
-	testutil.AssertHTTPResponse(t, deleteResponse, http.StatusAccepted, err)
-
-	defer deleteResponse.Body.Close()
-
-	testutil.AssertKubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &controlPlaneResource))
+	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+	assert.MapSet(t, resource.Labels, constants.VersionLabel)
+	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
 }
 
-// TestApiV1ClustersCreateAndDelete tests that a cluster can be created
-// in a control plane, and then deleted.
-func TestApiV1ClustersCreateAndDelete(t *testing.T) {
+// TestApiV1ControlPlanesGet tests a control plane can be retrieved and
+// that its fields are completed as specified by the schema.  This flexes
+// compositing of resources e.g. expansion of application bundles.
+func TestApiV1ControlPlanesGet(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	// Put some fixtures into place...
+	project := mustCreateProjectFixture(t, tc, projectID)
+	mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+	mustCreateControlPlaneApplicationBundleFixture(t, tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameWithResponse(context.TODO(), "foo")
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
+
+	result := *response.JSON200
+
+	assert.Equal(t, "foo", result.Name)
+	assert.NotNil(t, result.Status)
+	assert.Equal(t, "Provisioned", result.Status.Status)
+	assert.Equal(t, controlPlaneApplicationBundleName, result.ApplicationBundle.Name)
+	assert.Equal(t, controlPlaneApplicationBundleVersion, result.ApplicationBundle.Version)
+}
+
+// TestApiV1ControlPlanesList tests a control planes can be retrieved and
+// that their fields are completed as specified by the schema.  This flexes
+// compositing of resources e.g. expansion of application bundles.
+func TestApiV1ControlPlanesList(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	// Put some fixtures into place...
+	project := mustCreateProjectFixture(t, tc, projectID)
+	mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+	mustCreateControlPlaneApplicationBundleFixture(t, tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ControlplanesWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, "foo", results[0].Name)
+	assert.Equal(t, controlPlaneApplicationBundleName, results[0].ApplicationBundle.Name)
+	assert.Equal(t, controlPlaneApplicationBundleVersion, results[0].ApplicationBundle.Version)
+}
+
+// TestApiV1ControlPlanesDelete tests a control plane can be deleted.
+func TestApiV1ControlPlanesDelete(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	// Put some fixtures into place...
+	project := mustCreateProjectFixture(t, tc, projectID)
+	mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.DeleteApiV1ControlplanesControlPlaneName(context.TODO(), "foo")
+	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+
+	defer response.Body.Close()
+
+	var resource unikornv1.ControlPlane
+
+	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+}
+
+// TestApiV1ClustersCreate tests that a cluster can be created
+// in a control plane.
+func TestApiV1ClustersCreate(t *testing.T) {
 	t.Parallel()
 
 	tc, cleanup := MustNewTestContext(t)
@@ -530,23 +612,154 @@ func TestApiV1ClustersCreateAndDelete(t *testing.T) {
 		},
 	}
 
-	createResponse, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBody(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(clusterRequest))
-	testutil.AssertHTTPResponse(t, createResponse, http.StatusAccepted, err)
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBody(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(clusterRequest))
+	assert.HTTPResponse(t, response, http.StatusAccepted, err)
 
-	defer createResponse.Body.Close()
+	defer response.Body.Close()
 
 	// Check it exists in the control plane namespace.
-	// TODO: check the required metadata has been added by server.
-	var clusterResource unikornv1.KubernetesCluster
+	var resource unikornv1.KubernetesCluster
 
-	testutil.AssertNilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &clusterResource))
+	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
+	assert.MapSet(t, resource.Labels, constants.VersionLabel)
+	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
+	assert.MapSet(t, resource.Labels, constants.ControlPlaneLabel)
+}
 
-	deleteResponse, err := unikornClient.DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(context.TODO(), controlPlane.Name, "foo")
-	testutil.AssertHTTPResponse(t, deleteResponse, http.StatusAccepted, err)
+func TestApiV1ClustersGet(t *testing.T) {
+	t.Parallel()
 
-	defer deleteResponse.Body.Close()
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
 
-	testutil.AssertKubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &clusterResource))
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	// Put some fixtures into place...
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
+	mustKubernetesClusterApplicationBundleFixture(t, tc)
+
+	// Create the cluster...
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersClusterNameWithResponse(context.TODO(), controlPlane.Name, "foo")
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
+
+	result := *response.JSON200
+
+	assert.Equal(t, "foo", result.Name)
+	assert.NotNil(t, result.Status)
+	assert.Equal(t, "Provisioned", result.Status.Status)
+	assert.Equal(t, kubernetesClusterApplicationBundleName, result.ApplicationBundle.Name)
+	assert.Equal(t, kubernetesClusterApplicationBundleVersion, result.ApplicationBundle.Version)
+	assert.Equal(t, clusterComputeFailureDomain, result.Openstack.ComputeAvailabilityZone)
+	assert.Equal(t, clusterStorageFailureDomain, result.Openstack.VolumeAvailabilityZone)
+	assert.Equal(t, clusterExternalNetworkID, result.Openstack.ExternalNetworkID)
+	assert.NotNil(t, result.Openstack.SshKeyName)
+	assert.Equal(t, clusterSSHKeyName, *result.Openstack.SshKeyName)
+	assert.Equal(t, clusterNodeNetwork, result.Network.NodePrefix)
+	assert.Equal(t, clusterServiceNetwork, result.Network.ServicePrefix)
+	assert.Equal(t, clusterPodNetwork, result.Network.PodPrefix)
+	assert.Equal(t, 1, len(result.Network.DnsNameservers))
+	assert.Equal(t, clusterDNSNameserver, result.Network.DnsNameservers[0])
+	assert.Equal(t, "v"+imageK8sVersion, result.ControlPlane.Version)
+	assert.Equal(t, imageName, result.ControlPlane.ImageName)
+	assert.Equal(t, flavorName, result.ControlPlane.FlavorName)
+	assert.Equal(t, clusterControlPlaneReplicas, result.ControlPlane.Replicas)
+	assert.Equal(t, 1, len(result.WorkloadPools))
+	assert.Equal(t, clusterWorkloadPoolName, result.WorkloadPools[0].Name)
+	assert.Equal(t, "v"+imageK8sVersion, result.WorkloadPools[0].Machine.Version)
+	assert.Equal(t, imageName, result.WorkloadPools[0].Machine.ImageName)
+	assert.Equal(t, flavorName, result.WorkloadPools[0].Machine.FlavorName)
+	assert.Equal(t, clusterWorkloadPoolReplicas, result.WorkloadPools[0].Machine.Replicas)
+}
+
+func TestApiV1ClustersList(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	// Put some fixtures into place...
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
+	mustKubernetesClusterApplicationBundleFixture(t, tc)
+
+	// Create the cluster...
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersWithResponse(context.TODO(), controlPlane.Name)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, "foo", results[0].Name)
+	assert.NotNil(t, results[0].Status)
+	assert.Equal(t, "Provisioned", results[0].Status.Status)
+	assert.Equal(t, kubernetesClusterApplicationBundleName, results[0].ApplicationBundle.Name)
+	assert.Equal(t, kubernetesClusterApplicationBundleVersion, results[0].ApplicationBundle.Version)
+	assert.Equal(t, clusterComputeFailureDomain, results[0].Openstack.ComputeAvailabilityZone)
+	assert.Equal(t, clusterStorageFailureDomain, results[0].Openstack.VolumeAvailabilityZone)
+	assert.Equal(t, clusterExternalNetworkID, results[0].Openstack.ExternalNetworkID)
+	assert.NotNil(t, results[0].Openstack.SshKeyName)
+	assert.Equal(t, clusterSSHKeyName, *results[0].Openstack.SshKeyName)
+	assert.Equal(t, clusterNodeNetwork, results[0].Network.NodePrefix)
+	assert.Equal(t, clusterServiceNetwork, results[0].Network.ServicePrefix)
+	assert.Equal(t, clusterPodNetwork, results[0].Network.PodPrefix)
+	assert.Equal(t, 1, len(results[0].Network.DnsNameservers))
+	assert.Equal(t, clusterDNSNameserver, results[0].Network.DnsNameservers[0])
+	assert.Equal(t, "v"+imageK8sVersion, results[0].ControlPlane.Version)
+	assert.Equal(t, imageName, results[0].ControlPlane.ImageName)
+	assert.Equal(t, flavorName, results[0].ControlPlane.FlavorName)
+	assert.Equal(t, clusterControlPlaneReplicas, results[0].ControlPlane.Replicas)
+	assert.Equal(t, 1, len(results[0].WorkloadPools))
+	assert.Equal(t, clusterWorkloadPoolName, results[0].WorkloadPools[0].Name)
+	assert.Equal(t, "v"+imageK8sVersion, results[0].WorkloadPools[0].Machine.Version)
+	assert.Equal(t, imageName, results[0].WorkloadPools[0].Machine.ImageName)
+	assert.Equal(t, flavorName, results[0].WorkloadPools[0].Machine.FlavorName)
+	assert.Equal(t, clusterWorkloadPoolReplicas, results[0].WorkloadPools[0].Machine.Replicas)
+}
+
+func TestApiV1ClustersDelete(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	// Put some fixtures into place...
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
+	mustKubernetesClusterApplicationBundleFixture(t, tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(context.TODO(), controlPlane.Name, "foo")
+	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+
+	defer response.Body.Close()
+
+	var resource unikornv1.KubernetesCluster
+
+	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
 }
 
 // TestApiV1ProvidersOpenstackProjects tests OpenStack projects can be listed.
@@ -561,14 +774,14 @@ func TestApiV1ProvidersOpenstackProjects(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackProjectsWithResponse(context.TODO())
-	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
-	testutil.AssertNotNil(t, response.JSON200)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
 
-	testutil.AssertEqual(t, 1, len(results))
-	testutil.AssertEqual(t, projectID, results[0].Id)
-	testutil.AssertEqual(t, projectName, results[0].Name)
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, projectID, results[0].Id)
+	assert.Equal(t, projectName, results[0].Name)
 }
 
 // TestApiV1ProvidersOpenstackFlavors tests OpenStack flavors can be listed.
@@ -584,17 +797,17 @@ func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackFlavorsWithResponse(context.TODO())
-	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
-	testutil.AssertNotNil(t, response.JSON200)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
 
 	// NOTE: server converts from MiB to GiB of memory.
-	testutil.AssertEqual(t, 1, len(results))
-	testutil.AssertEqual(t, flavorID, results[0].Id)
-	testutil.AssertEqual(t, flavorCpus, results[0].Cpus)
-	testutil.AssertEqual(t, flavorMemory>>10, results[0].Memory)
-	testutil.AssertEqual(t, flavorDisk, results[0].Disk)
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, flavorID, results[0].Id)
+	assert.Equal(t, flavorCpus, results[0].Cpus)
+	assert.Equal(t, flavorMemory>>10, results[0].Memory)
+	assert.Equal(t, flavorDisk, results[0].Disk)
 }
 
 // TestApiV1ProvidersOpenstackImages tests OpenStack images can be listed.
@@ -610,23 +823,23 @@ func TestApiV1ProvidersOpenstackImages(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackImagesWithResponse(context.TODO())
-	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
-	testutil.AssertNotNil(t, response.JSON200)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
 
 	ts, err := time.Parse(time.RFC3339, imageTimestamp)
-	testutil.AssertNilError(t, err)
+	assert.NilError(t, err)
 
 	// NOTE: server converts kubernetes version to a proper semver so it's compatible
 	// with the CAPI kubeadm controller.
-	testutil.AssertEqual(t, 2, len(results))
-	testutil.AssertEqual(t, imageID, results[0].Id)
-	testutil.AssertEqual(t, imageName, results[0].Name)
-	testutil.AssertEqual(t, ts, results[0].Created)
-	testutil.AssertEqual(t, ts, results[0].Modified)
-	testutil.AssertEqual(t, "v"+imageK8sVersion, results[0].Versions.Kubernetes)
-	testutil.AssertEqual(t, imageGpuVersion, results[0].Versions.NvidiaDriver)
+	assert.Equal(t, 2, len(results))
+	assert.Equal(t, imageID, results[0].Id)
+	assert.Equal(t, imageName, results[0].Name)
+	assert.Equal(t, ts, results[0].Created)
+	assert.Equal(t, ts, results[0].Modified)
+	assert.Equal(t, "v"+imageK8sVersion, results[0].Versions.Kubernetes)
+	assert.Equal(t, imageGpuVersion, results[0].Versions.NvidiaDriver)
 }
 
 // TestApiV1ProvidersOpenstackAvailabilityZonesCompute tests OpenStack compute AZscan be listed.
@@ -642,13 +855,13 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesCompute(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesComputeWithResponse(context.TODO())
-	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
-	testutil.AssertNotNil(t, response.JSON200)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
 
-	testutil.AssertEqual(t, 1, len(results))
-	testutil.AssertEqual(t, computeAvailabilityZoneName, results[0].Name)
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, computeAvailabilityZoneName, results[0].Name)
 }
 
 // TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage tests OpenStack block storage AZscan be listed.
@@ -664,13 +877,13 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageWithResponse(context.TODO())
-	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
-	testutil.AssertNotNil(t, response.JSON200)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
 
-	testutil.AssertEqual(t, 1, len(results))
-	testutil.AssertEqual(t, blockStorageAvailabilityZone, results[0].Name)
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, blockStorageAvailabilityZone, results[0].Name)
 }
 
 // TestApiV1ProvidersOpenstackExternalNetworks tests OpenStack external networks can be listed.
@@ -686,13 +899,13 @@ func TestApiV1ProvidersOpenstackExternalNetworks(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackExternalNetworksWithResponse(context.TODO())
-	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
-	testutil.AssertNotNil(t, response.JSON200)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
 
-	testutil.AssertEqual(t, 1, len(results))
-	testutil.AssertEqual(t, externalNetworkID, results[0].Id)
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, externalNetworkID, results[0].Id)
 }
 
 // TestApiV1ProvidersOpenstackKeyPairs tests OpenStack key pairs can be listed.
@@ -708,11 +921,11 @@ func TestApiV1ProvidersOpenstackKeyPairs(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackKeyPairsWithResponse(context.TODO())
-	testutil.AssertHTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
-	testutil.AssertNotNil(t, response.JSON200)
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
 
-	testutil.AssertEqual(t, 1, len(results))
-	testutil.AssertEqual(t, keyPairName, results[0].Name)
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, keyPairName, results[0].Name)
 }

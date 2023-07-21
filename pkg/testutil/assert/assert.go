@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testutil
+package assert
 
 import (
 	"errors"
@@ -22,8 +22,8 @@ import (
 	"testing"
 )
 
-// AssertEqual is a terse way of checking some assumption holds, offing itself if it doesn't.
-func AssertEqual[T comparable](t *testing.T, expected, actual T) {
+// Equal is a terse way of checking some assumption holds, offing itself if it doesn't.
+func Equal[T comparable](t *testing.T, expected, actual T) {
 	t.Helper()
 
 	if expected != actual {
@@ -31,8 +31,8 @@ func AssertEqual[T comparable](t *testing.T, expected, actual T) {
 	}
 }
 
-// AssertNotEqual is a terse way of checking some assumption doesn't hold, offing itself if it does.
-func AssertNotEqual[T comparable](t *testing.T, expected, actual T) {
+// NotEqual is a terse way of checking some assumption doesn't hold, offing itself if it does.
+func NotEqual[T comparable](t *testing.T, expected, actual T) {
 	t.Helper()
 
 	if expected == actual {
@@ -40,8 +40,8 @@ func AssertNotEqual[T comparable](t *testing.T, expected, actual T) {
 	}
 }
 
-// AssertNilError is a terse way of crapping out if an error occurred.
-func AssertNilError(t *testing.T, err error) {
+// NilError is a terse way of crapping out if an error occurred.
+func NilError(t *testing.T, err error) {
 	t.Helper()
 
 	if err != nil {
@@ -49,8 +49,8 @@ func AssertNilError(t *testing.T, err error) {
 	}
 }
 
-// AssertNotNil is a terse way of crapping out if a pointer is nil.
-func AssertNotNil[T any](t *testing.T, v *T) {
+// NotNil is a terse way of crapping out if a pointer is nil.
+func NotNil[T any](t *testing.T, v *T) {
 	t.Helper()
 
 	if v == nil {
@@ -58,8 +58,21 @@ func AssertNotNil[T any](t *testing.T, v *T) {
 	}
 }
 
-// AssertError is a terse way of crapping out if an error didn't occur.
-func AssertError(t *testing.T, expected, err error) {
+// MapSet checks a map exists, and also that the named key is present.
+func MapSet[T any](t *testing.T, m map[string]T, key string) {
+	t.Helper()
+
+	if m == nil {
+		t.Fatalf("assertion failure: map undefined")
+	}
+
+	if _, ok := m[key]; !ok {
+		t.Fatalf("assertion failure: missing map key %s", key)
+	}
+}
+
+// Error is a terse way of crapping out if an error didn't occur.
+func Error(t *testing.T, expected, err error) {
 	t.Helper()
 
 	if err == nil {
@@ -71,8 +84,8 @@ func AssertError(t *testing.T, expected, err error) {
 	}
 }
 
-// AssertKubernetesError is a terse way of crapping out if an error didn't occur.
-func AssertKubernetesError(t *testing.T, callback func(error) bool, err error) {
+// KubernetesError is a terse way of crapping out if an error didn't occur.
+func KubernetesError(t *testing.T, callback func(error) bool, err error) {
 	t.Helper()
 
 	if err == nil {
@@ -84,11 +97,11 @@ func AssertKubernetesError(t *testing.T, callback func(error) bool, err error) {
 	}
 }
 
-// AssertHTTPResponse is a terse way of crapping out when the response is not
+// HTTPResponse is a terse way of crapping out when the response is not
 // as intended.
-func AssertHTTPResponse(t *testing.T, response *http.Response, statusCode int, err error) {
+func HTTPResponse(t *testing.T, response *http.Response, statusCode int, err error) {
 	t.Helper()
 
-	AssertNilError(t, err)
-	AssertEqual(t, statusCode, response.StatusCode)
+	NilError(t, err)
+	Equal(t, statusCode, response.StatusCode)
 }
