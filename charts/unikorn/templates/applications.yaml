@@ -67,6 +67,17 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
+  name: cluster-openstack-0.3.25-1
+spec:
+  repo: https://eschercloudai.github.io/helm-cluster-api
+  chart: cluster-api-cluster-openstack
+  version: v0.3.25
+  createNamespace: true
+  interface: 1.0.0
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
   name: openstack-cloud-provider-1.4.0-1
 spec:
   repo: https://kubernetes.github.io/cloud-provider-openstack
