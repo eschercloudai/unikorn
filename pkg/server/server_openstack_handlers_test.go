@@ -28,8 +28,8 @@ import (
 // * token.catalog.type is used to look for the service.
 // * token.catalog.endpoints.interface is used to look a service endpoint, "public" is the default.
 // * token.user.id is used by Unikorn for identity information in its access token.
-func v3AuthTokensSuccessResponse(tc *TestContext) string {
-	return `{
+func v3AuthTokensSuccessResponse(tc *TestContext) []byte {
+	return []byte(`{
 	"token": {
 		"catalog": [
 			{
@@ -110,7 +110,19 @@ func v3AuthTokensSuccessResponse(tc *TestContext) string {
 			"name": "foo"
 		}
 	}
-}`
+}`)
+}
+
+// v3AuthTokensUnauthorizedResponse covers the response you get when either the username
+// or password are incorrect.
+func v3AuthTokensUnauthorizedResponse(*TestContext) []byte {
+	return []byte(`{
+	"error":{
+		"code": 401,
+		"message": "The request you have made requires authentication.",
+		"title": "Unauthorized"
+	}
+}`)
 }
 
 // RegisterIdentityV3AuthTokensPostSuccessHandler is called when we want to login, or do a
@@ -120,7 +132,7 @@ func RegisterIdentityV3AuthTokensPostSuccessHandler(tc *TestContext) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Subject-Token", "ImAToken")
 		w.WriteHeader(http.StatusCreated)
-		if _, err := w.Write([]byte(v3AuthTokensSuccessResponse(tc))); err != nil {
+		if _, err := w.Write(v3AuthTokensSuccessResponse(tc)); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -135,7 +147,21 @@ func RegisterIdentityV3AuthTokensGetSuccessHandler(tc *TestContext) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Subject-Token", "ImAToken")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(v3AuthTokensSuccessResponse(tc))); err != nil {
+		if _, err := w.Write(v3AuthTokensSuccessResponse(tc)); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
+// RegisterIdentityV3AuthTokensPostUnauthorizedHandler is called when we want to login, or do a
+// token exchange/rescoping.
+func RegisterIdentityV3AuthTokensPostUnauthorizedHandler(tc *TestContext) {
+	tc.OpenstackRouter().Post("/identity/v3/auth/tokens", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		if _, err := w.Write(v3AuthTokensUnauthorizedResponse(tc)); err != nil {
 			if debug {
 				fmt.Println(err)
 			}

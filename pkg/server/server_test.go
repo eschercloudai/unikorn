@@ -26,6 +26,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -384,6 +385,43 @@ func MustNewScopedClient(t *testing.T, tc *TestContext) *generated.ClientWithRes
 	return MustNewClient(t, tc, response.JSON201.AccessToken)
 }
 
+// MustDoRequestWithForm is a helper that forms and executes a HTTP request with form data.
+// This is most useful for testing oauth2/oidc.
+func MustDoRequestWithForm(t *testing.T, method, url string, form url.Values) *http.Response {
+	t.Helper()
+
+	body := bytes.NewBufferString(form.Encode())
+
+	request, err := http.NewRequestWithContext(context.TODO(), method, url, body)
+	assert.NilError(t, err)
+
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+
+	response, err := client.Do(request)
+	assert.NilError(t, err)
+
+	return response
+}
+
+// AssertOauth2Error ensures the response contains a valid error and its type is as expected.
+func AssertOauth2Error(t *testing.T, response *http.Response, errorType generated.Oauth2ErrorError) {
+	t.Helper()
+
+	assert.Equal(t, "application/json", response.Header.Get("Content-Type"))
+
+	// NOTE: you'll need to replace the body if anything else needs to read it.
+	decoder := json.NewDecoder(response.Body)
+
+	var serverErr generated.Oauth2Error
+
+	err := decoder.Decode(&serverErr)
+	assert.NilError(t, err)
+
+	assert.Equal(t, errorType, serverErr.Error)
+}
+
 // TestApiV1AuthOAuth2TokensPassword tests the oauth2 password grant flow works.
 func TestApiV1AuthOAuth2TokensPassword(t *testing.T) {
 	t.Parallel()
@@ -396,6 +434,52 @@ func TestApiV1AuthOAuth2TokensPassword(t *testing.T) {
 	_ = MustNewUnscopedClient(t, tc)
 }
 
+// TestApiV1AuthOAuth2TokensPasswordUnauthorized tests oauth2 password grant failure due to
+// a bad username or password.
+func TestApiV1AuthOAuth2TokensPasswordUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityV3AuthTokensPostUnauthorizedHandler(tc)
+
+	endpoint := "http://" + tc.UnikornServerEndpoint() + "/api/v1/auth/oauth2/tokens"
+
+	query := url.Values{}
+	query.Set("grant_type", "password")
+	query.Set("username", "sahtrshdfda")
+	query.Set("password", "fthrdsesgsg")
+
+	response := MustDoRequestWithForm(t, http.MethodPost, endpoint, query)
+	assert.Equal(t, http.StatusUnauthorized, response.StatusCode)
+
+	defer response.Body.Close()
+
+	AssertOauth2Error(t, response, generated.AccessDenied)
+}
+
+// TestApiV1AuthOAuth2TokensPasswordInvalid tests oauth2 password grant failure due to
+// missing POST data.
+func TestApiV1AuthOAuth2TokensPasswordInvalid(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	endpoint := "http://" + tc.UnikornServerEndpoint() + "/api/v1/auth/oauth2/tokens"
+
+	query := url.Values{}
+	query.Set("grant_type", "password")
+
+	response := MustDoRequestWithForm(t, http.MethodPost, endpoint, query)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	defer response.Body.Close()
+
+	AssertOauth2Error(t, response, generated.InvalidRequest)
+}
+
 // TestApiV1AuthTokensToken tests an unscoped token can be scoped to a project.
 func TestApiV1AuthTokensToken(t *testing.T) {
 	t.Parallel()
@@ -406,6 +490,46 @@ func TestApiV1AuthTokensToken(t *testing.T) {
 	RegisterIdentityHandlers(tc)
 
 	_ = MustNewScopedClient(t, tc)
+}
+
+// TestApiV1AuthTokensTokenBadRequest tests that the tokens endpoint will error
+// correctly when no authorization token is provided.
+func TestApiV1AuthTokensTokenBadRequest(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	client, err := generated.NewClientWithResponses("http://" + tc.UnikornServerEndpoint())
+	assert.NilError(t, err)
+
+	response, err := client.PostApiV1AuthTokensTokenWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(&generated.TokenScope{}))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusBadRequest, err)
+	assert.NotNil(t, response.JSON400)
+
+	serverErr := *response.JSON400
+
+	assert.Equal(t, generated.InvalidRequest, serverErr.Error)
+}
+
+// TestApiV1AuthTokensTokenUnauthorized tests that the tokens endpoint will error
+// correctly when a bad autorization token is provided.
+func TestApiV1AuthTokensTokenUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	client, err := generated.NewClientWithResponses("http://"+tc.UnikornServerEndpoint(), generated.WithRequestEditorFn(bearerTokenInjector("garbage")))
+	assert.NilError(t, err)
+
+	response, err := client.PostApiV1AuthTokensTokenWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(&generated.TokenScope{}))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
 }
 
 // TestApiV1ProjectCreate tests that a project scoped token can create a project
