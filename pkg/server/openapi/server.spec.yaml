@@ -1283,10 +1283,6 @@ components:
           schema:
             $ref: '#/components/schemas/openstackAvailabilityZones'
   securitySchemes:
-    httpBasicAuthentication:
-      description: Operation requires HTTP basic authentication.
-      type: http
-      scheme: basic
     oauth2Authentication:
       description: Operation requires OAuth2 bearer token authentication.
       type: oauth2

@@ -52,22 +52,6 @@ func NewAuthorizer(issuer *jose.JWTIssuer) *Authorizer {
 	}
 }
 
-// authorizeHTTP checks basic authentication information is there then
-// lets this request bubble up to the handler for processing.  The ONLY
-// API that uses this is the one that does basic auth to oauth token issue.
-func authorizeHTTP(r *http.Request, scheme *openapi3.SecurityScheme) error {
-	authorizationScheme, _, err := authorization.GetHTTPAuthenticationScheme(r)
-	if err != nil {
-		return err
-	}
-
-	if !strings.EqualFold(authorizationScheme, scheme.Scheme) {
-		return errors.OAuth2InvalidRequest("authorization scheme not allowed").WithValues("scheme", authorizationScheme)
-	}
-
-	return nil
-}
-
 // authorizeOAuth2 checks APIs that require and oauth2 bearer token.
 func (a *Authorizer) authorizeOAuth2(ctx *authorizationContext, r *http.Request, scopes []string) error {
 	authorizationScheme, token, err := authorization.GetHTTPAuthenticationScheme(r)
@@ -100,10 +84,7 @@ func (a *Authorizer) authorizeOAuth2(ctx *authorizationContext, r *http.Request,
 
 // authorizeScheme requires the individual scheme to match.
 func (a *Authorizer) authorizeScheme(ctx *authorizationContext, r *http.Request, scheme *openapi3.SecurityScheme, scopes []string) error {
-	switch scheme.Type {
-	case "http":
-		return authorizeHTTP(r, scheme)
-	case "oauth2":
+	if scheme.Type == "oauth2" {
 		return a.authorizeOAuth2(ctx, r, scopes)
 	}
 
