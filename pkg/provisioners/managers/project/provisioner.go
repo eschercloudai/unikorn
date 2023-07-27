@@ -110,19 +110,6 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	// Find any control planes and delete them.  They in turn will delete clusters and
-	// free any Openstack resources.
-	controlPlanes := &unikornv1alpha1.ControlPlaneList{}
-	if err := p.client.List(ctx, controlPlanes, &client.ListOptions{Namespace: namespace.Name}); err != nil {
-		return err
-	}
-
-	for i := range controlPlanes.Items {
-		if err := generic.NewResourceProvisioner(p.client, &controlPlanes.Items[i]).Deprovision(ctx); err != nil {
-			return err
-		}
-	}
-
 	// Deprovision the namespace and await deletion.
 	if err := generic.NewResourceProvisioner(p.client, namespace).Deprovision(ctx); err != nil {
 		return err

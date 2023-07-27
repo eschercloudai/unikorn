@@ -24,12 +24,14 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/project"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -40,7 +42,6 @@ type reconciler struct {
 
 var _ reconcile.Reconciler = &reconciler{}
 
-//nolint:cyclop
 func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -67,32 +68,17 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 		log.Info("deleting resource")
 
-		if err := r.handleReconcileDeprovision(ctx, object); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-		defer cancel()
-
-		if err := provisioner.Deprovision(timeoutCtx); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		object.Finalizers = nil
-
-		if err := r.client.Update(ctx, object); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		return reconcile.Result{}, nil
+		return r.reconcileDelete(ctx, provisioner, object)
 	}
 
 	log.Info("reconciling resource")
 
 	// Check to see if this is (or appears to be) the first time we've seen a
 	// resource and do observability as appropriate.
-	if err := r.addFinalizer(ctx, object); err != nil {
-		return reconcile.Result{}, err
+	if ok := controllerutil.AddFinalizer(object, constants.Finalizer); ok {
+		if err := r.client.Update(ctx, object); err != nil {
+			return reconcile.Result{}, err
+		}
 	}
 
 	perr := provisioner.Provision(ctx)
@@ -113,33 +99,28 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	return reconcile.Result{}, nil
 }
 
-// addFinalizer looks to see if we've seen this resource yet, and adds a finalizer so
-// we can orchestrate deletion correctly.
-func (r *reconciler) addFinalizer(ctx context.Context, resource *unikornv1.Project) error {
-	for _, finalizer := range resource.Finalizers {
-		if finalizer == constants.Finalizer {
-			return nil
+// reconcileDelete handles resource deletion.
+func (r *reconciler) reconcileDelete(ctx context.Context, provisioner provisioners.Provisioner, resource *unikornv1.Project) (reconcile.Result, error) {
+	if ok := resource.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1.ProjectConditionReasonDeprovisioning, "Deprovisioning"); ok {
+		if err := r.client.Status().Update(ctx, resource); err != nil {
+			return reconcile.Result{}, err
 		}
 	}
 
-	resource.Finalizers = append(resource.Finalizers, constants.Finalizer)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
 
-	if err := r.client.Update(ctx, resource); err != nil {
-		return err
+	if err := provisioner.Deprovision(timeoutCtx); err != nil {
+		return reconcile.Result{}, err
 	}
 
-	return nil
-}
-
-// handleReconcileDeprovision indicates the deprovision request has been picked up.
-func (r *reconciler) handleReconcileDeprovision(ctx context.Context, project *unikornv1.Project) error {
-	if ok := project.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1.ProjectConditionReasonDeprovisioning, "Project is being deprovisioned"); ok {
-		if err := r.client.Status().Update(ctx, project); err != nil {
-			return err
+	if ok := controllerutil.RemoveFinalizer(resource, constants.Finalizer); ok {
+		if err := r.client.Update(ctx, resource); err != nil {
+			return reconcile.Result{}, err
 		}
 	}
 
-	return nil
+	return reconcile.Result{}, nil
 }
 
 // handleReconcileCondition inspects the error, if any, that halted the provisioning and reports
