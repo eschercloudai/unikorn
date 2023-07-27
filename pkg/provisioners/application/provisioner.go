@@ -413,6 +413,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		}
 	}
 
+	// TODO: can probably just use controllerutil.CreateOrPatch.
 	//nolint:nestif
 	if resource == nil {
 		log.Info("creating new application", "application", p.Name)
