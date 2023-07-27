@@ -47,6 +47,8 @@ import (
 
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
+	provisioners.ProvisionerMeta
+
 	// client provides access to Kubernetes.
 	client client.Client
 

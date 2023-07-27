@@ -18,6 +18,7 @@ package controlplane
 
 import (
 	"context"
+	goerrors "errors"
 	"sort"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
@@ -27,12 +28,13 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/common"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
+	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
-	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Client wraps up control plane related management handling.
@@ -57,37 +59,84 @@ type Meta struct {
 	// can reference it.
 	Name string
 
-	// Active defines whether the control plane is ready to be used: it's not
-	// marked for deletion, and it's active according to the controller.
-	// TODO: should we inherit the project's inactive status too?
-	Active bool
-
 	// Namespace is the namespace that is provisioned by the control plane.
 	// Should be usable and set when the project is active.
 	Namespace string
+
+	// Deleting tells us if we should allow new child objects to be created
+	// in this resource's namespace.
+	Deleting bool
 }
 
+var (
+	// ErrResourceDeleting is raised when the resource is being deleted.
+	ErrResourceDeleting = goerrors.New("resource is being deleted")
+
+	// ErrNamespaceUnset is raised when the namespace hasn't been created
+	// yet.
+	ErrNamespaceUnset = goerrors.New("resource namespace is unset")
+
+	// ErrApplicationBundle is raised when no suitable application
+	// bundle is found.
+	ErrApplicationBundle = goerrors.New("no application bundle found")
+)
+
 // active returns true if the project is usable.
-func active(c *unikornv1.ControlPlane) bool {
-	// Being deleted, don't use.
-	// Takes precedence over condition as there's a delay between the resource
-	// being deleted, and the controller acknoledging it.
-	if c.DeletionTimestamp != nil {
-		return false
+func active(c *unikornv1.ControlPlane) error {
+	// No namespace created yet, you cannot provision any child resources.
+	if c.Status.Namespace == "" {
+		return ErrNamespaceUnset
 	}
 
-	// Unknown condition, don't use.
-	condition, err := c.LookupCondition(unikornv1.ControlPlaneConditionAvailable)
+	return nil
+}
+
+// provisionDefaultControlPlane is called when a cluster creation call is made and the
+// control plane does not exist.
+func (c *Client) provisionDefaultControlPlane(ctx context.Context, name string) error {
+	log := log.FromContext(ctx)
+
+	log.Info("creating implicit control plane", "name", name)
+
+	applicationBundles, err := applicationbundle.NewClient(c.client).ListControlPlane(ctx)
 	if err != nil {
-		return false
+		return err
 	}
 
-	// Condition not provisioned, don't use.
-	if condition.Status != corev1.ConditionTrue {
-		return false
+	var applicationBundle *generated.ApplicationBundle
+
+	for _, bundle := range applicationBundles {
+		if bundle.Preview != nil && *bundle.Preview {
+			continue
+		}
+
+		if bundle.EndOfLife != nil {
+			continue
+		}
+
+		applicationBundle = bundle
+
+		break
 	}
 
-	return true
+	if applicationBundle == nil {
+		return ErrApplicationBundle
+	}
+
+	// Metadata should be called by descendents of the control
+	// plane e.g. clusters. Rather than delegate creation to each
+	// and every client implicitly create it.
+	defaultControlPlane := &generated.ControlPlane{
+		Name:                         name,
+		ApplicationBundle:            *applicationBundle,
+		ApplicationBundleAutoUpgrade: &generated.ApplicationBundleAutoUpgrade{},
+	}
+
+	if err := c.Create(ctx, defaultControlPlane); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Metadata retrieves the control plane metadata.
@@ -99,14 +148,50 @@ func (c *Client) Metadata(ctx context.Context, name string) (*Meta, error) {
 
 	result, err := c.get(ctx, project.Namespace, name)
 	if err != nil {
+		if !errors.IsHTTPNotFound(err) {
+			return nil, err
+		}
+
+		if err := c.provisionDefaultControlPlane(ctx, name); err != nil {
+			return nil, err
+		}
+	}
+
+	waitCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Allow a grace period for the project to become active to avoid client
+	// errors and retries.  The namespace creation should be ostensibly instant
+	// and likewise show up due to non-blocking yields.
+	callback := func() error {
+		result, err = c.get(waitCtx, project.Namespace, name)
+		if err != nil {
+			// Short cut deleting errors.
+			if goerrors.Is(err, ErrResourceDeleting) {
+				cancel()
+
+				return nil
+			}
+
+			return err
+		}
+
+		if err := active(result); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := retry.Forever().DoWithContext(waitCtx, callback); err != nil {
 		return nil, err
 	}
 
 	metadata := &Meta{
 		Project:   project,
 		Name:      name,
-		Active:    active(result),
 		Namespace: result.Status.Namespace,
+		Deleting:  result.DeletionTimestamp != nil,
 	}
 
 	return metadata, nil
@@ -250,8 +335,8 @@ func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) er
 		return err
 	}
 
-	if !project.Active {
-		return errors.OAuth2InvalidRequest("project is not active")
+	if project.Deleting {
+		return errors.OAuth2InvalidRequest("project is being deleted")
 	}
 
 	controlPlane := createControlPlane(project, request)
@@ -275,8 +360,8 @@ func (c *Client) Delete(ctx context.Context, name generated.ControlPlaneNamePara
 		return err
 	}
 
-	if !project.Active {
-		return errors.OAuth2InvalidRequest("project is not active")
+	if project.Deleting {
+		return errors.OAuth2InvalidRequest("project is being deleted")
 	}
 
 	controlPlane := &unikornv1.ControlPlane{
@@ -304,8 +389,8 @@ func (c *Client) Update(ctx context.Context, name generated.ControlPlaneNamePara
 		return err
 	}
 
-	if !project.Active {
-		return errors.OAuth2InvalidRequest("project is not active")
+	if project.Deleting {
+		return errors.OAuth2InvalidRequest("project is being deleted")
 	}
 
 	resource, err := c.get(ctx, project.Namespace, name)

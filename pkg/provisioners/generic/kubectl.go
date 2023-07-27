@@ -36,6 +36,8 @@ import (
 // TODO: some manifests may not have a namspace, we may want to allow
 // overriding this.
 type KubectlProvisioner struct {
+	provisioners.ProvisionerMeta
+
 	// config allows access to the provided kubeconfig, context etc.
 	// TODO: this is not aware of ClientConfigLoadingRules so environment
 	// variables will be ignored for now.

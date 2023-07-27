@@ -37,6 +37,8 @@ const (
 
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
+	provisioners.ProvisionerMeta
+
 	// client provides access to Kubernetes.
 	client client.Client
 
@@ -69,6 +71,9 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 	}
 
 	provisioner := &Provisioner{
+		ProvisionerMeta: provisioners.ProvisionerMeta{
+			Name: cluster.Name,
+		},
 		client:             client,
 		cluster:            cluster,
 		controlPlanePrefix: controlPlanePrefix,

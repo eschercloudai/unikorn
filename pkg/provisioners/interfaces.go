@@ -46,6 +46,9 @@ type RemoteCluster interface {
 // packages in a technology agnostic way.  For example some things may be
 // installed as a raw set of resources, a YAML manifest, Helm etc.
 type Provisioner interface {
+	// ProvisionerName returns the provisioner name.
+	ProvisionerName() string
+
 	// Provision deploys the requested package.
 	// Implementations should ensure this receiver is idempotent.
 	Provision(context.Context) error

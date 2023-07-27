@@ -18,6 +18,7 @@ package project
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
@@ -25,12 +26,13 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/authorization/oauth2"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
-	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Client wraps up project related management handling.
@@ -62,36 +64,32 @@ type Meta struct {
 	// can reference it.
 	Name string
 
-	// Active defines whether the project is ready to be used: it's not
-	// marked for deletion, and it's active according to the controller.
-	Active bool
-
 	// Namespace is the namespace that is provisioned by the project.
 	// Should be usable set when the project is active.
 	Namespace string
+
+	// Deleting tells us if we should allow new child objects to be created
+	// in this resource's namespace.
+	Deleting bool
 }
 
+var (
+	// ErrResourceDeleting is raised when the resource is being deleted.
+	ErrResourceDeleting = goerrors.New("resource is being deleted")
+
+	// ErrNamespaceUnset is raised when the namespace hasn't been created
+	// yet.
+	ErrNamespaceUnset = goerrors.New("resource namespace is unset")
+)
+
 // active returns true if the project is usable.
-func active(p *unikornv1.Project) bool {
-	// Being deleted, don't use.
-	// Takes precedence over condition as there's a delay between the resource
-	// being deleted, and the controller acknoledging it.
-	if p.DeletionTimestamp != nil {
-		return false
+func active(p *unikornv1.Project) error {
+	// No namespace created yet, you cannot provision any child resources.
+	if p.Status.Namespace == "" {
+		return ErrNamespaceUnset
 	}
 
-	// Unknown condition, don't use.
-	condition, err := p.LookupCondition(unikornv1.ProjectConditionAvailable)
-	if err != nil {
-		return false
-	}
-
-	// Condition not provisioned, don't use.
-	if condition.Status != corev1.ConditionTrue {
-		return false
-	}
-
-	return true
+	return nil
 }
 
 // Metadata retrieves the project metadata.
@@ -105,13 +103,57 @@ func (c *Client) Metadata(ctx context.Context) (*Meta, error) {
 
 	result, err := c.get(ctx, name)
 	if err != nil {
+		if !errors.IsHTTPNotFound(err) {
+			return nil, err
+		}
+
+		log := log.FromContext(ctx)
+
+		log.Info("creating implicit project", "name", name)
+
+		// Metadata should be called by descendents of the project
+		// e.g. control planes, and by transitive closure, clusters.
+		// Rather than delegate creation to each and every client,
+		// implicitly create it.
+		if err := c.Create(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	waitCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Allow a grace period for the project to become active to avoid client
+	// errors and retries.  The namespace creation should be ostensibly instant
+	// and likewise show up due to non-blocking yields.
+	callback := func() error {
+		result, err = c.get(waitCtx, name)
+		if err != nil {
+			// Short cut deleting errors.
+			if goerrors.Is(err, ErrResourceDeleting) {
+				cancel()
+
+				return nil
+			}
+
+			return err
+		}
+
+		if err := active(result); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := retry.Forever().DoWithContext(waitCtx, callback); err != nil {
 		return nil, err
 	}
 
 	metadata := &Meta{
 		Name:      name,
-		Active:    active(result),
 		Namespace: result.Status.Namespace,
+		Deleting:  result.DeletionTimestamp != nil,
 	}
 
 	return metadata, nil

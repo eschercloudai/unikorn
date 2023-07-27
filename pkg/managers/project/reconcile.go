@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/project"
 
@@ -45,7 +45,7 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	log := log.FromContext(ctx)
 
 	// See if the resource exists or not, if not it's been deleted.
-	object := &unikornv1alpha1.Project{}
+	object := &unikornv1.Project{}
 	if err := r.client.Get(ctx, request.NamespacedName, object); err != nil {
 		if kerrors.IsNotFound(err) {
 			log.Info("resource deleted")
@@ -91,52 +91,49 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	// Check to see if this is (or appears to be) the first time we've seen a
 	// resource and do observability as appropriate.
-	if err := r.handleReconcileFirstVisit(ctx, object); err != nil {
+	if err := r.addFinalizer(ctx, object); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Provision the resource.
-	if err := provisioner.Provision(ctx); err != nil {
-		if err := r.handleReconcileError(ctx, object, err); err != nil {
-			return reconcile.Result{}, err
-		}
+	perr := provisioner.Provision(ctx)
 
+	// Update the status conditionally, this will remove transient errors etc.
+	if err := r.handleReconcileCondition(ctx, object, perr); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	if err := r.handleReconcileComplete(ctx, object); err != nil {
-		return reconcile.Result{}, err
+	// If anything went wrong, requeue for another attempt.
+	// NOTE: DO NOT do what CAPI do and not-specify a wait period, it will
+	// suffer from an exponential back-off and kill performance.
+	if perr != nil {
+		//nolint:nilerr
+		return reconcile.Result{RequeueAfter: constants.DefaultYieldTimeout}, nil
 	}
 
 	return reconcile.Result{}, nil
 }
 
-// handleReconcileFirstVisit checks to see if the Available condition is present in the
-// status, if not we assume it's the first time we've seen this an set the condition to
-// Provisioning.
-func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, project *unikornv1alpha1.Project) error {
-	if _, err := project.LookupCondition(unikornv1alpha1.ProjectConditionAvailable); err != nil {
-		project.Finalizers = []string{
-			constants.Finalizer,
+// addFinalizer looks to see if we've seen this resource yet, and adds a finalizer so
+// we can orchestrate deletion correctly.
+func (r *reconciler) addFinalizer(ctx context.Context, resource *unikornv1.Project) error {
+	for _, finalizer := range resource.Finalizers {
+		if finalizer == constants.Finalizer {
+			return nil
 		}
+	}
 
-		if err := r.client.Update(ctx, project); err != nil {
-			return err
-		}
+	resource.Finalizers = append(resource.Finalizers, constants.Finalizer)
 
-		project.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.ProjectConditionReasonProvisioning, "Provisioning of project has started")
-
-		if err := r.client.Status().Update(ctx, project); err != nil {
-			return err
-		}
+	if err := r.client.Update(ctx, resource); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 // handleReconcileDeprovision indicates the deprovision request has been picked up.
-func (r *reconciler) handleReconcileDeprovision(ctx context.Context, project *unikornv1alpha1.Project) error {
-	if ok := project.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1alpha1.ProjectConditionReasonDeprovisioning, "Project is being deprovisioned"); ok {
+func (r *reconciler) handleReconcileDeprovision(ctx context.Context, project *unikornv1.Project) error {
+	if ok := project.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1.ProjectConditionReasonDeprovisioning, "Project is being deprovisioned"); ok {
 		if err := r.client.Status().Update(ctx, project); err != nil {
 			return err
 		}
@@ -145,38 +142,35 @@ func (r *reconciler) handleReconcileDeprovision(ctx context.Context, project *un
 	return nil
 }
 
-// handleReconcileComplete indicates that the reconcile is complete and the control
-// plane is ready to be used.
-func (r *reconciler) handleReconcileComplete(ctx context.Context, project *unikornv1alpha1.Project) error {
-	if ok := project.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1alpha1.ProjectConditionReasonProvisioned, "Provisioning of project has completed"); ok {
-		if err := r.client.Status().Update(ctx, project); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// handleReconcileError inspects the error type that halted the provisioning and reports
+// handleReconcileCondition inspects the error, if any, that halted the provisioning and reports
 // this as a ppropriate in the status.
-func (r *reconciler) handleReconcileError(ctx context.Context, project *unikornv1alpha1.Project, err error) error {
-	var reason unikornv1alpha1.ProjectConditionReason
+func (r *reconciler) handleReconcileCondition(ctx context.Context, project *unikornv1.Project, err error) error {
+	var status corev1.ConditionStatus
+
+	var reason unikornv1.ProjectConditionReason
 
 	var message string
 
 	switch {
+	case err == nil:
+		status = corev1.ConditionTrue
+		reason = unikornv1.ProjectConditionReasonProvisioned
+		message = "Provisioned"
 	case errors.Is(err, context.Canceled):
-		reason = unikornv1alpha1.ProjectConditionReasonCanceled
+		status = corev1.ConditionFalse
+		reason = unikornv1.ProjectConditionReasonCanceled
 		message = "Provisioning aborted due to controller shutdown"
 	case errors.Is(err, context.DeadlineExceeded):
-		reason = unikornv1alpha1.ProjectConditionReasonTimedout
+		status = corev1.ConditionFalse
+		reason = unikornv1.ProjectConditionReasonTimedout
 		message = fmt.Sprintf("Provisioning aborted due to a timeout: %v", err)
 	default:
-		reason = unikornv1alpha1.ProjectConditionReasonErrored
+		status = corev1.ConditionFalse
+		reason = unikornv1.ProjectConditionReasonErrored
 		message = fmt.Sprintf("Provisioning failed due to an error: %v", err)
 	}
 
-	if ok := project.UpdateAvailableCondition(corev1.ConditionFalse, reason, message); ok {
+	if ok := project.UpdateAvailableCondition(status, reason, message); ok {
 		if err := r.client.Status().Update(ctx, project); err != nil {
 			return err
 		}

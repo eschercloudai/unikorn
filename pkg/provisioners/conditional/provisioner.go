@@ -25,8 +25,7 @@ import (
 )
 
 type Provisioner struct {
-	// name is the conditional name.
-	name string
+	provisioners.ProvisionerMeta
 
 	// condition will execute the provisioner if true.
 	condition func() bool
@@ -37,7 +36,9 @@ type Provisioner struct {
 
 func New(name string, condition func() bool, provisioner provisioners.Provisioner) *Provisioner {
 	return &Provisioner{
-		name:        name,
+		ProvisionerMeta: provisioners.ProvisionerMeta{
+			Name: name,
+		},
 		condition:   condition,
 		provisioner: provisioner,
 	}
@@ -51,7 +52,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
 	if !p.condition() {
-		log.Info("conditional deprovision", "provisioner", p.name)
+		log.Info("conditional deprovision", "provisioner", p.Name)
 
 		return p.provisioner.Deprovision(ctx)
 	}
@@ -64,7 +65,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
 	if !p.condition() {
-		log.Info("skipping conditional deprovision", "provisioner", p.name)
+		log.Info("skipping conditional deprovision", "provisioner", p.Name)
 
 		return nil
 	}

@@ -246,8 +246,8 @@ func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlP
 		return err
 	}
 
-	if !controlPlane.Active {
-		return errors.OAuth2InvalidRequest("control plane is not active")
+	if controlPlane.Deleting {
+		return errors.OAuth2InvalidRequest("control plane is being deleted")
 	}
 
 	cluster, err := c.createCluster(controlPlane, options)
@@ -301,8 +301,8 @@ func (c *Client) Delete(ctx context.Context, controlPlaneName generated.ControlP
 		return err
 	}
 
-	if !controlPlane.Active {
-		return errors.OAuth2InvalidRequest("control plane is not active")
+	if controlPlane.Deleting {
+		return errors.OAuth2InvalidRequest("control plane is being deleted")
 	}
 
 	cluster := &unikornv1.KubernetesCluster{
@@ -330,8 +330,8 @@ func (c *Client) Update(ctx context.Context, controlPlaneName generated.ControlP
 		return err
 	}
 
-	if !controlPlane.Active {
-		return errors.OAuth2InvalidRequest("control plane is not active")
+	if controlPlane.Deleting {
+		return errors.OAuth2InvalidRequest("control plane is being deleted")
 	}
 
 	resource, err := c.get(ctx, controlPlane.Namespace, name)

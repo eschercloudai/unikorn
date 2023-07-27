@@ -95,7 +95,7 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	// Check to see if this is (or appears to be) the first time we've seen a
 	// resource and do observability as appropriate.
-	if err := r.handleReconcileFirstVisit(ctx, object); err != nil {
+	if err := r.addFinalizer(ctx, object); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -105,64 +105,37 @@ func (r *reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	provisionContext, cancel := context.WithTimeout(ctx, object.Spec.Timeout.Duration)
 	defer cancel()
 
-	// Provision the control plane.
-	if err := provisioner.Provision(provisionContext); err != nil {
-		// If the provisioner has voluntarily yielded, requeue it and look at
-		// it later to allow others to use the worker, or indeed pickup delete
-		// requests, updates... probably not a great idea :D
-		// NOTE: DO NOT do what CAPI do and not-specify a wait period, it will
-		// suffer from an exponential back-off and kill performance.
-		if errors.Is(err, provisionererrors.ErrYield) {
-			log.Info("reconcile yielding")
+	perr := provisioner.Provision(provisionContext)
 
-			return reconcile.Result{RequeueAfter: constants.DefaultYieldTimeout}, nil
-		}
-
-		if err := r.handleReconcileError(ctx, object, err); err != nil {
-			return reconcile.Result{}, err
-		}
-
+	// Update the status conditionally, this will remove transient errors etc.
+	if err := r.handleReconcileCondition(ctx, object, perr); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	if err := r.handleReconcileComplete(ctx, object); err != nil {
-		return reconcile.Result{}, err
+	// If anything went wrong, requeue for another attempt.
+	// NOTE: DO NOT do what CAPI do and not-specify a wait period, it will
+	// suffer from an exponential back-off and kill performance.
+	if perr != nil {
+		//nolint:nilerr
+		return reconcile.Result{RequeueAfter: constants.DefaultYieldTimeout}, nil
 	}
 
 	return reconcile.Result{}, nil
 }
 
-// handleReconcileFirstVisit checks to see if the Available condition is present in the
-// status, if not we assume it's the first time we've seen this an set the condition to
-// Provisioning.
-func (r *reconciler) handleReconcileFirstVisit(ctx context.Context, controlPlane *unikornv1.ControlPlane) error {
-	condition, err := controlPlane.LookupCondition(unikornv1.ControlPlaneConditionAvailable)
-	if err != nil {
-		controlPlane.Finalizers = []string{
-			constants.Finalizer,
+// addFinalizer looks to see if we've seen this resource yet, and adds a finalizer so
+// we can orchestrate deletion correctly.
+func (r *reconciler) addFinalizer(ctx context.Context, resource *unikornv1.ControlPlane) error {
+	for _, finalizer := range resource.Finalizers {
+		if finalizer == constants.Finalizer {
+			return nil
 		}
-
-		if err := r.client.Update(ctx, controlPlane); err != nil {
-			return err
-		}
-
-		controlPlane.UpdateAvailableCondition(corev1.ConditionFalse, unikornv1.ControlPlaneConditionReasonProvisioning, "Provisioning control plane")
-
-		if err := r.client.Status().Update(ctx, controlPlane); err != nil {
-			return err
-		}
-
-		return nil
 	}
 
-	if condition.Reason == unikornv1.ControlPlaneConditionReasonProvisioned {
-		controlPlane.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1.ControlPlaneConditionReasonUpdating, "Updating control plane")
+	resource.Finalizers = append(resource.Finalizers, constants.Finalizer)
 
-		if err := r.client.Status().Update(ctx, controlPlane); err != nil {
-			return err
-		}
-
-		return nil
+	if err := r.client.Update(ctx, resource); err != nil {
+		return err
 	}
 
 	return nil
@@ -179,38 +152,39 @@ func (r *reconciler) handleReconcileDeprovision(ctx context.Context, controlPlan
 	return nil
 }
 
-// handleReconcileComplete indicates that the reconcile is complete and the control
-// plane is ready to be used.
-func (r *reconciler) handleReconcileComplete(ctx context.Context, controlPlane *unikornv1.ControlPlane) error {
-	if ok := controlPlane.UpdateAvailableCondition(corev1.ConditionTrue, unikornv1.ControlPlaneConditionReasonProvisioned, "Provisioning of control plane has completed"); ok {
-		if err := r.client.Status().Update(ctx, controlPlane); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// handleReconcileError inspects the error type that halted the provisioning and reports
+// handleReconcileCondition inspects the error, if any, that halted the provisioning and reports
 // this as a ppropriate in the status.
-func (r *reconciler) handleReconcileError(ctx context.Context, controlPlane *unikornv1.ControlPlane, err error) error {
+func (r *reconciler) handleReconcileCondition(ctx context.Context, controlPlane *unikornv1.ControlPlane, err error) error {
+	var status corev1.ConditionStatus
+
 	var reason unikornv1.ControlPlaneConditionReason
 
 	var message string
 
 	switch {
+	case err == nil:
+		status = corev1.ConditionTrue
+		reason = unikornv1.ControlPlaneConditionReasonProvisioned
+		message = "Provisioning has completed"
+	case errors.Is(err, provisionererrors.ErrYield):
+		status = corev1.ConditionFalse
+		reason = unikornv1.ControlPlaneConditionReasonProvisioning
+		message = "Provisioning"
 	case errors.Is(err, context.Canceled):
+		status = corev1.ConditionFalse
 		reason = unikornv1.ControlPlaneConditionReasonCanceled
-		message = "Provisioning aborted due to controller shudown"
+		message = "Aborted due to controller shudown"
 	case errors.Is(err, context.DeadlineExceeded):
+		status = corev1.ConditionFalse
 		reason = unikornv1.ControlPlaneConditionReasonTimedout
-		message = fmt.Sprintf("Provisioning aborted due to a timeout: %v", err)
+		message = fmt.Sprintf("Aborted due to a timeout: %v", err)
 	default:
+		status = corev1.ConditionFalse
 		reason = unikornv1.ControlPlaneConditionReasonErrored
-		message = fmt.Sprintf("Provisioning failed due to an error: %v", err)
+		message = fmt.Sprintf("Failed due to an error: %v", err)
 	}
 
-	if ok := controlPlane.UpdateAvailableCondition(corev1.ConditionFalse, reason, message); ok {
+	if ok := controlPlane.UpdateAvailableCondition(status, reason, message); ok {
 		if err := r.client.Status().Update(ctx, controlPlane); err != nil {
 			return err
 		}

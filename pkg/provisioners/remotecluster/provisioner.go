@@ -67,6 +67,8 @@ func GetClient(ctx context.Context, generator provisioners.RemoteCluster) (clien
 // Provisioner provides generic handling of remote cluster instances.
 // Specialization is delegated to a provider specific interface.
 type Provisioner struct {
+	provisioners.ProvisionerMeta
+
 	// client provides access to Kubernetes.
 	client client.Client
 
@@ -77,6 +79,9 @@ type Provisioner struct {
 // New returns a new initialized provisioner object.
 func New(client client.Client, generator provisioners.RemoteCluster) *Provisioner {
 	return &Provisioner{
+		ProvisionerMeta: provisioners.ProvisionerMeta{
+			Name: GenerateName(generator),
+		},
 		client:    client,
 		generator: generator,
 	}
@@ -89,9 +94,7 @@ var _ provisioners.Provisioner = &Provisioner{}
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	name := GenerateName(p.generator)
-
-	log.Info("provisioning remote cluster", "remotecluster", name)
+	log.Info("provisioning remote cluster", "remotecluster", p.Name)
 
 	argocd, err := argocdclient.NewInCluster(ctx, p.client, namespace)
 	if err != nil {
@@ -112,13 +115,13 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	// condition is met.  This allows the provisioner to be used to initialize remotes
 	// in parallel with them coming up as some providers require add-ons to be installed
 	// concurrently before a readiness check will succeed.
-	if err := argocdcluster.Upsert(ctx, argocd, name, server, config); err != nil {
-		log.Info("remote cluster not ready, yielding", "remotecluster", name)
+	if err := argocdcluster.Upsert(ctx, argocd, p.Name, server, config); err != nil {
+		log.Info("remote cluster not ready, yielding", "remotecluster", p.Name)
 
 		return provisionererrors.ErrYield
 	}
 
-	log.Info("remote cluster provisioned", "remotecluster", name)
+	log.Info("remote cluster provisioned", "remotecluster", p.Name)
 
 	return nil
 }
@@ -127,20 +130,18 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	name := GenerateName(p.generator)
-
-	log.Info("deprovisioning remote cluster", "remotecluster", name)
+	log.Info("deprovisioning remote cluster", "remotecluster", p.Name)
 
 	argocd, err := argocdclient.NewInCluster(ctx, p.client, namespace)
 	if err != nil {
 		return err
 	}
 
-	if err := argocdcluster.Delete(ctx, argocd, name); err != nil {
+	if err := argocdcluster.Delete(ctx, argocd, p.Name); err != nil {
 		return err
 	}
 
-	log.Info("remote cluster deprovisioned", "remotecluster", name)
+	log.Info("remote cluster deprovisioned", "remotecluster", p.Name)
 
 	return nil
 }

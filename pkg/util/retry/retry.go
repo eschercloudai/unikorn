@@ -18,15 +18,8 @@ package retry
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
-)
-
-var (
-	// ErrNone is a sentinel for when no error is set by the callback
-	// and prevents a nil pointer dereference.
-	ErrNone = errors.New("no error")
 )
 
 // Callback is a callback that must return nil to escape the retry loop.
@@ -65,6 +58,12 @@ func (r *Retrier) Do(f Callback) error {
 
 // DoWithContext allows you to use a global context to interrupt execution.
 func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
+	// Check immediately to avoid a delay of period.
+	rerr := f()
+	if rerr == nil {
+		return nil
+	}
+
 	if r.timeout != 0 {
 		ctx, cancel := context.WithTimeout(c, r.timeout)
 		defer cancel()
@@ -74,8 +73,6 @@ func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
 
 	t := time.NewTicker(r.period)
 	defer t.Stop()
-
-	rerr := ErrNone
 
 	for {
 		select {

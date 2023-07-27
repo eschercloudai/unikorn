@@ -60,6 +60,8 @@ func init() {
 
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
+	provisioners.ProvisionerMeta
+
 	// client provides access to Kubernetes.
 	client client.Client
 
@@ -184,11 +186,15 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	// Indicate the namespace is created before provisioning the rest.  This will inevitably
+	// yield as the components take some time to become healthy.  It does however give
+	// clusters an opportunity to be provisioned before the CP is fully up, reducing
+	// latency at the front-end.
+	p.controlPlane.Status.Namespace = namespace.Name
+
 	if err := p.getControlPlaneProvisioner(namespace.Name).Provision(ctx); err != nil {
 		return err
 	}
-
-	p.controlPlane.Status.Namespace = namespace.Name
 
 	log.Info("control plane provisioned")
 
