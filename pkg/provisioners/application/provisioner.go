@@ -95,6 +95,8 @@ type Customizer interface {
 // identifies that resource out of all others, and add in the application
 // name to uniquely identify the application within that resource.
 type Provisioner struct {
+	provisioners.ProvisionerMeta
+
 	// client provides access to Kubernetes.
 	client client.Client
 
@@ -111,9 +113,6 @@ type Provisioner struct {
 	// is used to derive a unique label set to identify the resource.
 	resource MutuallyExclusiveResource
 
-	// name is the application name.
-	name string
-
 	// application is the generic Helm application descriptor.
 	application *unikornv1.HelmApplication
 
@@ -126,8 +125,10 @@ type Provisioner struct {
 // New returns a new initialized provisioner object.
 func New(client client.Client, name string, resource MutuallyExclusiveResource, application *unikornv1.HelmApplication) *Provisioner {
 	return &Provisioner{
+		ProvisionerMeta: provisioners.ProvisionerMeta{
+			Name: name,
+		},
 		client:      client,
-		name:        name,
 		resource:    resource,
 		application: application,
 	}
@@ -171,7 +172,7 @@ func (p *Provisioner) getLabels() (labels.Set, error) {
 		return nil, err
 	}
 
-	return labels.Merge(l, labels.Set{constants.ApplicationLabel: p.name}), nil
+	return labels.Merge(l, labels.Set{constants.ApplicationLabel: p.Name}), nil
 }
 
 // getReleaseName uses the release name in the application spec by default
@@ -314,7 +315,7 @@ func (p *Provisioner) generateResource() (*unstructured.Unstructured, error) {
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
 			"metadata": map[string]interface{}{
-				"generateName": p.name + "-",
+				"generateName": p.Name + "-",
 				"namespace":    namespace,
 				"labels":       labelsMap,
 			},
@@ -393,7 +394,7 @@ func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstru
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning application", "application", p.name)
+	log.Info("provisioning application", "application", p.Name)
 
 	// Convert the generic object type into unstructured for the next bit...
 	required, err := p.generateResource()
@@ -414,7 +415,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	//nolint:nestif
 	if resource == nil {
-		log.Info("creating new application", "application", p.name)
+		log.Info("creating new application", "application", p.Name)
 
 		if err := p.client.Create(ctx, required); err != nil {
 			return err
@@ -422,7 +423,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 		resource = required
 	} else {
-		log.Info("updating existing application", "application", p.name)
+		log.Info("updating existing application", "application", p.Name)
 
 		// Replace the specification with what we expect.
 		temp := resource.DeepCopy()
@@ -443,18 +444,18 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		}
 	}
 
-	log.Info("checking application health", "application", p.name)
+	log.Info("checking application health", "application", p.Name)
 
 	// NOTE: This isn't necessarily accurate, take CAPI clusters for instance,
 	// that's just a bunch of CRs, and they are instantly healthy until
 	// CAPI/CAPO take note and start making status updates...
 	if err := readiness.NewApplicationHealthy(p.client, resource).Check(ctx); err != nil {
-		log.Info("application not healthy, yielding", "application", p.name)
+		log.Info("application not healthy, yielding", "application", p.Name)
 
 		return provisionererrors.ErrYield
 	}
 
-	log.Info("application provisioned", "application", p.name)
+	log.Info("application provisioned", "application", p.Name)
 
 	return nil
 }
@@ -463,12 +464,12 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning application", "application", p.name)
+	log.Info("deprovisioning application", "application", p.Name)
 
 	resource, err := p.findApplication(ctx)
 	if err != nil {
 		if errors.Is(err, ErrItemNotFound) {
-			log.Info("application does not exist", "application", p.name)
+			log.Info("application does not exist", "application", p.Name)
 
 			return nil
 		}
@@ -476,7 +477,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("adding application finalizer", "application", p.name)
+	log.Info("adding application finalizer", "application", p.Name)
 
 	// Apply a finalizer to ensure synchronous deletion. See
 	// https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/
@@ -491,21 +492,21 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("deleting application", "application", p.name)
+	log.Info("deleting application", "application", p.Name)
 
 	if err := p.client.Delete(ctx, resource); err != nil {
 		return err
 	}
 
 	if !p.backgroundDelete {
-		log.Info("waiting for application deletion", "application", p.name)
+		log.Info("waiting for application deletion", "application", p.Name)
 
 		if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, resource)).Check(ctx); err != nil {
 			return err
 		}
 	}
 
-	log.Info("application deleted", "application", p.name)
+	log.Info("application deleted", "application", p.Name)
 
 	return nil
 }

@@ -39,7 +39,9 @@ type Options struct {
 
 	// WriteTimeout defines how long we take to respond before we give up.
 	// Ideally we'd like this to be short, but Openstack in general sucks
-	// for performance.
+	// for performance.  Additionally some calls like cluster creation can
+	// do a cascading create, e.g. create a default control plane, than in
+	// turn creates a project.
 	WriteTimeout time.Duration
 
 	// OTLPEndpoint defines whether to ship spans to an OTLP consumer or

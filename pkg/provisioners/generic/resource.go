@@ -33,6 +33,8 @@ import (
 // ResourceProvisioner is a provisioner that is able to parse and manage resources
 // sourced from a yaml manifest.
 type ResourceProvisioner struct {
+	provisioners.ProvisionerMeta
+
 	// client is a client to allow Kubernetes access.
 	client client.Client
 

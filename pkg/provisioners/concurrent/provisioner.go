@@ -27,18 +27,19 @@ import (
 )
 
 type Provisioner struct {
-	// anem is the concurrency group name.
-	name string
+	provisioners.ProvisionerMeta
 
 	// provisioners is the set of provisions to provision
 	// concurrently.
 	provisioners []provisioners.Provisioner
 }
 
-func New(name string, provisioners ...provisioners.Provisioner) *Provisioner {
+func New(name string, p ...provisioners.Provisioner) *Provisioner {
 	return &Provisioner{
-		name:         name,
-		provisioners: provisioners,
+		ProvisionerMeta: provisioners.ProvisionerMeta{
+			Name: name,
+		},
+		provisioners: p,
 	}
 }
 
@@ -49,7 +50,7 @@ var _ provisioners.Provisioner = &Provisioner{}
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning concurrency group", "group", p.name)
+	log.Info("provisioning concurrency group", "group", p.Name)
 
 	group := &errgroup.Group{}
 
@@ -61,7 +62,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 			// logging information, so do this here when waiting on child
 			// tasks.
 			if err := provisioner.Provision(ctx); err != nil {
-				log.Info("concurrency group member exited with error", "error", err)
+				log.Info("concurrency group member exited with error", "error", err, "group", p.Name, "provisioner", provisioner.ProvisionerName())
 
 				return err
 			}
@@ -73,10 +74,12 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	if err := group.Wait(); err != nil {
+		log.Info("concurrency group provision failed", "group", p.Name)
+
 		return err
 	}
 
-	log.Info("concurrency group provisioned", "group", p.name)
+	log.Info("concurrency group provisioned", "group", p.Name)
 
 	return nil
 }
@@ -85,7 +88,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning concurrency group", "group", p.name)
+	log.Info("deprovisioning concurrency group", "group", p.Name)
 
 	group := &errgroup.Group{}
 
@@ -96,10 +99,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	if err := group.Wait(); err != nil {
+		log.Info("concurrency group deprovision failed", "group", p.Name)
+
 		return err
 	}
 
-	log.Info("concurrency group deprovisioned", "group", p.name)
+	log.Info("concurrency group deprovisioned", "group", p.Name)
 
 	return nil
 }

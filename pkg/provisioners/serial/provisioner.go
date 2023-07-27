@@ -25,17 +25,18 @@ import (
 )
 
 type Provisioner struct {
-	// name is the group name.
-	name string
+	provisioners.ProvisionerMeta
 
 	// provisioners are the provisioner to provision in order.
 	provisioners []provisioners.Provisioner
 }
 
-func New(name string, provisioners ...provisioners.Provisioner) *Provisioner {
+func New(name string, p ...provisioners.Provisioner) *Provisioner {
 	return &Provisioner{
-		name:         name,
-		provisioners: provisioners,
+		ProvisionerMeta: provisioners.ProvisionerMeta{
+			Name: name,
+		},
+		provisioners: p,
 	}
 }
 
@@ -46,15 +47,17 @@ var _ provisioners.Provisioner = &Provisioner{}
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning serial group", "group", p.name)
+	log.Info("provisioning serial group", "group", p.Name)
 
 	for _, provisioner := range p.provisioners {
 		if err := provisioner.Provision(ctx); err != nil {
+			log.Info("serial group member exited with error", "error", err, "group", p.Name, "provisioner", provisioner.ProvisionerName())
+
 			return err
 		}
 	}
 
-	log.Info("serial group provisioned", "group", p.name)
+	log.Info("serial group provisioned", "group", p.Name)
 
 	return nil
 }
@@ -66,7 +69,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning serial group", "group", p.name)
+	log.Info("deprovisioning serial group", "group", p.Name)
 
 	for i := range p.provisioners {
 		provisioner := p.provisioners[len(p.provisioners)-(i+1)]
@@ -76,7 +79,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		}
 	}
 
-	log.Info("serial group deprovisioned", "group", p.name)
+	log.Info("serial group deprovisioned", "group", p.Name)
 
 	return nil
 }
