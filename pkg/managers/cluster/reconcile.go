@@ -25,7 +25,6 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/cluster"
 
 	corev1 "k8s.io/api/core/v1"
@@ -122,6 +121,10 @@ func (r *reconciler) reconcileDelete(ctx context.Context, provisioner provisione
 	defer cancel()
 
 	if err := provisioner.Deprovision(timeoutCtx); err != nil {
+		if errors.Is(err, provisioners.ErrYield) {
+			return reconcile.Result{RequeueAfter: constants.DefaultYieldTimeout}, nil
+		}
+
 		return reconcile.Result{}, err
 	}
 
@@ -148,7 +151,7 @@ func (r *reconciler) handleReconcileCondition(ctx context.Context, kubernetesClu
 		status = corev1.ConditionTrue
 		reason = unikornv1.KubernetesClusterConditionReasonProvisioned
 		message = "Provisioned"
-	case errors.Is(err, provisionererrors.ErrYield):
+	case errors.Is(err, provisioners.ErrYield):
 		status = corev1.ConditionFalse
 		reason = unikornv1.KubernetesClusterConditionReasonProvisioning
 		message = "Provisioning"
