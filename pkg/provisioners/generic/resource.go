@@ -21,10 +21,10 @@ import (
 
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
-	"github.com/eschercloudai/unikorn/pkg/readiness"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -135,9 +135,21 @@ func (p *ResourceProvisioner) Deprovision(ctx context.Context) error {
 
 	objectKey := client.ObjectKeyFromObject(p.resource)
 
-	log.Info("deleting object", "key", objectKey)
+	object := &unstructured.Unstructured{}
 
-	if err := c.Delete(ctx, p.resource); err != nil {
+	switch t := p.resource.(type) {
+	case *unstructured.Unstructured:
+		object.SetGroupVersionKind(t.GroupVersionKind())
+	case runtime.Object:
+		gvk, _, err := p.client.Scheme().ObjectKinds(t)
+		if err != nil {
+			return err
+		}
+
+		object.SetGroupVersionKind(gvk[0])
+	}
+
+	if err := c.Get(ctx, objectKey, object); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("object deleted", "key", objectKey)
 
@@ -147,11 +159,17 @@ func (p *ResourceProvisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	if err := readiness.NewRetry(readiness.NewResourceNotExists(c, p.resource)).Check(ctx); err != nil {
+	if object.GetDeletionTimestamp() != nil {
+		log.Info("awaiting object deletion", "key", objectKey)
+
+		return provisioners.ErrYield
+	}
+
+	log.Info("deleting object", "key", objectKey)
+
+	if err := c.Delete(ctx, p.resource); err != nil {
 		return err
 	}
 
-	log.Info("object deleted", "key", objectKey)
-
-	return nil
+	return provisioners.ErrYield
 }

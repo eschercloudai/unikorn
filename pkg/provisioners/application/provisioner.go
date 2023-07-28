@@ -23,7 +23,6 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/readiness"
 
@@ -453,7 +452,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	if err := readiness.NewApplicationHealthy(p.client, resource).Check(ctx); err != nil {
 		log.Info("application not healthy, yielding", "application", p.Name)
 
-		return provisionererrors.ErrYield
+		return provisioners.ErrYield
 	}
 
 	log.Info("application provisioned", "application", p.Name)
@@ -470,12 +469,22 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	resource, err := p.findApplication(ctx)
 	if err != nil {
 		if errors.Is(err, ErrItemNotFound) {
-			log.Info("application does not exist", "application", p.Name)
+			log.Info("application deleted", "application", p.Name)
 
 			return nil
 		}
 
 		return err
+	}
+
+	if resource.GetDeletionTimestamp() != nil {
+		if p.backgroundDelete {
+			return nil
+		}
+
+		log.Info("waiting for application deletion", "application", p.Name)
+
+		return provisioners.ErrYield
 	}
 
 	log.Info("adding application finalizer", "application", p.Name)
@@ -499,15 +508,5 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	if !p.backgroundDelete {
-		log.Info("waiting for application deletion", "application", p.Name)
-
-		if err := readiness.NewRetry(readiness.NewResourceNotExists(p.client, resource)).Check(ctx); err != nil {
-			return err
-		}
-	}
-
-	log.Info("application deleted", "application", p.Name)
-
-	return nil
+	return provisioners.ErrYield
 }

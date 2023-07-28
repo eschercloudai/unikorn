@@ -24,7 +24,6 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -120,7 +119,7 @@ func (g *RemoteClusterGenerator) Config(ctx context.Context) (*clientcmdapi.Conf
 		if errors.IsNotFound(err) {
 			log.Info("kubernetes cluster kubeconfig does not exist, yielding")
 
-			return nil, provisionererrors.ErrYield
+			return nil, provisioners.ErrYield
 		}
 
 		return nil, err

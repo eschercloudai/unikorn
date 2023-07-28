@@ -24,6 +24,7 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/generic"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanager"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterapi"
@@ -167,8 +168,10 @@ func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.
 	return serial.New("control plane",
 		vcluster.New(p.client, p.controlPlane, p.vclusterApplication).InNamespace(namespace),
 		remotecluster.New(p.client, remote),
-		certmanager.New(p.client, p.controlPlane, p.certManagerApplication).OnRemote(remote),
-		clusterapi.New(p.client, p.controlPlane, p.clusterAPIApplication).OnRemote(remote),
+		concurrent.New("cluster-api",
+			certmanager.New(p.client, p.controlPlane, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
+			clusterapi.New(p.client, p.controlPlane, p.clusterAPIApplication).OnRemote(remote).BackgroundDelete(),
+		),
 	)
 }
 

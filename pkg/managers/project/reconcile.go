@@ -111,6 +111,10 @@ func (r *reconciler) reconcileDelete(ctx context.Context, provisioner provisione
 	defer cancel()
 
 	if err := provisioner.Deprovision(timeoutCtx); err != nil {
+		if errors.Is(err, provisioners.ErrYield) {
+			return reconcile.Result{RequeueAfter: constants.DefaultYieldTimeout}, nil
+		}
+
 		return reconcile.Result{}, err
 	}
 

@@ -23,7 +23,6 @@ import (
 	argocdclient "github.com/eschercloudai/unikorn/pkg/argocd/client"
 	argocdcluster "github.com/eschercloudai/unikorn/pkg/argocd/cluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -118,7 +117,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	if err := argocdcluster.Upsert(ctx, argocd, p.Name, server, config); err != nil {
 		log.Info("remote cluster not ready, yielding", "remotecluster", p.Name)
 
-		return provisionererrors.ErrYield
+		return provisioners.ErrYield
 	}
 
 	log.Info("remote cluster provisioned", "remotecluster", p.Name)

@@ -22,7 +22,7 @@ import (
 	"io"
 	"os"
 
-	provisionererrors "github.com/eschercloudai/unikorn/pkg/provisioners/errors"
+	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -109,7 +109,7 @@ func (c *ControllerRuntimeClient) GetSecret(ctx context.Context, namespace, name
 		if kerrors.IsNotFound(err) {
 			log.Info("vitual cluster kubeconfig does not exist, yielding")
 
-			return nil, provisionererrors.ErrYield
+			return nil, provisioners.ErrYield
 		}
 
 		return nil, err
