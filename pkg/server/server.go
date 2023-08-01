@@ -105,6 +105,7 @@ func (s *Server) GetServer(client client.Client) (*http.Server, error) {
 	// Middleware specified here is applied to all requests pre-routing.
 	router := chi.NewRouter()
 	router.Use(middleware.Logger())
+	router.Use(middleware.Timeout(s.Options.RequestTimeout))
 	router.NotFound(http.HandlerFunc(handler.NotFound))
 	router.MethodNotAllowed(http.HandlerFunc(handler.MethodNotAllowed))
 

@@ -598,6 +598,44 @@ func TestApiV1ControlPlanesCreate(t *testing.T) {
 	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
 }
 
+// TestApiV1ControlPlaneCreateImplicitProject tests that a control plane can be created
+// in a project that does not exist yet.
+func TestApiV1ControlPlanesCreateImplicitProject(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	// Create the control plane...
+	unikornClient := MustNewScopedClient(t, tc)
+
+	request := &generated.ControlPlane{
+		Name: "foo",
+		ApplicationBundle: generated.ApplicationBundle{
+			Name: "foo",
+		},
+	}
+
+	response, err := unikornClient.PostApiV1ControlplanesWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(request))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusInternalServerError, err)
+	assert.NotNil(t, response.JSON500)
+
+	serverErr := *response.JSON500
+
+	assert.Equal(t, generated.ServerError, serverErr.Error)
+
+	// Check the project exists.
+	// TODO: we should probably emulate the project manager here and allocate a namespace
+	// so the handler can progress... However, it' proabably much easier to do this with
+	// integration testing.
+	var resource unikornv1.Project
+
+	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &resource))
+	assert.MapSet(t, resource.Labels, constants.VersionLabel)
+}
+
 // TestApiV1ControlPlanesGet tests a control plane can be retrieved and
 // that its fields are completed as specified by the schema.  This flexes
 // compositing of resources e.g. expansion of application bundles.
@@ -748,6 +786,74 @@ func TestApiV1ClustersCreate(t *testing.T) {
 	assert.MapSet(t, resource.Labels, constants.VersionLabel)
 	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
 	assert.MapSet(t, resource.Labels, constants.ControlPlaneLabel)
+}
+
+// TestApiV1ClustersCreateImplicitControlPlane tests that a cluster can be created
+// in a control plane that doesn't exist yet.
+func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	// Put some fixtures into place...
+	project := mustCreateProjectFixture(t, tc, projectID)
+	mustCreateControlPlaneApplicationBundleFixture(t, tc)
+
+	// Create the cluster...
+	unikornClient := MustNewScopedClient(t, tc)
+
+	clusterRequest := &generated.KubernetesCluster{
+		Name: "foo",
+		ApplicationBundle: generated.ApplicationBundle{
+			Name: "foo",
+		},
+		Network: generated.KubernetesClusterNetwork{
+			DnsNameservers: []string{
+				"8.8.8.8",
+			},
+			NodePrefix:    "192.168.0.0/24",
+			ServicePrefix: "172.16.0.0/12",
+			PodPrefix:     "10.0.0.0/8",
+		},
+		ControlPlane: generated.OpenstackMachinePool{
+			Version:    "v1.28.0",
+			Replicas:   3,
+			ImageName:  "ubuntu-24.04-lts",
+			FlavorName: "strawberry",
+		},
+		WorkloadPools: generated.KubernetesClusterWorkloadPools{
+			{
+				Name: "foo",
+				Machine: generated.OpenstackMachinePool{
+					Version:    "v1.28.0",
+					Replicas:   3,
+					ImageName:  "ubuntu-24.04-lts",
+					FlavorName: "strawberry",
+				},
+			},
+		},
+	}
+
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), "foo", "application/json", NewJSONReader(clusterRequest))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusInternalServerError, err)
+	assert.NotNil(t, response.JSON500)
+
+	serverErr := *response.JSON500
+
+	assert.Equal(t, generated.ServerError, serverErr.Error)
+
+	// Check the control plane exists in the project namespace.
+	var resource unikornv1.ControlPlane
+
+	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+	assert.MapSet(t, resource.Labels, constants.VersionLabel)
+	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
 }
 
 func TestApiV1ClustersGet(t *testing.T) {

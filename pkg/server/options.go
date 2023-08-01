@@ -47,6 +47,9 @@ type Options struct {
 	// OTLPEndpoint defines whether to ship spans to an OTLP consumer or
 	// not, and where to send them to.
 	OTLPEndpoint string
+
+	// RequestTimeout places a hard limit on all requests lengths.
+	RequestTimeout time.Duration
 }
 
 // addFlags allows server options to be modified.
@@ -55,5 +58,6 @@ func (o *Options) AddFlags(f *pflag.FlagSet) {
 	f.DurationVar(&o.ReadTimeout, "server-read-timeout", time.Second, "How long to wait for the client to send the request body.")
 	f.DurationVar(&o.ReadHeaderTimeout, "server-read-header-timeout", time.Second, "How long to wait for the client to send headers.")
 	f.DurationVar(&o.WriteTimeout, "server-write-timeout", 10*time.Second, "How long to wait for the API to respond to the client.")
+	f.DurationVar(&o.RequestTimeout, "server-request-timeout", 30*time.Second, "How long to wait of a request to be serviced.")
 	f.StringVar(&o.OTLPEndpoint, "otlp-endpoint", "", "An optional OTLP endpoint to ship spans to.")
 }
