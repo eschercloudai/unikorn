@@ -72,9 +72,6 @@ type ServerInterface interface {
 	// (DELETE /api/v1/project)
 	DeleteApiV1Project(w http.ResponseWriter, r *http.Request)
 
-	// (GET /api/v1/project)
-	GetApiV1Project(w http.ResponseWriter, r *http.Request)
-
 	// (POST /api/v1/project)
 	PostApiV1Project(w http.ResponseWriter, r *http.Request)
 
@@ -559,23 +556,6 @@ func (siw *ServerInterfaceWrapper) DeleteApiV1Project(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1Project operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1Project(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{"project"})
-
-	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1Project(w, r)
-	})
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
 // PostApiV1Project operation middleware
 func (siw *ServerInterfaceWrapper) PostApiV1Project(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -881,9 +861,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/project", wrapper.DeleteApiV1Project)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/project", wrapper.GetApiV1Project)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/project", wrapper.PostApiV1Project)

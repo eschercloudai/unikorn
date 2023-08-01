@@ -82,24 +82,6 @@ paths:
           $ref: '#/components/responses/jwksResponse'
   /api/v1/project:
     description: Unikorn project services.
-    get:
-      description: |-
-        Gets the Unikorn project associated with the authenticated user's
-        OpenStack project.
-      security:
-      - oauth2Authentication:
-        - project
-      responses:
-        '200':
-          $ref: '#/components/responses/projectResponse'
-        '400':
-          $ref: '#/components/responses/badRequestResponse'
-        '401':
-          $ref: '#/components/responses/unauthorizedResponse'
-        '404':
-          $ref: '#/components/responses/notFoundResponse'
-        '500':
-          $ref: '#/components/responses/internalServerErrorResponse'
     post:
       x-no-body: true
       description: |-

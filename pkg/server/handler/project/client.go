@@ -25,7 +25,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization/oauth2"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
-	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -172,37 +171,6 @@ func (c *Client) get(ctx context.Context, name string) (*unikornv1.Project, erro
 	}
 
 	return result, nil
-}
-
-// Get returns the implicit project identified by the JWT claims.
-func (c *Client) Get(ctx context.Context) (*generated.Project, error) {
-	name, err := NameFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := c.get(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-
-	project := &generated.Project{
-		Status: &generated.KubernetesResourceStatus{
-			Name:         result.Name,
-			CreationTime: result.CreationTimestamp.Time,
-			Status:       "Unknown",
-		},
-	}
-
-	if result.DeletionTimestamp != nil {
-		project.Status.DeletionTime = &result.DeletionTimestamp.Time
-	}
-
-	if condition, err := result.LookupCondition(unikornv1.ProjectConditionAvailable); err == nil {
-		project.Status.Status = string(condition.Reason)
-	}
-
-	return project, nil
 }
 
 // Create creates the implicit project indentified by the JTW claims.

@@ -562,6 +562,44 @@ func TestApiV1ProjectCreateAndDelete(t *testing.T) {
 	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
 }
 
+// TestApiV1ProjectCreateExisting tests a project cannot be created on top of an
+// existing one.
+func TestApiV1ProjectCreateExisting(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	mustCreateProjectFixture(t, tc, projectID)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.PostApiV1Project(context.TODO())
+	assert.HTTPResponse(t, response, http.StatusConflict, err)
+
+	defer response.Body.Close()
+}
+
+// TestApiV1ProjectDeleteNotFound tests a project deletion when there is no
+// project errors in the correct way.
+func TestApiV1ProjectDeleteNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.DeleteApiV1Project(context.TODO())
+	assert.HTTPResponse(t, response, http.StatusNotFound, err)
+
+	defer response.Body.Close()
+}
+
 // TestApiV1ControlPlaneCreate tests that a control plane can be created
 // in a project.
 func TestApiV1ControlPlanesCreate(t *testing.T) {
@@ -572,10 +610,8 @@ func TestApiV1ControlPlanesCreate(t *testing.T) {
 
 	RegisterIdentityHandlers(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 
-	// Create the control plane...
 	unikornClient := MustNewScopedClient(t, tc)
 
 	request := &generated.ControlPlane{
@@ -590,7 +626,6 @@ func TestApiV1ControlPlanesCreate(t *testing.T) {
 
 	defer response.Body.Close()
 
-	// Check it exists in the project namespace.
 	var resource unikornv1.ControlPlane
 
 	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
@@ -608,7 +643,6 @@ func TestApiV1ControlPlanesCreateImplicitProject(t *testing.T) {
 
 	RegisterIdentityHandlers(tc)
 
-	// Create the control plane...
 	unikornClient := MustNewScopedClient(t, tc)
 
 	request := &generated.ControlPlane{
@@ -626,7 +660,6 @@ func TestApiV1ControlPlanesCreateImplicitProject(t *testing.T) {
 
 	assert.Equal(t, generated.ServerError, serverErr.Error)
 
-	// Check the project exists.
 	// TODO: we should probably emulate the project manager here and allocate a namespace
 	// so the handler can progress... However, it' proabably much easier to do this with
 	// integration testing.
@@ -647,7 +680,6 @@ func TestApiV1ControlPlanesGet(t *testing.T) {
 
 	RegisterIdentityHandlers(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 	mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 	mustCreateControlPlaneApplicationBundleFixture(t, tc)
@@ -678,7 +710,6 @@ func TestApiV1ControlPlanesList(t *testing.T) {
 
 	RegisterIdentityHandlers(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 	mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 	mustCreateControlPlaneApplicationBundleFixture(t, tc)
@@ -706,7 +737,6 @@ func TestApiV1ControlPlanesDelete(t *testing.T) {
 
 	RegisterIdentityHandlers(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 	mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 
@@ -735,11 +765,9 @@ func TestApiV1ClustersCreate(t *testing.T) {
 	RegisterComputeV2FlavorsDetail(tc)
 	RegisterComputeV2ServerGroups(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 
-	// Create the cluster...
 	unikornClient := MustNewScopedClient(t, tc)
 
 	clusterRequest := &generated.KubernetesCluster{
@@ -779,7 +807,6 @@ func TestApiV1ClustersCreate(t *testing.T) {
 
 	defer response.Body.Close()
 
-	// Check it exists in the control plane namespace.
 	var resource unikornv1.KubernetesCluster
 
 	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
@@ -801,11 +828,9 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 	RegisterComputeV2FlavorsDetail(tc)
 	RegisterComputeV2ServerGroups(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 	mustCreateControlPlaneApplicationBundleFixture(t, tc)
 
-	// Create the cluster...
 	unikornClient := MustNewScopedClient(t, tc)
 
 	clusterRequest := &generated.KubernetesCluster{
@@ -848,7 +873,6 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 
 	assert.Equal(t, generated.ServerError, serverErr.Error)
 
-	// Check the control plane exists in the project namespace.
 	var resource unikornv1.ControlPlane
 
 	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
@@ -867,13 +891,11 @@ func TestApiV1ClustersGet(t *testing.T) {
 	RegisterComputeV2FlavorsDetail(tc)
 	RegisterComputeV2ServerGroups(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
 	mustKubernetesClusterApplicationBundleFixture(t, tc)
 
-	// Create the cluster...
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersClusterNameWithResponse(context.TODO(), controlPlane.Name, "foo")
@@ -920,13 +942,11 @@ func TestApiV1ClustersList(t *testing.T) {
 	RegisterComputeV2FlavorsDetail(tc)
 	RegisterComputeV2ServerGroups(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
 	mustKubernetesClusterApplicationBundleFixture(t, tc)
 
-	// Create the cluster...
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersWithResponse(context.TODO(), controlPlane.Name)
@@ -974,7 +994,6 @@ func TestApiV1ClustersDelete(t *testing.T) {
 	RegisterComputeV2FlavorsDetail(tc)
 	RegisterComputeV2ServerGroups(tc)
 
-	// Put some fixtures into place...
 	project := mustCreateProjectFixture(t, tc, projectID)
 	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")

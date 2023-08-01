@@ -385,12 +385,6 @@ type OpenstackVolume struct {
 	Size int `json:"size"`
 }
 
-// Project A Unikorn project.
-type Project struct {
-	// Status A Kubernetes resource status.
-	Status *KubernetesResourceStatus `json:"status,omitempty"`
-}
-
 // StringParameter A basic string parameter.
 type StringParameter = string
 
@@ -515,9 +509,6 @@ type OpenstackKeyPairsResponse = OpenstackKeyPairs
 
 // OpenstackProjectsResponse A list of Openstack projects.
 type OpenstackProjectsResponse = OpenstackProjects
-
-// ProjectResponse A Unikorn project.
-type ProjectResponse = Project
 
 // TokenResponse Oauth2 token result.
 type TokenResponse = Token

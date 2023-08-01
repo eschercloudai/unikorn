@@ -122,17 +122,6 @@ func (h *Handler) GetApiV1AuthJwks(w http.ResponseWriter, r *http.Request) {
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
-func (h *Handler) GetApiV1Project(w http.ResponseWriter, r *http.Request) {
-	result, err := project.NewClient(h.client).Get(r.Context())
-	if err != nil {
-		errors.HandleError(w, r, err)
-		return
-	}
-
-	h.setUncacheable(w)
-	util.WriteJSONResponse(w, r, http.StatusOK, result)
-}
-
 func (h *Handler) PostApiV1Project(w http.ResponseWriter, r *http.Request) {
 	if err := project.NewClient(h.client).Create(r.Context()); err != nil {
 		errors.HandleError(w, r, err)

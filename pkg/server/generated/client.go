@@ -158,9 +158,6 @@ type ClientInterface interface {
 	// DeleteApiV1Project request
 	DeleteApiV1Project(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetApiV1Project request
-	GetApiV1Project(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// PostApiV1Project request
 	PostApiV1Project(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -476,18 +473,6 @@ func (c *Client) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubecon
 
 func (c *Client) DeleteApiV1Project(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteApiV1ProjectRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetApiV1Project(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetApiV1ProjectRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1276,33 +1261,6 @@ func NewDeleteApiV1ProjectRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewGetApiV1ProjectRequest generates requests for GetApiV1Project
-func NewGetApiV1ProjectRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/project")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewPostApiV1ProjectRequest generates requests for PostApiV1Project
 func NewPostApiV1ProjectRequest(server string) (*http.Request, error) {
 	var err error
@@ -1630,9 +1588,6 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteApiV1Project request
 	DeleteApiV1ProjectWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteApiV1ProjectResponse, error)
-
-	// GetApiV1Project request
-	GetApiV1ProjectWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1ProjectResponse, error)
 
 	// PostApiV1Project request
 	PostApiV1ProjectWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostApiV1ProjectResponse, error)
@@ -2117,31 +2072,6 @@ func (r DeleteApiV1ProjectResponse) StatusCode() int {
 	return 0
 }
 
-type GetApiV1ProjectResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Project
-	JSON400      *Oauth2Error
-	JSON401      *Oauth2Error
-	JSON500      *Oauth2Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetApiV1ProjectResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetApiV1ProjectResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type PostApiV1ProjectResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2558,15 +2488,6 @@ func (c *ClientWithResponses) DeleteApiV1ProjectWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseDeleteApiV1ProjectResponse(rsp)
-}
-
-// GetApiV1ProjectWithResponse request returning *GetApiV1ProjectResponse
-func (c *ClientWithResponses) GetApiV1ProjectWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1ProjectResponse, error) {
-	rsp, err := c.GetApiV1Project(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetApiV1ProjectResponse(rsp)
 }
 
 // PostApiV1ProjectWithResponse request returning *PostApiV1ProjectResponse
@@ -3389,53 +3310,6 @@ func ParseDeleteApiV1ProjectResponse(rsp *http.Response) (*DeleteApiV1ProjectRes
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Oauth2Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetApiV1ProjectResponse parses an HTTP response from a GetApiV1ProjectWithResponse call
-func ParseGetApiV1ProjectResponse(rsp *http.Response) (*GetApiV1ProjectResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetApiV1ProjectResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Project
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Oauth2Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
