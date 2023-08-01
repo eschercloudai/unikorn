@@ -147,7 +147,8 @@ images-kind-load: images
 
 .PHONY: test-unit
 test-unit:
-	go test ./...
+	go test -coverpkg ./... -coverprofile cover.out ./...
+	go tool cover -html cover.out -o cover.html
 
 # Build a binary and install it.
 $(PREFIX)/%: $(BINDIR)/%
