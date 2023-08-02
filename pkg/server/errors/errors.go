@@ -111,14 +111,6 @@ func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
 
 	// Emit the response to the client.
 	w.Header().Add("Cache-Control", "no-cache")
-
-	// Short cut errors with no response.
-	switch e.status {
-	case http.StatusNotFound, http.StatusConflict:
-		w.WriteHeader(e.status)
-		return
-	}
-
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(e.status)
 
@@ -147,7 +139,7 @@ func HTTPForbidden(description string) *HTTPError {
 }
 
 func HTTPNotFound() *HTTPError {
-	return newHTTPError(http.StatusNotFound, "", "resource not found")
+	return newHTTPError(http.StatusNotFound, generated.NotFound, "resource not found")
 }
 
 func IsHTTPNotFound(err error) bool {
@@ -169,7 +161,7 @@ func HTTPMethodNotAllowed() *HTTPError {
 }
 
 func HTTPConflict() *HTTPError {
-	return newHTTPError(http.StatusConflict, "", "")
+	return newHTTPError(http.StatusConflict, generated.Conflict, "the requested resource already exists")
 }
 
 // OAuth2InvalidRequest indicates a client error.
