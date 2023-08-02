@@ -122,24 +122,6 @@ paths:
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/controlplanes:
     description: Unikorn control plane services.
-    get:
-      description: |-
-        Lists all Unikorn control planes contained within the selected Unikorn
-        project.
-      security:
-      - oauth2Authentication:
-        - project
-      responses:
-        '200':
-          $ref: '#/components/responses/controlPlanesResponse'
-        '400':
-          $ref: '#/components/responses/badRequestResponse'
-        '401':
-          $ref: '#/components/responses/unauthorizedResponse'
-        '404':
-          $ref: '#/components/responses/notFoundResponse'
-        '500':
-          $ref: '#/components/responses/internalServerErrorResponse'
     post:
       description: |-
         Creates a new Unikorn control plane within the selected Unikorn project.
@@ -545,6 +527,7 @@ components:
           - unsupported_grant_type
           # Proprietary
           - not_found
+          - conflict
           - method_not_allowed
           - unsupported_media_type
         error_description:
@@ -1162,8 +1145,16 @@ components:
             $ref: '#/components/schemas/oauth2Error'
     notFoundResponse:
       description: Unable to find a resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/oauth2Error'
     conflictResponse:
       description: Resource conlicts with another.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/oauth2Error'
     internalServerErrorResponse:
       description: An unexpected error occurred, please report.
       content:

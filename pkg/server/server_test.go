@@ -576,10 +576,13 @@ func TestApiV1ProjectCreateExisting(t *testing.T) {
 
 	unikornClient := MustNewScopedClient(t, tc)
 
-	response, err := unikornClient.PostApiV1Project(context.TODO())
-	assert.HTTPResponse(t, response, http.StatusConflict, err)
+	response, err := unikornClient.PostApiV1ProjectWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusConflict, err)
+	assert.NotNil(t, response.JSON409)
 
-	defer response.Body.Close()
+	serverErr := *response.JSON409
+
+	assert.Equal(t, serverErr.Error, generated.Conflict)
 }
 
 // TestApiV1ProjectDeleteNotFound tests a project deletion when there is no
@@ -594,10 +597,13 @@ func TestApiV1ProjectDeleteNotFound(t *testing.T) {
 
 	unikornClient := MustNewScopedClient(t, tc)
 
-	response, err := unikornClient.DeleteApiV1Project(context.TODO())
-	assert.HTTPResponse(t, response, http.StatusNotFound, err)
+	response, err := unikornClient.DeleteApiV1ProjectWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.NotNil(t, response.JSON404)
 
-	defer response.Body.Close()
+	serverErr := *response.JSON404
+
+	assert.Equal(t, serverErr.Error, generated.NotFound)
 }
 
 // TestApiV1ControlPlaneCreate tests that a control plane can be created
@@ -631,6 +637,37 @@ func TestApiV1ControlPlanesCreate(t *testing.T) {
 	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
 	assert.MapSet(t, resource.Labels, constants.VersionLabel)
 	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
+}
+
+// TestApiV1ControlPlanesCreateExisting tests control plane creation when another
+// already exists with the same name.
+func TestApiV1ControlPlanesCreateExisting(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	request := &generated.ControlPlane{
+		Name: "foo",
+		ApplicationBundle: generated.ApplicationBundle{
+			Name: "foo",
+		},
+	}
+
+	response, err := unikornClient.PostApiV1ControlplanesWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(request))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusConflict, err)
+	assert.NotNil(t, response.JSON409)
+
+	serverErr := *response.JSON409
+
+	assert.Equal(t, serverErr.Error, generated.Conflict)
 }
 
 // TestApiV1ControlPlaneCreateImplicitProject tests that a control plane can be created
@@ -699,6 +736,29 @@ func TestApiV1ControlPlanesGet(t *testing.T) {
 	assert.Equal(t, controlPlaneApplicationBundleVersion, result.ApplicationBundle.Version)
 }
 
+// TestApiV1ControlPlanesGetNotFound tests control planes behave correctly when
+// a control plane doesn't exist.
+func TestApiV1ControlPlanesGetNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	mustCreateProjectFixture(t, tc, projectID)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameWithResponse(context.TODO(), "foo")
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.NotNil(t, response.JSON404)
+
+	serverErr := *response.JSON404
+
+	assert.Equal(t, serverErr.Error, generated.NotFound)
+}
+
 // TestApiV1ControlPlanesList tests a control planes can be retrieved and
 // that their fields are completed as specified by the schema.  This flexes
 // compositing of resources e.g. expansion of application bundles.
@@ -728,6 +788,69 @@ func TestApiV1ControlPlanesList(t *testing.T) {
 	assert.Equal(t, controlPlaneApplicationBundleVersion, results[0].ApplicationBundle.Version)
 }
 
+// TestApiV1ControlPlanesUpdate tests control planes can be updated.
+func TestApiV1ControlPlanesUpdate(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+
+	request := &generated.ControlPlane{
+		Name: "foo",
+		ApplicationBundle: generated.ApplicationBundle{
+			Name: "foo",
+		},
+	}
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.PutApiV1ControlplanesControlPlaneNameWithBody(context.TODO(), "foo", "application/json", NewJSONReader(request))
+	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+
+	defer response.Body.Close()
+
+	var resource unikornv1.ControlPlane
+
+	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+	assert.NotNil(t, resource.Spec.ApplicationBundle)
+	assert.Equal(t, *resource.Spec.ApplicationBundle, "foo")
+}
+
+// TestApiV1ControlPlanesUpdateNotFound tests control planes behave correctly when
+// an update request is made for a non-existent resource.
+func TestApiV1ControlPlanesUpdateNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	mustCreateProjectFixture(t, tc, projectID)
+
+	request := &generated.ControlPlane{
+		Name: "foo",
+		ApplicationBundle: generated.ApplicationBundle{
+			Name: "foo",
+		},
+	}
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.PutApiV1ControlplanesControlPlaneNameWithBodyWithResponse(context.TODO(), "foo", "application/json", NewJSONReader(request))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.NotNil(t, response.JSON404)
+
+	serverErr := *response.JSON404
+
+	assert.Equal(t, serverErr.Error, generated.NotFound)
+}
+
 // TestApiV1ControlPlanesDelete tests a control plane can be deleted.
 func TestApiV1ControlPlanesDelete(t *testing.T) {
 	t.Parallel()
@@ -750,6 +873,29 @@ func TestApiV1ControlPlanesDelete(t *testing.T) {
 	var resource unikornv1.ControlPlane
 
 	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+}
+
+// TestApiV1ControlPlanesDeleteNotFound tests that a deletion of a not found resource
+// results in the correct response.
+func TestApiV1ControlPlanesDeleteNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	mustCreateProjectFixture(t, tc, projectID)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.DeleteApiV1ControlplanesControlPlaneNameWithResponse(context.TODO(), "foo")
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.NotNil(t, response.JSON404)
+
+	serverErr := *response.JSON404
+
+	assert.Equal(t, serverErr.Error, generated.NotFound)
 }
 
 // TestApiV1ClustersCreate tests that a cluster can be created

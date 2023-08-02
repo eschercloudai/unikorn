@@ -18,6 +18,7 @@ const (
 // Defines values for Oauth2ErrorError.
 const (
 	AccessDenied            Oauth2ErrorError = "access_denied"
+	Conflict                Oauth2ErrorError = "conflict"
 	InvalidClient           Oauth2ErrorError = "invalid_client"
 	InvalidGrant            Oauth2ErrorError = "invalid_grant"
 	InvalidRequest          Oauth2ErrorError = "invalid_request"
@@ -471,6 +472,9 @@ type ApplicationBundleResponse = ApplicationBundles
 // BadRequestResponse Generic error message.
 type BadRequestResponse = Oauth2Error
 
+// ConflictResponse Generic error message.
+type ConflictResponse = Oauth2Error
+
 // ControlPlaneResponse A Unikorn control plane.
 type ControlPlaneResponse = ControlPlane
 
@@ -488,6 +492,9 @@ type KubernetesClusterResponse = KubernetesCluster
 
 // KubernetesClustersResponse A list of Unikorn Kubernetes clusters.
 type KubernetesClustersResponse = KubernetesClusters
+
+// NotFoundResponse Generic error message.
+type NotFoundResponse = Oauth2Error
 
 // OpenstackBlockStorageAvailabilityZonesResponse A list of Openstack availability zones.
 type OpenstackBlockStorageAvailabilityZonesResponse = OpenstackAvailabilityZones
