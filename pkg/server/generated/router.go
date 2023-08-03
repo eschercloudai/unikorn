@@ -15,11 +15,11 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /api/v1/applicationBundles/cluster)
-	GetApiV1ApplicationBundlesCluster(w http.ResponseWriter, r *http.Request)
+	// (GET /api/v1/applicationbundles/cluster)
+	GetApiV1ApplicationbundlesCluster(w http.ResponseWriter, r *http.Request)
 
-	// (GET /api/v1/applicationBundles/controlPlane)
-	GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, r *http.Request)
+	// (GET /api/v1/applicationbundles/controlPlane)
+	GetApiV1ApplicationbundlesControlPlane(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/auth/jwks)
 	GetApiV1AuthJwks(w http.ResponseWriter, r *http.Request)
@@ -106,14 +106,14 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// GetApiV1ApplicationBundlesCluster operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ApplicationBundlesCluster(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ApplicationbundlesCluster operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ApplicationbundlesCluster(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{""})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ApplicationBundlesCluster(w, r)
+		siw.Handler.GetApiV1ApplicationbundlesCluster(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -123,14 +123,14 @@ func (siw *ServerInterfaceWrapper) GetApiV1ApplicationBundlesCluster(w http.Resp
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetApiV1ApplicationBundlesControlPlane operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, r *http.Request) {
+// GetApiV1ApplicationbundlesControlPlane operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1ApplicationbundlesControlPlane(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{""})
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV1ApplicationBundlesControlPlane(w, r)
+		siw.Handler.GetApiV1ApplicationbundlesControlPlane(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -806,10 +806,10 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/applicationBundles/cluster", wrapper.GetApiV1ApplicationBundlesCluster)
+		r.Get(options.BaseURL+"/api/v1/applicationbundles/cluster", wrapper.GetApiV1ApplicationbundlesCluster)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/applicationBundles/controlPlane", wrapper.GetApiV1ApplicationBundlesControlPlane)
+		r.Get(options.BaseURL+"/api/v1/applicationbundles/controlPlane", wrapper.GetApiV1ApplicationbundlesControlPlane)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/auth/jwks", wrapper.GetApiV1AuthJwks)
