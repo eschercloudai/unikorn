@@ -916,7 +916,7 @@ func TestApiV1ClustersCreate(t *testing.T) {
 
 	unikornClient := MustNewScopedClient(t, tc)
 
-	clusterRequest := &generated.KubernetesCluster{
+	request := &generated.KubernetesCluster{
 		Name: "foo",
 		ApplicationBundle: generated.ApplicationBundle{
 			Name: "foo",
@@ -948,7 +948,7 @@ func TestApiV1ClustersCreate(t *testing.T) {
 		},
 	}
 
-	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBody(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(clusterRequest))
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBody(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(request))
 	assert.HTTPResponse(t, response, http.StatusAccepted, err)
 
 	defer response.Body.Close()
@@ -959,6 +959,66 @@ func TestApiV1ClustersCreate(t *testing.T) {
 	assert.MapSet(t, resource.Labels, constants.VersionLabel)
 	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
 	assert.MapSet(t, resource.Labels, constants.ControlPlaneLabel)
+}
+
+// TestApiV1ClustersCreateExisting tests creating a cluster when one exists
+// errors in the right way.
+func TestApiV1ClustersCreateExisting(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	request := &generated.KubernetesCluster{
+		Name: "foo",
+		ApplicationBundle: generated.ApplicationBundle{
+			Name: "foo",
+		},
+		Network: generated.KubernetesClusterNetwork{
+			DnsNameservers: []string{
+				"8.8.8.8",
+			},
+			NodePrefix:    "192.168.0.0/24",
+			ServicePrefix: "172.16.0.0/12",
+			PodPrefix:     "10.0.0.0/8",
+		},
+		ControlPlane: generated.OpenstackMachinePool{
+			Version:    "v1.28.0",
+			Replicas:   3,
+			ImageName:  "ubuntu-24.04-lts",
+			FlavorName: "strawberry",
+		},
+		WorkloadPools: generated.KubernetesClusterWorkloadPools{
+			{
+				Name: "foo",
+				Machine: generated.OpenstackMachinePool{
+					Version:    "v1.28.0",
+					Replicas:   3,
+					ImageName:  "ubuntu-24.04-lts",
+					FlavorName: "strawberry",
+				},
+			},
+		},
+	}
+
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(request))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusConflict, err)
+	assert.NotNil(t, response.JSON409)
+
+	serverErr := *response.JSON409
+
+	assert.Equal(t, serverErr.Error, generated.Conflict)
 }
 
 // TestApiV1ClustersCreateImplicitControlPlane tests that a cluster can be created
@@ -979,7 +1039,7 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 
 	unikornClient := MustNewScopedClient(t, tc)
 
-	clusterRequest := &generated.KubernetesCluster{
+	request := &generated.KubernetesCluster{
 		Name: "foo",
 		ApplicationBundle: generated.ApplicationBundle{
 			Name: "foo",
@@ -1011,7 +1071,7 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 		},
 	}
 
-	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), "foo", "application/json", NewJSONReader(clusterRequest))
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), "foo", "application/json", NewJSONReader(request))
 	assert.HTTPResponse(t, response.HTTPResponse, http.StatusInternalServerError, err)
 	assert.NotNil(t, response.JSON500)
 
@@ -1026,6 +1086,7 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
 }
 
+// TestApiV1ClustersGet tests a cluster can be referenced by name.
 func TestApiV1ClustersGet(t *testing.T) {
 	t.Parallel()
 
@@ -1077,6 +1138,31 @@ func TestApiV1ClustersGet(t *testing.T) {
 	assert.Equal(t, clusterWorkloadPoolReplicas, result.WorkloadPools[0].Machine.Replicas)
 }
 
+// TestApiV1ClustersGetNotFound tests a request for a non-existent cluster returns the
+// correct error.
+func TestApiV1ClustersGetNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersClusterNameWithResponse(context.TODO(), controlPlane.Name, "foo")
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.NotNil(t, response.JSON404)
+
+	result := *response.JSON404
+
+	assert.Equal(t, generated.NotFound, result.Error)
+}
+
+// TestApiV1ClustersList tests clusters can be listed.
 func TestApiV1ClustersList(t *testing.T) {
 	t.Parallel()
 
@@ -1129,7 +1215,8 @@ func TestApiV1ClustersList(t *testing.T) {
 	assert.Equal(t, clusterWorkloadPoolReplicas, results[0].WorkloadPools[0].Machine.Replicas)
 }
 
-func TestApiV1ClustersDelete(t *testing.T) {
+// TestApiV1ClustersUpdate tests clusters can be updated.
+func TestApiV1ClustersUpdate(t *testing.T) {
 	t.Parallel()
 
 	tc, cleanup := MustNewTestContext(t)
@@ -1139,6 +1226,123 @@ func TestApiV1ClustersDelete(t *testing.T) {
 	RegisterImageV2Images(tc)
 	RegisterComputeV2FlavorsDetail(tc)
 	RegisterComputeV2ServerGroups(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	request := &generated.KubernetesCluster{
+		Name: "foo",
+		ApplicationBundle: generated.ApplicationBundle{
+			Name: "foo",
+		},
+		Network: generated.KubernetesClusterNetwork{
+			DnsNameservers: []string{
+				"8.8.8.8",
+			},
+			NodePrefix:    "192.168.0.0/24",
+			ServicePrefix: "172.16.0.0/12",
+			PodPrefix:     "10.0.0.0/8",
+		},
+		ControlPlane: generated.OpenstackMachinePool{
+			Version:    "v1.28.0",
+			Replicas:   3,
+			ImageName:  "ubuntu-24.04-lts",
+			FlavorName: "strawberry",
+		},
+		WorkloadPools: generated.KubernetesClusterWorkloadPools{
+			{
+				Name: "foo",
+				Machine: generated.OpenstackMachinePool{
+					Version:    "v1.28.0",
+					Replicas:   3,
+					ImageName:  "ubuntu-24.04-lts",
+					FlavorName: "strawberry",
+				},
+			},
+		},
+	}
+
+	response, err := unikornClient.PutApiV1ControlplanesControlPlaneNameClustersClusterNameWithBody(context.TODO(), controlPlane.Name, "foo", "application/json", NewJSONReader(request))
+	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+
+	defer response.Body.Close()
+
+	var resource unikornv1.KubernetesCluster
+
+	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
+	assert.Equal(t, *resource.Spec.ApplicationBundle, "foo")
+}
+
+// TestApiV1ClustersUpdateNotFound tests clusters return the correct error if they don't
+// exist on update.
+func TestApiV1ClustersUpdateNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	request := &generated.KubernetesCluster{
+		Name: "foo",
+		ApplicationBundle: generated.ApplicationBundle{
+			Name: "foo",
+		},
+		Network: generated.KubernetesClusterNetwork{
+			DnsNameservers: []string{
+				"8.8.8.8",
+			},
+			NodePrefix:    "192.168.0.0/24",
+			ServicePrefix: "172.16.0.0/12",
+			PodPrefix:     "10.0.0.0/8",
+		},
+		ControlPlane: generated.OpenstackMachinePool{
+			Version:    "v1.28.0",
+			Replicas:   3,
+			ImageName:  "ubuntu-24.04-lts",
+			FlavorName: "strawberry",
+		},
+		WorkloadPools: generated.KubernetesClusterWorkloadPools{
+			{
+				Name: "foo",
+				Machine: generated.OpenstackMachinePool{
+					Version:    "v1.28.0",
+					Replicas:   3,
+					ImageName:  "ubuntu-24.04-lts",
+					FlavorName: "strawberry",
+				},
+			},
+		},
+	}
+
+	response, err := unikornClient.PutApiV1ControlplanesControlPlaneNameClustersClusterNameWithBodyWithResponse(context.TODO(), controlPlane.Name, "foo", "application/json", NewJSONReader(request))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.NotNil(t, response.JSON404)
+
+	serverErr := *response.JSON404
+
+	assert.Equal(t, serverErr.Error, generated.NotFound)
+}
+
+// TestApiV1ClustersDelete tests clusters can be deleted.
+func TestApiV1ClustersDelete(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
 
 	project := mustCreateProjectFixture(t, tc, projectID)
 	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
@@ -1155,6 +1359,30 @@ func TestApiV1ClustersDelete(t *testing.T) {
 	var resource unikornv1.KubernetesCluster
 
 	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
+}
+
+// TestApiV1ClustersDeleteNotFound tests that the deletion of a non-existent cluster
+// results in the correct error.
+func TestApiV1ClustersDeleteNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.DeleteApiV1ControlplanesControlPlaneNameClustersClusterNameWithResponse(context.TODO(), controlPlane.Name, "foo")
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.NotNil(t, response.JSON404)
+
+	serverErr := *response.JSON404
+
+	assert.Equal(t, serverErr.Error, generated.NotFound)
 }
 
 // TestApiV1ProvidersOpenstackProjects tests OpenStack projects can be listed.

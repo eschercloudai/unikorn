@@ -132,6 +132,9 @@ const (
 	clusterWorkloadPoolReplicas = 10
 )
 
+// mustCreateKubernetesClusterFixture creates a basic cluster resource in Kubernetes.
+//
+//nolint:unparam
 func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace, name string) {
 	t.Helper()
 
