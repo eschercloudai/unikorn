@@ -390,6 +390,7 @@ type File struct {
 }
 
 // MachineGenericAutoscaling defines generic autoscaling configuration.
+// +kubebuilder:validation:XValidation:message="maximumReplicas must be greater than minimumReplicas",rule=(self.maximumReplicas > self.minimumReplicas)
 type MachineGenericAutoscaling struct {
 	// MinimumReplicas defines the minimum number of replicas that
 	// this pool can be scaled down to.

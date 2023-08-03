@@ -33,8 +33,7 @@ type Interface interface {
 	UnikornV1alpha1() unikornv1alpha1.UnikornV1alpha1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	unikornV1alpha1 *unikornv1alpha1.UnikornV1alpha1Client

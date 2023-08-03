@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +35,9 @@ type FakeKubernetesClusters struct {
 	ns   string
 }
 
-var kubernetesclustersResource = schema.GroupVersionResource{Group: "unikorn.eschercloud.ai", Version: "v1alpha1", Resource: "kubernetesclusters"}
+var kubernetesclustersResource = v1alpha1.SchemeGroupVersion.WithResource("kubernetesclusters")
 
-var kubernetesclustersKind = schema.GroupVersionKind{Group: "unikorn.eschercloud.ai", Version: "v1alpha1", Kind: "KubernetesCluster"}
+var kubernetesclustersKind = v1alpha1.SchemeGroupVersion.WithKind("KubernetesCluster")
 
 // Get takes name of the kubernetesCluster, and returns the corresponding kubernetesCluster object, and an error if there is any.
 func (c *FakeKubernetesClusters) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.KubernetesCluster, err error) {

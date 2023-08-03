@@ -77,11 +77,11 @@ FLAGS=-trimpath -ldflags '-X $(MODULE)/pkg/constants.Version=$(VERSION) -X $(MOD
 LINT_VERSION=v1.52.2
 
 # Defines the version of the CRD generation tools to use.
-CONTROLLER_TOOLS_VERSION=v0.8.0
+CONTROLLER_TOOLS_VERSION=v0.12.1
 
 # Defines the version of code generator tools to use.
 # This should be kept in sync with the Kubenetes library versions defined in go.mod.
-CODEGEN_VERSION=v0.25.2
+CODEGEN_VERSION=v0.27.3
 
 OPENAPI_CODEGEN_VERSION=v1.12.4
 
@@ -158,7 +158,7 @@ $(PREFIX)/%: $(BINDIR)/%
 $(CRDDIR): $(APISRC)
 	@mkdir -p $@
 	@go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-	$(GOBIN)/controller-gen crd crd:crdVersions=v1 paths=./pkg/apis/... output:dir=$@
+	$(GOBIN)/controller-gen crd:crdVersions=v1 paths=./pkg/apis/... output:dir=$@
 	@touch $(CRDDIR)
 
 # Generate a clientset to interact with our custom resources.
