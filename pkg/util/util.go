@@ -128,3 +128,27 @@ func Filter[T any](l []T, callback func(T) bool) []T {
 
 	return r
 }
+
+// In is a generic function to search for inclusion in a slice.
+func In[T comparable](l []T, a T) bool {
+	for _, i := range l {
+		if i == a {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Keys returns the keys from a string map.
+//
+//nolint:prealloc
+func Keys[T any](m map[string]T) []string {
+	var r []string
+
+	for k := range m {
+		r = append(r, k)
+	}
+
+	return r
+}

@@ -147,7 +147,7 @@ func (v *OpenAPIValidator) validateRequest(r *http.Request, authContext *authori
 			return nil, authContext.err
 		}
 
-		return nil, errors.OAuth2InvalidRequest("request invalid").WithError(err)
+		return nil, errors.OAuth2InvalidRequest("request body invalid").WithError(err)
 	}
 
 	responseValidationInput := &openapi3filter.ResponseValidationInput{

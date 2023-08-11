@@ -23,7 +23,9 @@ jobs:
     - name: License Checker
       run: make license
     - name: Validate OpenAPI Schema
-      run: make touch validate
+      run: make validate
+    - name: Validate documentation
+      run: sudo apt -y install wbritish && make validate-docs
   Runtime:
     runs-on: ubuntu-latest
     steps:

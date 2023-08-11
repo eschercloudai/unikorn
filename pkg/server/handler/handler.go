@@ -285,7 +285,7 @@ func (h *Handler) GetApiV1ControlplanesControlPlaneNameClustersClusterNameKubeco
 	util.WriteOctetStreamResponse(w, r, http.StatusOK, result)
 }
 
-func (h *Handler) GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetApiV1ApplicationbundlesControlPlane(w http.ResponseWriter, r *http.Request) {
 	result, err := applicationbundle.NewClient(h.client).ListControlPlane(r.Context())
 	if err != nil {
 		errors.HandleError(w, r, err)
@@ -296,7 +296,7 @@ func (h *Handler) GetApiV1ApplicationBundlesControlPlane(w http.ResponseWriter, 
 	util.WriteJSONResponse(w, r, http.StatusOK, result)
 }
 
-func (h *Handler) GetApiV1ApplicationBundlesCluster(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetApiV1ApplicationbundlesCluster(w http.ResponseWriter, r *http.Request) {
 	result, err := applicationbundle.NewClient(h.client).ListCluster(r.Context())
 	if err != nil {
 		errors.HandleError(w, r, err)

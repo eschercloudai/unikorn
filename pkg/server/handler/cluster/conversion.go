@@ -34,8 +34,8 @@ import (
 )
 
 // convertOpenstack converts from a custom resource into the API definition.
-func convertOpenstack(in *unikornv1.KubernetesCluster) generated.KubernetesClusterOpenstack {
-	openstack := generated.KubernetesClusterOpenstack{
+func convertOpenstack(in *unikornv1.KubernetesCluster) generated.KubernetesClusterOpenStack {
+	openstack := generated.KubernetesClusterOpenStack{
 		ComputeAvailabilityZone: *in.Spec.Openstack.FailureDomain,
 		VolumeAvailabilityZone:  *in.Spec.Openstack.VolumeFailureDomain,
 		ExternalNetworkID:       *in.Spec.Openstack.ExternalNetworkID,

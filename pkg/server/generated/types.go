@@ -19,6 +19,7 @@ const (
 const (
 	AccessDenied            Oauth2ErrorError = "access_denied"
 	Conflict                Oauth2ErrorError = "conflict"
+	Forbidden               Oauth2ErrorError = "forbidden"
 	InvalidClient           Oauth2ErrorError = "invalid_client"
 	InvalidGrant            Oauth2ErrorError = "invalid_grant"
 	InvalidRequest          Oauth2ErrorError = "invalid_request"
@@ -33,7 +34,12 @@ const (
 	UnsupportedResponseType Oauth2ErrorError = "unsupported_response_type"
 )
 
-// ApplicationBundle A bundle of applications.
+// ApplicationBundle A bundle of applications. This forms the basis of resource versions. Bundles marked
+// as preview should not be selected by default, and end of life bundles should not be
+// used to avoid unnecessary upgrades. If enabled, automatic upgrades will occur if
+// a newer version of a bundle exists that is not in preview. When a bundle's end of
+// life expires, resources will undergo a foreced upgrade, regardless of whether
+// automatic upgrade is enabled for a resource or not.
 type ApplicationBundle struct {
 	// EndOfLife When the bundle is end-of-life.
 	EndOfLife *time.Time `json:"endOfLife,omitempty"`
@@ -48,7 +54,8 @@ type ApplicationBundle struct {
 	Version string `json:"version"`
 }
 
-// ApplicationBundleAutoUpgrade When specified enables auto upgrade of application bundles.
+// ApplicationBundleAutoUpgrade When specified, enables auto upgrade of application bundles. All resources will be
+// automatically upgraded if the currently selected bundle is end of life.
 type ApplicationBundleAutoUpgrade struct {
 	// DaysOfWeek Days of the week and time windows that permit operations to be performed in.
 	DaysOfWeek *AutoUpgradeDaysOfWeek `json:"daysOfWeek,omitempty"`
@@ -81,12 +88,18 @@ type AutoUpgradeDaysOfWeek struct {
 	Wednesday *TimeWindow `json:"wednesday,omitempty"`
 }
 
-// ControlPlane A Unikorn control plane.
+// ControlPlane A control plane.
 type ControlPlane struct {
-	// ApplicationBundle A bundle of applications.
+	// ApplicationBundle A bundle of applications. This forms the basis of resource versions. Bundles marked
+	// as preview should not be selected by default, and end of life bundles should not be
+	// used to avoid unnecessary upgrades. If enabled, automatic upgrades will occur if
+	// a newer version of a bundle exists that is not in preview. When a bundle's end of
+	// life expires, resources will undergo a foreced upgrade, regardless of whether
+	// automatic upgrade is enabled for a resource or not.
 	ApplicationBundle ApplicationBundle `json:"applicationBundle"`
 
-	// ApplicationBundleAutoUpgrade When specified enables auto upgrade of application bundles.
+	// ApplicationBundleAutoUpgrade When specified, enables auto upgrade of application bundles. All resources will be
+	// automatically upgraded if the currently selected bundle is end of life.
 	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgrade `json:"applicationBundleAutoUpgrade,omitempty"`
 
 	// Name The name of the resource.
@@ -96,29 +109,36 @@ type ControlPlane struct {
 	Status *KubernetesResourceStatus `json:"status,omitempty"`
 }
 
-// ControlPlanes A list of Unikorn control planes.
+// ControlPlanes A list of control planes.
 type ControlPlanes = []ControlPlane
 
 // Hour An hour of the day in UTC.
 type Hour = int
 
-// JsonWebKey JSON web key.
+// JsonWebKey JSON web key. See the relevant JWKS documentation for further details.
 type JsonWebKey = map[string]interface{}
 
-// JsonWebKeySet JSON web key set.
+// JsonWebKeySet JSON web key set. This data type is defined by an external 3rd party standards
+// committee. Consult the relevant documentation for further details.
 type JsonWebKeySet struct {
 	Keys *[]JsonWebKey `json:"keys,omitempty"`
 }
 
-// KubernetesCluster Unikorn Kubernetes cluster creation parameters.
+// KubernetesCluster Kubernetes cluster creation parameters.
 type KubernetesCluster struct {
 	// Api Kubernetes API settings.
 	Api *KubernetesClusterAPI `json:"api,omitempty"`
 
-	// ApplicationBundle A bundle of applications.
+	// ApplicationBundle A bundle of applications. This forms the basis of resource versions. Bundles marked
+	// as preview should not be selected by default, and end of life bundles should not be
+	// used to avoid unnecessary upgrades. If enabled, automatic upgrades will occur if
+	// a newer version of a bundle exists that is not in preview. When a bundle's end of
+	// life expires, resources will undergo a foreced upgrade, regardless of whether
+	// automatic upgrade is enabled for a resource or not.
 	ApplicationBundle ApplicationBundle `json:"applicationBundle"`
 
-	// ApplicationBundleAutoUpgrade When specified enables auto upgrade of application bundles.
+	// ApplicationBundleAutoUpgrade When specified, enables auto upgrade of application bundles. All resources will be
+	// automatically upgraded if the currently selected bundle is end of life.
 	ApplicationBundleAutoUpgrade *ApplicationBundleAutoUpgrade `json:"applicationBundleAutoUpgrade,omitempty"`
 
 	// ControlPlane A Kubernetes cluster machine.
@@ -133,13 +153,13 @@ type KubernetesCluster struct {
 	// Network A kubernetes cluster network settings.
 	Network KubernetesClusterNetwork `json:"network"`
 
-	// Openstack Unikorn Kubernetes cluster creation Openstack parameters.
-	Openstack KubernetesClusterOpenstack `json:"openstack"`
+	// Openstack Kubernetes cluster creation OpenStack parameters.
+	Openstack KubernetesClusterOpenStack `json:"openstack"`
 
 	// Status A Kubernetes resource status.
 	Status *KubernetesResourceStatus `json:"status,omitempty"`
 
-	// WorkloadPools A non-empty list of Kubernetes cluster workload pools.
+	// WorkloadPools A list of Kubernetes cluster workload pools.
 	WorkloadPools KubernetesClusterWorkloadPools `json:"workloadPools"`
 }
 
@@ -152,12 +172,13 @@ type KubernetesClusterAPI struct {
 	SubjectAlternativeNames *[]string `json:"subjectAlternativeNames,omitempty"`
 }
 
-// KubernetesClusterAutoscaling A Kubernetes cluster workload pool autoscaling configuration.
+// KubernetesClusterAutoscaling A Kubernetes cluster workload pool autoscaling configuration. Cluster autoscaling
+// must also be enabled in the cluster features.
 type KubernetesClusterAutoscaling struct {
-	// MaximumReplicas The maximum number of replicas to allow.
+	// MaximumReplicas The maximum number of replicas to allow. Must be greater than the minimum.
 	MaximumReplicas int `json:"maximumReplicas"`
 
-	// MinimumReplicas The minimum number of replicas to allow.
+	// MinimumReplicas The minimum number of replicas to allow. Must be less than the maximum.
 	MinimumReplicas int `json:"minimumReplicas"`
 }
 
@@ -169,7 +190,7 @@ type KubernetesClusterFeatures struct {
 	// CertManager Enable cert-manager.
 	CertManager *bool `json:"certManager,omitempty"`
 
-	// FileStorage Enable POSIX file based persistent storage.
+	// FileStorage Enable POSIX file based persistent storage (Longhorn).
 	FileStorage *bool `json:"fileStorage,omitempty"`
 
 	// Ingress Enable an ingress controller.
@@ -187,25 +208,25 @@ type KubernetesClusterNetwork struct {
 	// DnsNameservers A list of DNS name server to use.
 	DnsNameservers []string `json:"dnsNameservers"`
 
-	// NodePrefix Network prefix to provision nodes in.
+	// NodePrefix Network prefix to provision nodes in. Must be a valid CIDR block.
 	NodePrefix string `json:"nodePrefix"`
 
-	// PodPrefix Network prefix to provision pods in.
+	// PodPrefix Network prefix to provision pods in. Must be a valid CIDR block.
 	PodPrefix string `json:"podPrefix"`
 
-	// ServicePrefix Network prefix to provision services in.
+	// ServicePrefix Network prefix to provision services in. Must be a valid CIDR block.
 	ServicePrefix string `json:"servicePrefix"`
 }
 
-// KubernetesClusterOpenstack Unikorn Kubernetes cluster creation Openstack parameters.
-type KubernetesClusterOpenstack struct {
+// KubernetesClusterOpenStack Kubernetes cluster creation OpenStack parameters.
+type KubernetesClusterOpenStack struct {
 	// ComputeAvailabilityZone Compute availability zone for control plane, and workload pool default.
 	ComputeAvailabilityZone string `json:"computeAvailabilityZone"`
 
-	// ExternalNetworkID Openstack external network ID.
+	// ExternalNetworkID OpenStack external network ID.
 	ExternalNetworkID string `json:"externalNetworkID"`
 
-	// SshKeyName Openstack SSH Key to install on all machines.
+	// SshKeyName OpenStack SSH Key to install on all machines.
 	SshKeyName *string `json:"sshKeyName,omitempty"`
 
 	// VolumeAvailabilityZone Volume availability zone for control plane, and workload pool default.
@@ -214,13 +235,14 @@ type KubernetesClusterOpenstack struct {
 
 // KubernetesClusterWorkloadPool A Kuberntes cluster workload pool.
 type KubernetesClusterWorkloadPool struct {
-	// Autoscaling A Kubernetes cluster workload pool autoscaling configuration.
+	// Autoscaling A Kubernetes cluster workload pool autoscaling configuration. Cluster autoscaling
+	// must also be enabled in the cluster features.
 	Autoscaling *KubernetesClusterAutoscaling `json:"autoscaling,omitempty"`
 
-	// AvailabilityZone Workload pool availability zone.
+	// AvailabilityZone Workload pool availability zone. Overrides the cluster default.
 	AvailabilityZone *string `json:"availabilityZone,omitempty"`
 
-	// Labels Workload pool labels to apply on node creation.
+	// Labels Workload pool key value labels to apply on node creation.
 	Labels *map[string]string `json:"labels,omitempty"`
 
 	// Machine A Kubernetes cluster machine.
@@ -230,61 +252,70 @@ type KubernetesClusterWorkloadPool struct {
 	Name string `json:"name"`
 }
 
-// KubernetesClusterWorkloadPools A non-empty list of Kubernetes cluster workload pools.
+// KubernetesClusterWorkloadPools A list of Kubernetes cluster workload pools.
 type KubernetesClusterWorkloadPools = []KubernetesClusterWorkloadPool
 
-// KubernetesClusters A list of Unikorn Kubernetes clusters.
+// KubernetesClusters A list of Kubernetes clusters.
 type KubernetesClusters = []KubernetesCluster
+
+// KubernetesNameParameter A Kubernetes name. Must be a valid DNS containing only lower case characters, numbers or hyphens, start and end with a character or number, and be at most 63 characters in length.
+type KubernetesNameParameter = string
 
 // KubernetesResourceStatus A Kubernetes resource status.
 type KubernetesResourceStatus struct {
 	// CreationTime The time the resource was created.
 	CreationTime time.Time `json:"creationTime"`
 
-	// DeletionTime The time a control plane was deleted.
+	// DeletionTime The time the resource was deleted.
 	DeletionTime *time.Time `json:"deletionTime,omitempty"`
 
 	// Name The name of the resource.
 	Name string `json:"name"`
 
-	// Status The current status of the resource.
+	// Status The current status of the resource. Intially the status will be "Unknown" until
+	// the resource is reconciled by the relevant controller. It then will transition to
+	// "Provisioning" and will be ready for use when it changes to "Provisioned". The status
+	// will also transition to the "Provisioning" status during an update. The
+	// status will change to "Deprovisioning" when a delete request is being processed.
+	// It may also change to "Error" if an unexpected error occurred during any operation.
+	// Errors may be transient.
 	Status string `json:"status"`
 }
 
 // Oauth2Error Generic error message.
 type Oauth2Error struct {
-	// Error A terse error string expaning on the HTTP error code.
+	// Error A terse error string expanding on the HTTP error code. Errors are based on the OAuth2 specification, but are expanded with proprietary status codes for APIs other than those specified by OAuth2.
 	Error Oauth2ErrorError `json:"error"`
 
 	// ErrorDescription Verbose message describing the error.
 	ErrorDescription string `json:"error_description"`
 }
 
-// Oauth2ErrorError A terse error string expaning on the HTTP error code.
+// Oauth2ErrorError A terse error string expanding on the HTTP error code. Errors are based on the OAuth2 specification, but are expanded with proprietary status codes for APIs other than those specified by OAuth2.
 type Oauth2ErrorError string
 
-// OpenstackAvailabilityZone An Openstack availability zone.
+// OpenstackAvailabilityZone An OpenStack availability zone.
 type OpenstackAvailabilityZone struct {
 	// Name The availability zone name.
 	Name string `json:"name"`
 }
 
-// OpenstackAvailabilityZones A list of Openstack availability zones.
+// OpenstackAvailabilityZones A list of OpenStack availability zones.
 type OpenstackAvailabilityZones = []OpenstackAvailabilityZone
 
-// OpenstackExternalNetwork An Openstack external network.
+// OpenstackExternalNetwork An OpenStack external network.
 type OpenstackExternalNetwork struct {
-	// Id Openstack external network ID.
+	// Id OpenStack external network ID.
 	Id string `json:"id"`
 
 	// Name Opestack external network name.
 	Name string `json:"name"`
 }
 
-// OpenstackExternalNetworks A list of Openstack external networks.
+// OpenstackExternalNetworks A list of OpenStack external networks.
 type OpenstackExternalNetworks = []OpenstackExternalNetwork
 
-// OpenstackFlavor An Openstack flavor.
+// OpenstackFlavor An OpenStack flavor.
 type OpenstackFlavor struct {
 	// Cpus The number of CPUs.
 	Cpus int `json:"cpus"`
@@ -305,12 +336,13 @@ type OpenstackFlavor struct {
 	Name string `json:"name"`
 }
 
-// OpenstackFlavors A list of Openstack flavors.
+// OpenstackFlavors A list of OpenStack flavors.
 type OpenstackFlavors = []OpenstackFlavor
 
-// OpenstackImage And Openstack image.
+// OpenstackImage And OpenStack image.
 type OpenstackImage struct {
-	// Created Time when the image was created.
+	// Created Time when the image was created. Images with a newer creation time should
+	// be favoured over older images as they will contain updates and fewer vulnerabilities.
 	Created time.Time `json:"created"`
 
 	// Id The unique image ID.
@@ -324,7 +356,8 @@ type OpenstackImage struct {
 
 	// Versions Image version metadata.
 	Versions struct {
-		// Kubernetes The kubernetes semantic version.
+		// Kubernetes The kubernetes semantic version.  This should be used directly when specifying
+		// Kubernetes control planes and workload pools in a cluster specification.
 		Kubernetes string `json:"kubernetes"`
 
 		// NvidiaDriver The nvidia driver version.
@@ -332,62 +365,60 @@ type OpenstackImage struct {
 	} `json:"versions"`
 }
 
-// OpenstackImages A list of Openstack images that are compatible with this platform.
+// OpenstackImages A list of OpenStack images that are compatible with this platform.
 type OpenstackImages = []OpenstackImage
 
-// OpenstackKeyPair An Openstack key pair.
+// OpenstackKeyPair An OpenStack SSH key pair.
 type OpenstackKeyPair struct {
 	// Name The key pair name.
 	Name string `json:"name"`
 }
 
-// OpenstackKeyPairs A list of Openstack key pairs.
+// OpenstackKeyPairs A list of OpenStack key pairs.
 type OpenstackKeyPairs = []OpenstackKeyPair
 
 // OpenstackMachinePool A Kubernetes cluster machine.
 type OpenstackMachinePool struct {
-	// Disk An Openstack volume.
+	// Disk An OpenStack volume.
 	Disk *OpenstackVolume `json:"disk,omitempty"`
 
-	// FlavorName Openstack flavor name.
+	// FlavorName OpenStack flavor name.
 	FlavorName string `json:"flavorName"`
 
-	// ImageName Openstack image name.
+	// ImageName OpenStack image name.
 	ImageName string `json:"imageName"`
 
 	// Replicas Number of machines.
 	Replicas int `json:"replicas"`
 
-	// Version Kubernetes version.
+	// Version Kubernetes version. This should be derived from the image name as images
+	// will be preloaded with containers for a specific Kubernetes version.
 	Version string `json:"version"`
 }
 
-// OpenstackProject An Openstack project.
+// OpenstackProject An OpenStack project.
 type OpenstackProject struct {
 	// Description A verbose description of the project.
 	Description *string `json:"description,omitempty"`
 
-	// Id Globally unique project ID.
+	// Id The unique project ID.
 	Id string `json:"id"`
 
-	// Name The name of the project within the scope of the domain.
+	// Name The name of the project.
 	Name string `json:"name"`
 }
 
-// OpenstackProjects A list of Openstack projects.
+// OpenstackProjects A list of OpenStack projects.
 type OpenstackProjects = []OpenstackProject
 
-// OpenstackVolume An Openstack volume.
+// OpenstackVolume An OpenStack volume.
 type OpenstackVolume struct {
-	// AvailabilityZone Volume availability zone.
+	// AvailabilityZone Volume availability zone. Overrides the cluster default.
 	AvailabilityZone *string `json:"availabilityZone,omitempty"`
 
 	// Size Disk size in GiB.
 	Size int `json:"size"`
 }
-
-// StringParameter A basic string parameter.
-type StringParameter = string
 
 // TimeWindow A time window that wraps into the next day if required.
 type TimeWindow struct {
@@ -415,25 +446,25 @@ type Token struct {
 
 // TokenRequestOptions oauth2 token endpoint.
 type TokenRequestOptions struct {
-	// ClientId Client ID.
+	// ClientId Client ID. Required with the "code" grant type.
 	ClientId *string `json:"client_id"`
 
-	// Code Authorization code.
+	// Code Authorization code. Required with the "code" grant type.
 	Code *string `json:"code"`
 
-	// CodeVerifier Client code verifier.
+	// CodeVerifier Client code verifier. Required with the "code" grant type.
 	CodeVerifier *string `json:"code_verifier"`
 
-	// GrantType Supported grant type.
+	// GrantType Supported grant type.  Must be either "code" or "password".
 	GrantType string `json:"grant_type"`
 
-	// Password Resource owner password.
+	// Password Resource owner password. Required with the "password" grant type.
 	Password *string `json:"password"`
 
-	// RedirectUri Client redirect URI.
+	// RedirectUri Client redirect URI. Required with the "code" grant type.
 	RedirectUri *string `json:"redirect_uri"`
 
-	// Username Resource owner username.
+	// Username Resource owner username. Required with the "password" grant type.
 	Username *string `json:"username"`
 	union    json.RawMessage
 }
@@ -448,23 +479,23 @@ type TokenRequestOptions1 struct {
 	GrantType *interface{} `json:"grant_type,omitempty"`
 }
 
-// TokenScope Openstack token scope.
+// TokenScope OpenStack token scope.
 type TokenScope struct {
-	// Project Openstack token project scope.
+	// Project OpenStack token project scope.
 	Project TokenScopeProject `json:"project"`
 }
 
-// TokenScopeProject Openstack token project scope.
+// TokenScopeProject OpenStack token project scope.
 type TokenScopeProject struct {
-	// Id Openstack project ID.
+	// Id OpenStack project ID.
 	Id string `json:"id"`
 }
 
-// ClusterNameParameter A basic string parameter.
-type ClusterNameParameter = StringParameter
+// ClusterNameParameter A Kubernetes name. Must be a valid DNS containing only lower case characters, numbers or hyphens, start and end with a character or number, and be at most 63 characters in length.
+type ClusterNameParameter = KubernetesNameParameter
 
-// ControlPlaneNameParameter A basic string parameter.
-type ControlPlaneNameParameter = StringParameter
+// ControlPlaneNameParameter A Kubernetes name. Must be a valid DNS containing only lower case characters, numbers or hyphens, start and end with a character or number, and be at most 63 characters in length.
+type ControlPlaneNameParameter = KubernetesNameParameter
 
 // ApplicationBundleResponse A list of application bundles.
 type ApplicationBundleResponse = ApplicationBundles
@@ -475,46 +506,47 @@ type BadRequestResponse = Oauth2Error
 // ConflictResponse Generic error message.
 type ConflictResponse = Oauth2Error
 
-// ControlPlaneResponse A Unikorn control plane.
+// ControlPlaneResponse A control plane.
 type ControlPlaneResponse = ControlPlane
 
-// ControlPlanesResponse A list of Unikorn control planes.
+// ControlPlanesResponse A list of control planes.
 type ControlPlanesResponse = ControlPlanes
 
 // InternalServerErrorResponse Generic error message.
 type InternalServerErrorResponse = Oauth2Error
 
-// JwksResponse JSON web key set.
+// JwksResponse JSON web key set. This data type is defined by an external 3rd party standards
+// committee. Consult the relevant documentation for further details.
 type JwksResponse = JsonWebKeySet
 
-// KubernetesClusterResponse Unikorn Kubernetes cluster creation parameters.
+// KubernetesClusterResponse Kubernetes cluster creation parameters.
 type KubernetesClusterResponse = KubernetesCluster
 
-// KubernetesClustersResponse A list of Unikorn Kubernetes clusters.
+// KubernetesClustersResponse A list of Kubernetes clusters.
 type KubernetesClustersResponse = KubernetesClusters
 
 // NotFoundResponse Generic error message.
 type NotFoundResponse = Oauth2Error
 
-// OpenstackBlockStorageAvailabilityZonesResponse A list of Openstack availability zones.
+// OpenstackBlockStorageAvailabilityZonesResponse A list of OpenStack availability zones.
 type OpenstackBlockStorageAvailabilityZonesResponse = OpenstackAvailabilityZones
 
-// OpenstackComputeAvailabilityZonesResponse A list of Openstack availability zones.
+// OpenstackComputeAvailabilityZonesResponse A list of OpenStack availability zones.
 type OpenstackComputeAvailabilityZonesResponse = OpenstackAvailabilityZones
 
-// OpenstackExternalNetworksResponse A list of Openstack external networks.
+// OpenstackExternalNetworksResponse A list of OpenStack external networks.
 type OpenstackExternalNetworksResponse = OpenstackExternalNetworks
 
-// OpenstackFlavorsResponse A list of Openstack flavors.
+// OpenstackFlavorsResponse A list of OpenStack flavors.
 type OpenstackFlavorsResponse = OpenstackFlavors
 
-// OpenstackImagesResponse A list of Openstack images that are compatible with this platform.
+// OpenstackImagesResponse A list of OpenStack images that are compatible with this platform.
 type OpenstackImagesResponse = OpenstackImages
 
-// OpenstackKeyPairsResponse A list of Openstack key pairs.
+// OpenstackKeyPairsResponse A list of OpenStack key pairs.
 type OpenstackKeyPairsResponse = OpenstackKeyPairs
 
-// OpenstackProjectsResponse A list of Openstack projects.
+// OpenstackProjectsResponse A list of OpenStack projects.
 type OpenstackProjectsResponse = OpenstackProjects
 
 // TokenResponse Oauth2 token result.
@@ -523,13 +555,13 @@ type TokenResponse = Token
 // UnauthorizedResponse Generic error message.
 type UnauthorizedResponse = Oauth2Error
 
-// CreateControlPlaneRequest A Unikorn control plane.
+// CreateControlPlaneRequest A control plane.
 type CreateControlPlaneRequest = ControlPlane
 
-// CreateKubernetesClusterRequest Unikorn Kubernetes cluster creation parameters.
+// CreateKubernetesClusterRequest Kubernetes cluster creation parameters.
 type CreateKubernetesClusterRequest = KubernetesCluster
 
-// TokenScopeRequest Openstack token scope.
+// TokenScopeRequest OpenStack token scope.
 type TokenScopeRequest = TokenScope
 
 // PostApiV1AuthOauth2TokensFormdataRequestBody defines body for PostApiV1AuthOauth2Tokens for application/x-www-form-urlencoded ContentType.

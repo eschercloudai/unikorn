@@ -100,5 +100,10 @@ func (a *Authenticator) Token(r *http.Request, scope *generated.TokenScope) (*ge
 }
 
 func (a *Authenticator) JWKS() (interface{}, error) {
-	return a.issuer.JWKS()
+	result, err := a.issuer.JWKS()
+	if err != nil {
+		return nil, errors.OAuth2ServerError("unable to generate json web key set").WithError(err)
+	}
+
+	return result, nil
 }

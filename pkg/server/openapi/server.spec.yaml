@@ -1,35 +1,88 @@
 openapi: 3.0.3
 info:
-  title: Unikorn Server
-  description: RESTful API service for Unikorn custom resources and UI.
+  title: Kubernetes Service API
+  description: |-
+    The Kubernetes Service API provides services that allows provisioning and life cycle
+    management of Kubernetes clusters. The API is logically composed of authentication
+    services, platform provider specific calls to get a set of resource types that can
+    be then used by abstract Kubernetes Service resources to create and manage Kubernetes
+    clusters.  Unless stated otherwise, all request bodies and responses will accept and
+    return JSON content type respectively.  Requests must specify the HTML content type
+    header.
   version: 0.2.0
+# This allows the documentation engine to combine API endpoints into related groups
+# and also defines the order of appearance.
+x-documentation-groups:
+- id: auth
+  name: Authentication and Authorisation API
+  description: |-
+    The authentication and authorisation API grants access to all other APIs.  Authentication
+    is based on the industry standard OAuth2 protocol.  Access to other APIs defined in this
+    specification will be with the HTTP bearer token method using the opaque JWT access
+    token returned by an OAuth2 authentication flow.  The initial access token will be
+    unscoped, meaning that you will need to use it to list available projects with
+    the relevant provider API.  Then you must scope the token to a specific project
+    before accessing further core and provider specific APIs.
+- id: main
+  name: Core API
+  description: |-
+    The core API allows the management of core resources. Conceptually there are projects
+    that are implicitly referenced by a scoped token issued during authentication.  Within
+    a project are a number of control planes. In the context of the Kubernetes Service, a
+    control plane is a management layer that provides multi-tenant isolation, and Kubernetes
+    cluster provisioning and scaling services. Kubernetes clusters are provisioned within
+    a control plane. Provisioning of projects and control planes may be done explicitly or
+    implicitly, however this latter approach is less flexible as the Kubernetes Service will
+    have to choose some default values for you, however it provides a faster and better
+    user experience.
+- id: provider-openstack
+  name: OpenStack Platform Provider API
+  description: |-
+    The OpenStack platform provider API provides access to services that list various
+    platform specific resources that are required by the core API, for example virtual
+    machine types and images. While you can manually specify resource names with the
+    core API, it is recommended that you first consult the platform provider APIs in
+    order to get an up to date list of resources that are available for consumption.
 paths:
   /api/v1/auth/oauth2/authorization:
-    description: OAuth2 authorization grant endpoint.
+    x-documentation-group: auth
+    description: |-
+      Implements OAuth2 authorisation grants.
     get:
       x-no-security-requirements: true
       description: |-
-        Provides authentication and authorization as per the OAuth2 specification.
-        This particular implementation uses a "code" type response, and PKCE.
+        Provides authentication and authorisation as per the OAuth2 specification.
+        This particular implementation requires a "code" type response, and PKCE.
+        You may specify the "openid" scope in order to have an OpenID Connect
+        identity token returned during code exchange.
       responses:
         '302':
-          description: A redirect to the specified URI with an authorization code.
+          description: A redirect to the specified identity provider URI.
         # TODO: returns HTML not JSON
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/auth/oauth2/tokens:
-    description: OAuth2 code exchange endpoint.
+    x-documentation-group: auth
+    description: |-
+      Implements OAuth2 code exchange.
     post:
       x-no-security-requirements: true
       description: |-
-        Provides authorization code to token exchange as per the OAuth2 specification.
+        Provides authorisation code to access token exchange as per the OAuth2
+        specification with the "authorization_code" grant. If requested during
+        authentication, and OpenID Connect identity token will also be returned.  
+        The "password" grant type is also supported for applications where using
+        a web browser in the authentication flow would be impractical, for example
+        with automated command line client based tooling, however this is not
+        recommended as it exposes credentials to the API, and not only with a trusted
+        3rd party identity provider.
       requestBody:
         $ref: '#/components/requestBodies/tokenRequest'
       responses:
         '200':
-          description: A token.
+          $ref: '#/components/responses/tokenResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -37,26 +90,30 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/auth/oidc/callback:
-    description: OIDC response code callback endpoint.
+    x-documentation-group: auth
+    description: |-
+      Implements the OIDC response code callback.
     get:
       x-no-security-requirements: true
       description: |-
-        Intenally when using oauth2, we actually talk to an OIDC IdP, so have to
-        essentially do oauth in oauth.  This endpoint allows code exchange with
-        the OIDC IdP, then redirects back to the browser with an oauth2 code.
+        The Kubernetes Service OAuth2 implementation does not provide any direct
+        authentication or authorisation.  It instead delegates to a 3rd party
+        identity provider.  This endpoint allows a 3rd party authorisation code
+        to be returned to the Kubernetes Service and exchanged for an identity token.
       responses:
         '302':
-          description: A redirect back to the browser with an authorization code.
+          description: A redirect back to the browser with an authorisation code.
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/auth/tokens/token:
-    description: Token based authentication services.
+    x-documentation-group: auth
+    description: |-
+      Implements token project scoping.
     post:
       description: |-
-        Authenticates against OpenStack, and returns a signed and encrypted oauth2
-        JWT.  This token has a claim that contains the Openstack authorization token.
-        The Openstack authorization token is project scoped, so the JWT is granted
-        the "project" scope, allowing more APIs to be accessed.
+        Creates a new authorisation token scoped to a specific project. This must be
+        called in order to implicitly grant the "project" OAuth2 scope and allow
+        access to other APIs offered by the Kubernetes Service.
       security:
       - oauth2Authentication: []
       requestBody:
@@ -71,22 +128,30 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/auth/jwks:
+    x-documentation-group: auth
     description: JSON web key set endpoint.
     get:
       description: |-
         Returns an array of public keys used to verify JWT tokens issued by
-        this server.
+        this server, for example identity or authorisation tokens.
       x-no-security-requirements: true
       responses:
         '200':
           $ref: '#/components/responses/jwksResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/project:
-    description: Unikorn project services.
+    x-documentation-group: main
+    description: |-
+      Implements project management services. Projects, as currently defined
+      by the Kubernetes service, are implicit as access tokens issued by the
+      authentication and authorisation API as these are scoped to a specific
+      project.
     post:
       x-no-body: true
       description: |-
-        Creates a new Unikorn project associated with the authenticated user's
-        OpenStack project.
+        Creates a new project resource associated with the authenticated user's
+        scoped authorisation token.
       security:
       - oauth2Authentication:
         - project
@@ -103,15 +168,15 @@ paths:
           $ref: '#/components/responses/internalServerErrorResponse'
     delete:
       description: |-
-        Deletes the Unikorn project associated with the authenticated user's
-        OpenStack project.  This is a cascading operation and will delete all
+        Deletes the project associated with the authenticated user's scoped
+        authorisation token. This is a cascading operation and will delete all
         contained control planes and clusters.
       security:
       - oauth2Authentication:
         - project
       responses:
         '202':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/acceptedResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -121,10 +186,34 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/controlplanes:
-    description: Unikorn control plane services.
+    x-documentation-group: main
+    description: |-
+      Implements control plane management services. Control planes manage the
+      life cycle of Kubernetes clusters, through provisioning, upgrading, to deletion.
+      Control planes must reference a versioned application bundle that defines the
+      software versions of control plane components, and forms the basis of automatic
+      upgrade functionality.  Referencing an explicit control plane name will
+      implicitly create the associated project.
+    get:
+      description: |-
+        Lists control planes within the scoped project.
+      security:
+      - oauth2Authentication:
+        - project
+      responses:
+        '200':
+          $ref: '#/components/responses/controlPlanesResponse'
+        '400':
+          $ref: '#/components/responses/badRequestResponse'
+        '401':
+          $ref: '#/components/responses/unauthorizedResponse'
+        '404':
+          $ref: '#/components/responses/notFoundResponse'
+        '500':
+          $ref: '#/components/responses/internalServerErrorResponse'
     post:
       description: |-
-        Creates a new Unikorn control plane within the selected Unikorn project.
+        Creates a new control plane within the scoped project.
       security:
       - oauth2Authentication:
         - project
@@ -142,12 +231,19 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/controlplanes/{controlPlaneName}:
-    description: Unikorn control plane services.
+    x-documentation-group: main
+    description: |-
+      Implements control plane management services. Control planes manage the
+      life cycle of Kubernetes clusters, through provisioning, upgrading, to deletion.
+      Control planes must reference a versioned application bundle that defines the
+      software versions of control plane components, and forms the basis of automatic
+      upgrade functionality.  Referencing an explicit control plane name will
+      implicitly create the associated project.
     parameters:
     - $ref: '#/components/parameters/controlPlaneNameParameter'
     get:
       description: |-
-        Gets a Unikorn control plane from within the selected Unikorn project.
+        Gets a control plane from within the scoped project.
       security:
       - oauth2Authentication:
         - project
@@ -164,9 +260,7 @@ paths:
           $ref: '#/components/responses/internalServerErrorResponse'
     put:
       description: |-
-        Updates a Unikorn control plane within the selected Unikorn project.
-        This is typically used to modify software versions managed by the
-        underlying continuous delivery platform.
+        Updates a control plane within the scoped project.
       security:
       - oauth2Authentication:
         - project
@@ -185,14 +279,14 @@ paths:
           $ref: '#/components/responses/internalServerErrorResponse'
     delete:
       description: |-
-        Deletes a Unikorn control plane from within the selected Unikorn project.
+        Deletes a control plane from within the scoped project.
         This is a cascading operation and will delete all contained clusters.
       security:
       - oauth2Authentication:
         - project
       responses:
         '202':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/acceptedResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -202,12 +296,13 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/controlplanes/{controlPlaneName}/clusters:
-    description: Unikorn cluster services.
+    x-documentation-group: main
+    description: Cluster services.
     parameters:
     - $ref: '#/components/parameters/controlPlaneNameParameter'
     get:
       description: |-
-        List all Unikorn clusters within the selected Unikorn control plane.
+        List all clusters within the selected control plane.
       security:
       - oauth2Authentication:
         - project
@@ -224,7 +319,7 @@ paths:
           $ref: '#/components/responses/internalServerErrorResponse'
     post:
       description: |-
-        Create a new Unikorn cluster within the selected Unikorn control plane.
+        Creates a new cluster within the selected control plane.
       security:
       - oauth2Authentication:
         - project
@@ -242,13 +337,14 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName}:
-    description: Unikorn cluster services.
+    x-documentation-group: main
+    description: Cluster services.
     parameters:
     - $ref: '#/components/parameters/controlPlaneNameParameter'
     - $ref: '#/components/parameters/clusterNameParameter'
     get:
       description: |-
-        Get a Unikorn cluster from within the selected Unikorn control plane.
+        Get a cluster from within the selected control plane.
       security:
       - oauth2Authentication:
         - project
@@ -265,11 +361,7 @@ paths:
           $ref: '#/components/responses/internalServerErrorResponse'
     put:
       description: |-
-        Update a Unikorn cluster within the selected Unikorn control plane.
-        This is used to modify cluster paramters e.g. Kubernetes versions or
-        scaling (where automatic scaling is not employed), and to modify any
-        software componenets deployed within the cluster by the underlying
-        continuous deliver platform.
+        Update a cluster within the selected control plane.
       security:
       - oauth2Authentication:
         - project
@@ -288,13 +380,13 @@ paths:
           $ref: '#/components/responses/internalServerErrorResponse'
     delete:
       description: |-
-        Delete a Unikorn cluster from within a Unikorn control plane.
+        Delete a cluster from within a the selected control plane.
       security:
       - oauth2Authentication:
         - project
       responses:
         '202':
-          $ref: '#/components/responses/nullResponse'
+          $ref: '#/components/responses/acceptedResponse'
         '400':
           $ref: '#/components/responses/badRequestResponse'
         '401':
@@ -304,13 +396,14 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/controlplanes/{controlPlaneName}/clusters/{clusterName}/kubeconfig:
-    description: Unikorn cluster services.
+    x-documentation-group: main
+    description: Cluster services.
     parameters:
     - $ref: '#/components/parameters/controlPlaneNameParameter'
     - $ref: '#/components/parameters/clusterNameParameter'
     get:
       description: |-
-        Get a Unikorn cluster kubernetes config.
+        Get a cluster's Kubernetes configuration.
       security:
       - oauth2Authentication:
         - project
@@ -325,8 +418,9 @@ paths:
           $ref: '#/components/responses/notFoundResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/applicationBundles/controlPlane:
-    description: Unikorn control plane application bundle services.
+  /api/v1/applicationbundles/controlPlane:
+    x-documentation-group: main
+    description: Control plane application bundle services.
     get:
       description: |-
         Lists global application bundles for control planes.  This is
@@ -342,8 +436,9 @@ paths:
           $ref: '#/components/responses/unauthorizedResponse'
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
-  /api/v1/applicationBundles/cluster:
-    description: Unikorn cluster application bundle services.
+  /api/v1/applicationbundles/cluster:
+    x-documentation-group: main
+    description: Cluster application bundle services.
     get:
       description: |-
         Lists global application bundles for clusters.  This is
@@ -360,6 +455,7 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/projects:
+    x-documentation-group: provider-openstack
     description: OpenStack identity project services.
     get:
       description: |-
@@ -376,6 +472,7 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/flavors:
+    x-documentation-group: provider-openstack
     description: OpenStack compute flavor services.
     get:
       description: |-
@@ -394,6 +491,7 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/images:
+    x-documentation-group: provider-openstack
     description: OpenStack compute image services.
     get:
       description: |-
@@ -412,6 +510,7 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/availability-zones/compute:
+    x-documentation-group: provider-openstack
     description: OpenStack compute availability zone services.
     get:
       description: |-
@@ -430,6 +529,7 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/availability-zones/block-storage:
+    x-documentation-group: provider-openstack
     description: OpenStack block storage availability zone services.
     get:
       description: |-
@@ -448,6 +548,7 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/external-networks:
+    x-documentation-group: provider-openstack
     description: OpenStack external network services.
     get:
       description: |-
@@ -466,6 +567,7 @@ paths:
         '500':
           $ref: '#/components/responses/internalServerErrorResponse'
   /api/v1/providers/openstack/key-pairs:
+    x-documentation-group: provider-openstack
     description: OpenStack key pair services.
     get:
       description: |-
@@ -488,21 +590,31 @@ components:
     controlPlaneNameParameter:
       name: controlPlaneName
       in: path
-      description: The Unikorn control plane name.
+      description: |-
+        The control plane name, if the control plane does not exist, then it may be
+        implicitly created, for example a cluster is created against a control plane
+        that does not exist. Must be a valid DNS containing only lower case characters,
+        numbers or hyphens, start and end with a character or number, and be at most
+        63 characters in length.
       required: true
       schema:
-        $ref: '#/components/schemas/stringParameter'
+        $ref: '#/components/schemas/kubernetesNameParameter'
     clusterNameParameter:
       name: clusterName
       in: path
-      description: The Unikorn cluster name.
+      description: |-
+        The cluster name. Must be a valid DNS containing only lower case characters,
+        numbers or hyphens, start and end with a character or number, and be at most
+        63 characters in length.
       required: true
       schema:
-        $ref: '#/components/schemas/stringParameter'
+        $ref: '#/components/schemas/kubernetesNameParameter'
   schemas:
-    stringParameter:
-      description: A basic string parameter.
+    kubernetesNameParameter:
+      description: A Kubernetes name. Must be a valid DNS containing only lower case characters, numbers or hyphens, start and end with a character or number, and be at most 63 characters in length.
       type: string
+      minLength: 1
+      maxLength: 63
     oauth2Error:
       description: Generic error message.
       type: object
@@ -511,7 +623,7 @@ components:
       - error_description
       properties:
         error:
-          description: A terse error string expaning on the HTTP error code.
+          description: A terse error string expanding on the HTTP error code. Errors are based on the OAuth2 specification, but are expanded with proprietary status codes for APIs other than those specified by OAuth2.
           type: string
           enum:
           # Defined by OAuth2
@@ -530,6 +642,7 @@ components:
           - conflict
           - method_not_allowed
           - unsupported_media_type
+          - forbidden
         error_description:
           description: Verbose message describing the error.
           type: string
@@ -540,30 +653,30 @@ components:
       - grant_type
       properties:
         grant_type:
-          description: Supported grant type.
+          description: Supported grant type.  Must be either "code" or "password".
           type: string
         code:
-          description: Authorization code.
+          description: Authorization code. Required with the "code" grant type.
           type: string
           nullable: true
         client_id:
-          description: Client ID.
+          description: Client ID. Required with the "code" grant type.
           type: string
           nullable: true
         redirect_uri:
-          description: Client redirect URI.
+          description: Client redirect URI. Required with the "code" grant type.
           type: string
           nullable: true
         code_verifier:
-          description: Client code verifier.
+          description: Client code verifier. Required with the "code" grant type.
           type: string
           nullable: true
         username:
-          description: Resource owner username.
+          description: Resource owner username. Required with the "password" grant type.
           type: string
           nullable: true
         password:
-          description: Resource owner password.
+          description: Resource owner password. Required with the "password" grant type.
           type: string
           nullable: true
       oneOf:
@@ -575,7 +688,7 @@ components:
         properties:
           grant_type:
             enum:
-            - authorization_code
+            - authorisation_code
       - required:
         - username
         - password
@@ -584,7 +697,7 @@ components:
             enum:
             - password
     tokenScope:
-      description: Openstack token scope.
+      description: OpenStack token scope.
       type: object
       required:
       - project
@@ -592,13 +705,13 @@ components:
         project:
           $ref: '#/components/schemas/tokenScopeProject'
     tokenScopeProject:
-      description: Openstack token project scope.
+      description: OpenStack token project scope.
       type: object
       required:
       - id
       properties:
         id:
-          description: Openstack project ID.
+          description: OpenStack project ID.
           type: string
       additionalProperties: false
     token:
@@ -622,7 +735,9 @@ components:
           description: The time in seconds the token will last for.
           type: integer
     jsonWebKeySet:
-      description: JSON web key set.
+      description: |-
+        JSON web key set. This data type is defined by an external 3rd party standards
+        committee. Consult the relevant documentation for further details.
       type: object
       properties:
         keys:
@@ -630,7 +745,7 @@ components:
           items:
             $ref: '#/components/schemas/jsonWebKey'
     jsonWebKey:
-      description: JSON web key.
+      description: JSON web key. See the relevant JWKS documentation for further details.
       type: object
       items:
         description: JSON web key.
@@ -651,20 +766,27 @@ components:
           type: string
           format: date-time
         deletionTime:
-          description: The time a control plane was deleted.
+          description: The time the resource was deleted.
           type: string
           format: date-time
         status:
-          description: The current status of the resource.
+          description: |-
+            The current status of the resource. Intially the status will be "Unknown" until
+            the resource is reconciled by the relevant controller. It then will transition to
+            "Provisioning" and will be ready for use when it changes to "Provisioned". The status
+            will also transition to the "Provisioning" status during an update. The
+            status will change to "Deprovisioning" when a delete request is being processed.
+            It may also change to "Error" if an unexpected error occurred during any operation.
+            Errors may be transient.
           type: string
     project:
-      description: A Unikorn project.
+      description: A project.
       type: object
       properties:
         status:
           $ref: '#/components/schemas/kubernetesResourceStatus'
     controlPlane:
-      description: A Unikorn control plane.
+      description: A control plane.
       type: object
       required:
       - name
@@ -680,12 +802,12 @@ components:
         applicationBundleAutoUpgrade:
           $ref: '#/components/schemas/applicationBundleAutoUpgrade'
     controlPlanes:
-      description: A list of Unikorn control planes.
+      description: A list of control planes.
       type: array
       items:
         $ref: '#/components/schemas/controlPlane'
-    kubernetesClusterOpenstack:
-      description: Unikorn Kubernetes cluster creation Openstack parameters.
+    kubernetesClusterOpenStack:
+      description: Kubernetes cluster creation OpenStack parameters.
       type: object
       required:
       - computeAvailabilityZone
@@ -699,13 +821,14 @@ components:
           description: Volume availability zone for control plane, and workload pool default.
           type: string
         externalNetworkID:
-          description: Openstack external network ID.
+          description: OpenStack external network ID.
           type: string
         sshKeyName:
-          description: Openstack SSH Key to install on all machines.
+          description: OpenStack SSH Key to install on all machines.
           type: string
     kubernetesClusterNetwork:
       description: A kubernetes cluster network settings.
+      type: object
       required:
       - nodePrefix
       - servicePrefix
@@ -713,22 +836,23 @@ components:
       - dnsNameservers
       properties:
         nodePrefix:
-          description: Network prefix to provision nodes in.
+          description: Network prefix to provision nodes in. Must be a valid CIDR block.
           type: string
         servicePrefix:
-          description: Network prefix to provision services in.
+          description: Network prefix to provision services in. Must be a valid CIDR block.
           type: string
         podPrefix:
-          description: Network prefix to provision pods in.
+          description: Network prefix to provision pods in. Must be a valid CIDR block.
           type: string
         dnsNameservers:
           description: A list of DNS name server to use.
           type: array
           items:
-            description: A DNS nameserver address.
+            description: A DNS nameserver IPv4 address.
             type: string
     kubernetesClusterAPI:
       description: Kubernetes API settings.
+      type: object
       properties:
         subjectAlternativeNames:
           description: Set of non-standard X.509 SANs to add to the API certificate.
@@ -745,7 +869,7 @@ components:
             description: An IPv4 CIDR address prefix.
             type: string
     openstackVolume:
-      description: An Openstack volume.
+      description: An OpenStack volume.
       type: object
       required:
       - size
@@ -754,7 +878,7 @@ components:
           description: Disk size in GiB.
           type: integer
         availabilityZone:
-          description: Volume availability zone.
+          description: Volume availability zone. Overrides the cluster default.
           type: string
     openstackMachinePool:
       description: A Kubernetes cluster machine.
@@ -769,31 +893,37 @@ components:
           description: Number of machines.
           type: integer
         version:
-          description: Kubernetes version.
+          description: |-
+            Kubernetes version. This should be derived from the image name as images
+            will be preloaded with containers for a specific Kubernetes version.
           type: string
           minLength: 1
         imageName:
-          description: Openstack image name.
+          description: OpenStack image name.
           type: string
           minLength: 1
         flavorName:
-          description: Openstack flavor name.
+          description: OpenStack flavor name.
           type: string
           minLength: 1
         disk:
           $ref: '#/components/schemas/openstackVolume'
     kubernetesClusterAutoscaling:
-      description: A Kubernetes cluster workload pool autoscaling configuration.
+      description: |-
+        A Kubernetes cluster workload pool autoscaling configuration. Cluster autoscaling
+        must also be enabled in the cluster features.
       type: object
       required:
       - minimumReplicas
       - maximumReplicas
       properties:
         minimumReplicas:
-          description: The minimum number of replicas to allow.
+          description: |-
+            The minimum number of replicas to allow. Must be less than the maximum.
           type: integer
         maximumReplicas:
-          description: The maximum number of replicas to allow.
+          description: |-
+            The maximum number of replicas to allow. Must be greater than the minimum.
           type: integer
     kubernetesClusterWorkloadPool:
       description: A Kuberntes cluster workload pool.
@@ -808,10 +938,10 @@ components:
         machine:
           $ref: '#/components/schemas/openstackMachinePool'
         availabilityZone:
-          description: Workload pool availability zone.
+          description: Workload pool availability zone. Overrides the cluster default.
           type: string
         labels:
-          description: Workload pool labels to apply on node creation.
+          description: Workload pool key value labels to apply on node creation.
           type: object
           additionalProperties:
             description: A string value.
@@ -819,13 +949,14 @@ components:
         autoscaling:
           $ref: '#/components/schemas/kubernetesClusterAutoscaling'
     kubernetesClusterWorkloadPools:
-      description: A non-empty list of Kubernetes cluster workload pools.
+      description: A list of Kubernetes cluster workload pools.
       type: array
       minItems: 1
       items:
         $ref: '#/components/schemas/kubernetesClusterWorkloadPool'
     kubernetesClusterFeatures:
       description: A set of optional add on features for the cluster.
+      type: object
       properties:
         autoscaling:
           description: Enable auto-scaling.
@@ -840,13 +971,13 @@ components:
           description: Enable the Kubernetes dashboard.  Requires ingress and certManager to be enabled.
           type: boolean
         fileStorage:
-          description: Enable POSIX file based persistent storage.
+          description: Enable POSIX file based persistent storage (Longhorn).
           type: boolean
         prometheus:
           description: Enable Prometheus.
           type: boolean
     kubernetesCluster:
-      description: Unikorn Kubernetes cluster creation parameters.
+      description: Kubernetes cluster creation parameters.
       type: object
       required:
       - name
@@ -864,7 +995,7 @@ components:
         applicationBundleAutoUpgrade:
           $ref: '#/components/schemas/applicationBundleAutoUpgrade'
         openstack:
-          $ref: '#/components/schemas/kubernetesClusterOpenstack'
+          $ref: '#/components/schemas/kubernetesClusterOpenStack'
         network:
           $ref: '#/components/schemas/kubernetesClusterNetwork'
         api:
@@ -878,12 +1009,18 @@ components:
         status:
           $ref: '#/components/schemas/kubernetesResourceStatus'
     kubernetesClusters:
-      description: A list of Unikorn Kubernetes clusters.
+      description: A list of Kubernetes clusters.
       type: array
       items:
         $ref: '#/components/schemas/kubernetesCluster'
     applicationBundle:
-      description: A bundle of applications.
+      description: |-
+        A bundle of applications. This forms the basis of resource versions. Bundles marked
+        as preview should not be selected by default, and end of life bundles should not be
+        used to avoid unnecessary upgrades. If enabled, automatic upgrades will occur if
+        a newer version of a bundle exists that is not in preview. When a bundle's end of
+        life expires, resources will undergo a foreced upgrade, regardless of whether
+        automatic upgrade is enabled for a resource or not.
       type: object
       required:
       - name
@@ -908,7 +1045,9 @@ components:
       items:
         $ref: '#/components/schemas/applicationBundle'
     applicationBundleAutoUpgrade:
-      description: When specified enables auto upgrade of application bundles.
+      description: |-
+        When specified, enables auto upgrade of application bundles. All resources will be
+        automatically upgraded if the currently selected bundle is end of life.
       type: object
       properties:
         daysOfWeek:
@@ -948,28 +1087,28 @@ components:
       minimum: 0
       maximum: 23
     openstackProject:
-      description: An Openstack project.
+      description: An OpenStack project.
       type: object
       required:
       - id
       - name
       properties:
         id:
-          description: Globally unique project ID.
+          description: The unique project ID.
           type: string
         name:
-          description: The name of the project within the scope of the domain.
+          description: The name of the project.
           type: string
         description:
           description: A verbose description of the project.
           type: string
     openstackProjects:
-      description: A list of Openstack projects.
+      description: A list of OpenStack projects.
       type: array
       items:
         $ref: '#/components/schemas/openstackProject'
     openstackImage:
-      description: And Openstack image.
+      description: And OpenStack image.
       type: object
       required:
       - id
@@ -985,7 +1124,9 @@ components:
           description: The image name.
           type: string
         created:
-          description: Time when the image was created.
+          description: |-
+            Time when the image was created. Images with a newer creation time should
+            be favoured over older images as they will contain updates and fewer vulnerabilities.
           type: string
           format: date-time
         modified:
@@ -1000,18 +1141,20 @@ components:
           - nvidiaDriver
           properties:
             kubernetes:
-              description: The kubernetes semantic version.
+              description: |-
+                The kubernetes semantic version.  This should be used directly when specifying
+                Kubernetes control planes and workload pools in a cluster specification.
               type: string
             nvidiaDriver:
               description: The nvidia driver version.
               type: string
     openstackImages:
-      description: A list of Openstack images that are compatible with this platform.
+      description: A list of OpenStack images that are compatible with this platform.
       type: array
       items:
         $ref: '#/components/schemas/openstackImage'
     openstackFlavor:
-      description: An Openstack flavor.
+      description: An OpenStack flavor.
       type: object
       required:
       - id
@@ -1039,30 +1182,30 @@ components:
           description: The number of GPUs, if not set there are none.
           type: integer
     openstackFlavors:
-      description: A list of Openstack flavors.
+      description: A list of OpenStack flavors.
       type: array
       items:
         $ref: '#/components/schemas/openstackFlavor'
     openstackExternalNetwork:
-      description: An Openstack external network.
+      description: An OpenStack external network.
       type: object
       required:
       - id
       - name
       properties:
         id:
-          description: Openstack external network ID.
+          description: OpenStack external network ID.
           type: string
         name:
           description: Opestack external network name.
           type: string
     openstackExternalNetworks:
-      description: A list of Openstack external networks.
+      description: A list of OpenStack external networks.
       type: array
       items:
         $ref: '#/components/schemas/openstackExternalNetwork'
     openstackKeyPair:
-      description: An Openstack key pair.
+      description: An OpenStack SSH key pair.
       type: object
       required:
       - name
@@ -1071,12 +1214,12 @@ components:
           description: The key pair name.
           type: string
     openstackKeyPairs:
-      description: A list of Openstack key pairs.
+      description: A list of OpenStack key pairs.
       type: array
       items:
         $ref: '#/components/schemas/openstackKeyPair'
     openstackAvailabilityZone:
-      description: An Openstack availability zone.
+      description: An OpenStack availability zone.
       type: object
       required:
       - name
@@ -1085,176 +1228,355 @@ components:
           description: The availability zone name.
           type: string
     openstackAvailabilityZones:
-      description: A list of Openstack availability zones.
+      description: A list of OpenStack availability zones.
       type: array
       items:
         $ref: '#/components/schemas/openstackAvailabilityZone'
   requestBodies:
     tokenRequest:
-      description: oauth2 token endpoint.
+      description: OAuth2 token request, consult the relevant OAuth2 and OIDC specifications for further details. The request body must use form encoding as described in the OAuth2 specification.
       required: true
       content:
         application/x-www-form-urlencoded:
           schema:
             $ref: '#/components/schemas/tokenRequestOptions'
     tokenScopeRequest:
-      description: Openstack authentication scoping information.
+      description: OpenStack authentication scoping request. This allows an authenticated user to issue am authorisation token scoped to a specific project. Project scoping is required by most API endpoints.
       required: true
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/tokenScope'
     createControlPlaneRequest:
-      description: Unikorn control plane parameters.
+      description: Control plane request parameters.
       required: true
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/controlPlane'
     createKubernetesClusterRequest:
-      description: Unikorn Kubernetes cluster parameters.
+      description: Kubernetes cluster request parameters.
       required: true
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/kubernetesCluster'
   responses:
-    nullResponse:
-      description: Delete Me
-    okResponse:
-      description: Request is ok with no body.
     acceptedResponse:
-      description: Creation request accepted.
+      description: |-
+        The request has been accepted and will be fulfilled asynchronously.
+        You may poll the resource and monitor its status for completion.
     badRequestResponse:
-      description: Request body failed schema validation.
+      description: |-
+        Request body failed schema validation, or the request does not contain
+        all the required fields.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/oauth2Error'
+          example:
+            error: invalid_request
+            error_description: request body invalid
     unauthorizedResponse:
-      description: Authentication failed.
+      description: |-
+        Authentication failed or the access token has expired.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/oauth2Error'
+          example:
+            error: access_denied
+            error_description: authentication failed
     forbiddenResponse:
-      description: Request was denied by authorization.
+      description: |-
+        Request was denied by authorisation, this may be caused by the authorisation
+        token not having the required scope for an API, or the user doesn't have the
+        necessary privileges on the provider platform.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/oauth2Error'
+          example:
+            error: forbidden
+            error_description: user credentials do not have the required privileges
     notFoundResponse:
-      description: Unable to find a resource.
+      description: |-
+        Unable to find a resource.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/oauth2Error'
+          example:
+            error: not_found
+            error_description: the requested resource does not exist
     conflictResponse:
-      description: Resource conlicts with another.
+      description: |-
+        Resource conflicts with another, usually this means they have the same name.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/oauth2Error'
+          example:
+            error: conflict
+            error_description: a resource with the same name already exists
     internalServerErrorResponse:
-      description: An unexpected error occurred, please report.
+      description: |-
+        An unexpected error occurred, this may be an unexpected transient error and
+        may succeed on a retry. If this isn't the case, please report it as an issue.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/oauth2Error'
+          example:
+            error: server_error
+            error_description: failed to token claim
     tokenResponse:
-      description: Authentication was successful.
+      description: |-
+        Authentication was successful and returns an authorisation token. The response
+        may optionally include an OIDC identity token if that scope was requested.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/token'
+          example:
+            access_token: eyJhbGciOiJFQ0RILUVTIiwiY3R5IjoiSldUIiwiZW5jIjoiQTI1NkdDTSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtNTIxIiwieCI6IkFic05hU1ByY3Y5RVJsWmFrOHVDc2V0T2F2aTJ4bS1taXFPWjVvQmFNR2ptc05Cbi04aE84QU9DbGR2OVM3dDlydTBEbDhabzFEcThxOEM5WUp0WGJfa0YiLCJ5IjoiQWU3VS1DcktsY3RJOXYzM0RsTWFsS0ZBZk9YcC1QeV9zZ0Y5Tjdaa05NQkRDRkVKb0FrRy1FTnhTczI2ME5memg4SnJnSnBRbUFFWHhvZ0poWHp2YWZMQSJ9LCJraWQiOiIxZHh3c29KUlZEQmxTYmxvSm93dDlJTkJwdGJTb21XUlBZck5LeWNFQV9RIiwidHlwIjoiSldUIn0..urRmbxH2_bn8LMla.Yw0a3qstHMAKnxawkIYntHcvOCjaxjzvV1JlmYM-2CTbC1i2VtAsNIKoOlFJ56H2N08pMY9OpZ2cukCHP1BQxsKMsc41VwlIZYvjFrzWIEeDoF92FmpCRGWztuwchBWd7PEQYpfeJFJ2BegacGheQqfRXX35RNDy-ZOc4dWkuvFrV8ISuA8-7_ce7Ha25SrRuSRarTfM_BLA1uDA_P9AWjhsyGKOK2FkuaDU0XmXlLWDz6dKdKy9RJtR_nUUcsljtaImJXjNNPAmJq10nJ501EK_I6M9B3TRUrqalOBm4ks7-vmF_gcE1saOv2AciE9P2BMkc635kaD3C5HlyWT95Skd6C_FwppjQUvYUY0y7Eq2NpnVfkX4uSPm8fUD4brSjGWnHMNE8z4M2_PlM4KSZAieLRmMAjY5xW8XY_uCXr5nb-8SmA_P-ljCVOPPAXDXExa2xSxbAJvrYqWeuG2IvAkC0ab6pojlqUmkRWvOX5tnXQav5vO2qOAgCYUhSIWXz0-Y8hczRUSgDTyQm59yU7xqVqCiywChgXlO32KwhhnrfLxNlrMB45XOlzhJP1c3DCg7ZW7bO_Q7A08GjvrXxTm7gUDr-jsdW9hTSiNJQu__zSMFPVVNTqnz1MDFIeusi6GJi9VC0A_ouXsdhcNKn6jeIDV9dnMxCcjbQT5qsCEqo-UcCGvH0_w4aChpldMg8HGPeUSZhaBSL1yns_I0C9AADFe9dmXN6wCHBu8JCy-T4FoeXRlVSKVuG2GJi8sfzAFFh6iKhQXxHm5KNA_iorBJVEOSX3dL6KOUXfdsBfTzg3aMoEyp2bJ9NaactGmFyJZM9e6MxS8UxgN6KHe7Gduc0NGFyBru3ClMq2BzchOxbzDQ_oi5YoSuxLpgGl3xiJfNnClqFTqXMJ75uSk0_OkKgvmHea9QGRaasx5XALSpap_ckCZvNYjG_oZh404-KTjpa2iJgENczeUT2F4jq59rCCAUFZVfyu3qtBAeJme4VghnbTvaITJbpFeBUySgYKcuGQ.uvQMjilUi8JcdyGe3Lbatg
+            token_type: Bearer
+            id_token: eyJhbGciOiJFUzUxMiJ9.eyJhdF9oYXNoIjoidGJHNlFHek5WZE5fcjZ6Y0EzRlFyQzllNmVPbUpPN3lrSjFsTFBxNUJ0RSIsImF1ZCI6WyI5YTcxOWUxZS1hYTg1LTRhMjEtYTIyMS0zMjRlNzg3ZWZkNzgiXSwiZW1haWwiOiJqb2huLmRvZUBlbWFpbC5jb20iLCJleHAiOjE2OTE1NzM4NzEsImlhdCI6MTY5MTQ4NzQ3MSwiaXNzIjoiaHR0cHM6Ly9rdWJlcm5ldGVzLmVzY2hlcmNsb3VkLmNvbSIsInBpY3R1cmUiOiJodHRwczovL3d3dy5ncmF2YXRhci5jb20vYXZhdGFyLzhmNmU5NjI3NGMyYWJmNjE3YTM5ODdlNzRlOWU3NTdlIiwic3ViIjoiam9obi5kb2VAZW1haWwuY29tIn0.AYxSoAwkuKfBpp5o1spmAyqzhkSR76hbjF1OCKe4iLS6BCP9ySZYeV-kBCd0t3cd6VxbO5FVQJPRt8k0q88rc21JATyV8kScNnr-1jFmAJuXO6ga021KTRQnG68D8zZN9LwmMSRh3HPFtOq4LCcmQES2adeJysoG998mmtuTwp4fArwa
+            expires_in: 3600
     jwksResponse:
-      description: A JSON web key set.
+      description: |-
+        A JSON web key set. This is a set of named public keys that are referenced by JSON
+        web tokens. The public key can be used to verify that a token was signed by this
+        service.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/jsonWebKeySet'
-    projectResponse:
-      description: A Unikorn project.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/project'
+          example:
+            keys:
+            - use: sig
+              kty: EC
+              kid: 1dxwsoJRVDBlSbloJowt9INBptbSomWRPYrNKycEA_Q
+              crv: P-521
+              x: AGWAbuKBnn0qXsj8iddWhZj5-ZTM4F4d5rJeKbblOGVc-5nJNURsPb7k-MhEqr9QAi5jKnd7lkmkHU2mnalwsQPK
+              y: AAepClWS8MoLLCzqMQ2bl3KwzF7eSYLhcSrsk8kYuRaNN45mnVuQsH43QOILEB5XXaHhySSRgVCamMwZWUwArv1k
     controlPlaneResponse:
-      description: A Unikorn control plane.
+      description: A control plane.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/controlPlane'
+          example:
+            applicationBundle: 
+              name: control-plane-1.0.0
+              version: 1.1.0
+            applicationBundleAutoUpgrade: {}
+            name: default
+            status:
+              creationTime: 2023-07-31T10:45:42Z
+              name: default
+              status: Provisioned
     controlPlanesResponse:
-      description: A list of Unikorn control planes.
+      description: A list of control planes.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/controlPlanes'
+          example:
+          - applicationBundle:
+              name: control-plane-1.0.0
+              version: 1.0.0
+            applicationBundleAutoUpgrade: {}
+            name: default
+            status:
+              creationTime: 2023-07-31T10:45:42Z
+              name: default
+              status: Provisioned
+    kubernetesClusterKubeconfigResponse:
+      description: A Kubernetes cluster configuration.
+      content:
+        application/octet-stream: {}
     kubernetesClusterResponse:
-      description: A Unikorn Kubernetes cluster.
+      description: A Kubernetes cluster.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/kubernetesCluster'
-    kubernetesClusterKubeconfigResponse:
-      description: A Unikorn Kubernetes cluster configuration.
-      content:
-        application/octet-stream: {}
+          example:
+            applicationBundle:
+              name: kubernetes-cluster-1.0.0
+              version: 1.0.0
+            controlPlane:
+              flavorName: g.2.standard
+              imageName: eck-230714-4bef8ab1
+              replicas: 3
+              version: v1.27.2
+            features:
+              autoscaling: true
+              certManager: false
+              fileStorage: false
+              ingress: false
+              kubernetesDashboard: false
+              prometheus: false
+            name: cluster
+            network:
+              dnsNameservers:
+              - 8.8.8.8
+              - 8.8.4.4
+              nodePrefix: 192.168.0.0/16
+              podPrefix: 10.0.0.0/8
+              servicePrefix: 172.16.0.0/12
+            openstack:
+              computeAvailabilityZone: nova
+              externalNetworkID: c9d130bc-301d-45c0-9328-a6964af65579
+              volumeAvailabilityZone: nova
+            status:
+              creationTime: 2023-07-31T10:45:45Z
+              name: cluster
+              status: Provisioned
+            workloadPools:
+            - autoscaling:
+                maximumReplicas: 3
+                minimumReplicas: 0
+              machine:
+                disk:
+                  size: 50
+                flavorName: g.4.highmem.a100.1g.10gb
+                imageName: eck-230714-4bef8ab1
+                replicas: 3
+                version: v1.27.2
+              name: default
     kubernetesClustersResponse:
-      description: A list of Unikorn Kubernetes clusters.
+      description: A list of Kubernetes clusters.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/kubernetesClusters'
+          example:
+          - applicationBundle:
+              name: kubernetes-cluster-1.0.0
+              version: 1.0.0
+            controlPlane:
+              flavorName: g.2.standard
+              imageName: eck-230714-4bef8ab1
+              replicas: 3
+              version: v1.27.2
+            features:
+              autoscaling: true
+              certManager: false
+              fileStorage: false
+              ingress: false
+              kubernetesDashboard: false
+              prometheus: false
+            name: cluster
+            network:
+              dnsNameservers:
+              - 8.8.8.8
+              - 8.8.4.4
+              nodePrefix: 192.168.0.0/16
+              podPrefix: 10.0.0.0/8
+              servicePrefix: 172.16.0.0/12
+            openstack:
+              computeAvailabilityZone: nova
+              externalNetworkID: c9d130bc-301d-45c0-9328-a6964af65579
+              volumeAvailabilityZone: nova
+            status:
+              creationTime: 2023-07-31T10:45:45Z
+              name: cluster
+              status: Provisioned
+            workloadPools:
+            - autoscaling:
+                maximumReplicas: 3
+                minimumReplicas: 0
+              machine:
+                disk:
+                  size: 50
+                flavorName: g.4.highmem.a100.1g.10gb
+                imageName: eck-230714-4bef8ab1
+                replicas: 3
+                version: v1.27.2
+              name: default
     applicationBundleResponse:
       description: A list of application bundles.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/applicationBundles'
+          example:
+          - name: kubernetes-cluster-1.0.0
+            version: 1.3.0
     openstackProjectsResponse:
-      description: A list of Openstack projects.
+      description: A list of OpenStack projects.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackProjects'
+          example:
+          - description: My project
+            id: 23a9e437091d481da99f2aa07180b4ea
+            name: my_project
     openstackImagesResponse:
-      description: A list of Openstack images that are compatible with this platform.
+      description: A list of OpenStack images that are compatible with this platform.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackImages'
+          example:
+          - created: 2023-02-22T12:04:13Z
+            id: a64f9269-36e0-4312-b8d1-52d93d569b7b
+            modified: 2023-02-22T12:15:18Z
+            name: ubu2204-v1.25.6-gpu-525.85.05-7ced4154
+            versions:
+              kubernetes: v1.25.6
+              nvidiaDriver: 525.85.05
     openstackFlavorsResponse:
-      description: A list of Openstack flavors.
+      description: A list of OpenStack flavors.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackFlavors'
+          example:
+          - cpus: 4
+            disk: 20
+            gpus: 1
+            id: 9a8c6370-4065-4d4a-9da0-7678df40cd9d
+            memory: 32
+            name: g.4.highmem.a100.1g.10gb
     openstackExternalNetworksResponse:
-      description: A list of Openstack external networks.
+      description: A list of OpenStack external networks.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackExternalNetworks'
+          example:
+          - id: c9d130bc-301d-45c0-9328-a6964af65579
+            name: Internet
     openstackKeyPairsResponse:
-      description: A list of Openstack key pairs.
+      description: A list of OpenStack key pairs.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackKeyPairs'
+          example:
+          - name: my-ssh-key
     openstackComputeAvailabilityZonesResponse:
-      description: A list of Openstack availability zones.
+      description: A list of OpenStack availability zones.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackAvailabilityZones'
+          example:
+          - name: nova
+          - name: POD-1
+          - name: POD-2
     openstackBlockStorageAvailabilityZonesResponse:
-      description: A list of Openstack availability zones.
+      description: A list of OpenStack availability zones.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/openstackAvailabilityZones'
+          example:
+          - name: nova
   securitySchemes:
     oauth2Authentication:
       description: Operation requires OAuth2 bearer token authentication.

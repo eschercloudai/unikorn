@@ -135,7 +135,7 @@ func (e *HTTPError) Write(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTPForbidden(description string) *HTTPError {
-	return newHTTPError(http.StatusForbidden, generated.InvalidRequest, description)
+	return newHTTPError(http.StatusForbidden, generated.Forbidden, description)
 }
 
 func HTTPNotFound() *HTTPError {

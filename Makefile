@@ -198,6 +198,11 @@ lint: $(GENDIR)
 validate: $(SRVGENDIR)
 	go run ./hack/validate_openapi
 
+# Validate the docs can be generated without fail.
+.PHONY: validate-docs
+validate-docs: $(SRVGENDIR)
+	go run ./hack/docs --dry-run
+
 # Perform license checking.
 # This must pass or you will be denied by CI.
 .PHONY: license
