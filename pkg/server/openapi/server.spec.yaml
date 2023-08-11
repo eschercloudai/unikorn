@@ -6,8 +6,7 @@ info:
     management of Kubernetes clusters. The API is logically composed of authentication
     services, platform provider specific calls to get a set of resource types that can
     be then used by abstract Kubernetes Service resources to create and manage Kubernetes
-    clusters.  Unless stated otherwise, all request bodies and responses will accept and
-    return JSON content type respectively.  Requests must specify the HTML content type
+    clusters. Requests must specify the HTML content type
     header.
   version: 0.2.0
 # This allows the documentation engine to combine API endpoints into related groups
@@ -688,7 +687,7 @@ components:
         properties:
           grant_type:
             enum:
-            - authorisation_code
+            - authorization_code
       - required:
         - username
         - password
@@ -1234,12 +1233,18 @@ components:
         $ref: '#/components/schemas/openstackAvailabilityZone'
   requestBodies:
     tokenRequest:
-      description: OAuth2 token request, consult the relevant OAuth2 and OIDC specifications for further details. The request body must use form encoding as described in the OAuth2 specification.
+      description: OAuth2 token request, consult the relevant OAuth2 and OIDC specifications for further details.
       required: true
       content:
         application/x-www-form-urlencoded:
           schema:
             $ref: '#/components/schemas/tokenRequestOptions'
+          example:
+            grant_type: authorization_code
+            client_id: e58d490e-62f8-49a3-b7d0-b9beb615dabb
+            redirect_uri: https://example.com/oauth2/callback
+            code: eyJhbGciOiJFQ0RILUVTIiwiY3R5IjoiSldUIiwiZW5jIjoiQTI1NkdDTSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtNTIxIiwieCI6IkFic05hU1ByY3Y5RVJsWmFrOHVDc2V0T2F2aTJ4bS1taXFPWjVvQmFNR2ptc05Cbi04aE84QU9DbGR2OVM3dDlydTBEbDhabzFEcThxOEM5WUp0WGJfa0YiLCJ5IjoiQWU3VS1DcktsY3RJOXYzM0RsTWFsS0ZBZk9YcC1QeV9zZ0Y5Tjdaa05NQkRDRkVKb0FrRy1FTnhTczI2ME5memg4SnJnSnBRbUFFWHhvZ0poWHp2YWZMQSJ9LCJraWQiOiIxZHh3c29KUlZEQmxTYmxvSm93dDlJTkJwdGJTb21XUlBZck5LeWNFQV9RIiwidHlwIjoiSldUIn0..urRmbxH2_bn8LMla.Yw0a3qstHMAKnxawkIYntHcvOCjaxjzvV1JlmYM-2CTbC1i2VtAsNIKoOlFJ56H2N08pMY9OpZ2cukCHP1BQxsKMsc41VwlIZYvjFrzWIEeDoF92FmpCRGWztuwchBWd7PEQYpfeJFJ2BegacGheQqfRXX35RNDy-ZOc4dWkuvFrV8ISuA8-7_ce7Ha25SrRuSRarTfM_BLA1uDA_P9AWjhsyGKOK2FkuaDU0XmXlLWDz6dKdKy9RJtR_nUUcsljtaImJXjNNPAmJq10nJ501EK_I6M9B3TRUrqalOBm4ks7-vmF_gcE1saOv2AciE9P2BMkc635kaD3C5HlyWT95Skd6C_FwppjQUvYUY0y7Eq2NpnVfkX4uSPm8fUD4brSjGWnHMNE8z4M2_PlM4KSZAieLRmMAjY5xW8XY_uCXr5nb-8SmA_P-ljCVOPPAXDXExa2xSxbAJvrYqWeuG2IvAkC0ab6pojlqUmkRWvOX5tnXQav5vO2qOAgCYUhSIWXz0-Y8hczRUSgDTyQm59yU7xqVqCiywChgXlO32KwhhnrfLxNlrMB45XOlzhJP1c3DCg7ZW7bO_Q7A08GjvrXxTm7gUDr-jsdW9hTSiNJQu__zSMFPVVNTqnz1MDFIeusi6GJi9VC0A_ouXsdhcNKn6jeIDV9dnMxCcjbQT5qsCEqo-UcCGvH0_w4aChpldMg8HGPeUSZhaBSL1yns_I0C9AADFe9dmXN6wCHBu8JCy-T4FoeXRlVSKVuG2GJi8sfzAFFh6iKhQXxHm5KNA_iorBJVEOSX3dL6KOUXfdsBfTzg3aMoEyp2bJ9NaactGmFyJZM9e6MxS8UxgN6KHe7Gduc0NGFyBru3ClMq2BzchOxbzDQ_oi5YoSuxLpgGl3xiJfNnClqFTqXMJ75uSk0_OkKgvmHea9QGRaasx5XALSpap_ckCZvNYjG_oZh404-KTjpa2iJgENczeUT2F4jq59rCCAUFZVfyu3qtBAeJme4VghnbTvaITJbpFeBUySgYKcuGQ.uvQMjilUi8JcdyGe3Lbatg
+            code_verifier: ZWQ0MGJjZGYyNThkZDYyM2QwNzQyOTY0NGM0ZWZjMzU5ZjRmMDkzZjVkNDJkNjVhNjAxZDYzZTVkYzY0MmNjZQo
     tokenScopeRequest:
       description: OpenStack authentication scoping request. This allows an authenticated user to issue am authorisation token scoped to a specific project. Project scoping is required by most API endpoints.
       required: true
@@ -1247,6 +1252,9 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/tokenScope'
+          example:
+            project:
+              id: 64a9e4371d1d481da99f2f907180b4ea
     createControlPlaneRequest:
       description: Control plane request parameters.
       required: true
@@ -1254,6 +1262,11 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/controlPlane'
+          example:
+            applicationBundle:
+              name: control-plane-1.0.0
+              version: 1.1.0
+            name: default
     createKubernetesClusterRequest:
       description: Kubernetes cluster request parameters.
       required: true
@@ -1261,6 +1274,41 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/kubernetesCluster'
+          example:
+            applicationBundle:
+              name: kubernetes-cluster-1.0.0
+              version: 1.0.0
+            controlPlane:
+              flavorName: g.2.standard
+              imageName: eck-230714-4bef8ab1
+              replicas: 3
+              version: v1.27.2
+            features:
+              autoscaling: true
+            name: cluster
+            network:
+              dnsNameservers:
+              - 8.8.8.8
+              - 8.8.4.4
+              nodePrefix: 192.168.0.0/16
+              podPrefix: 10.0.0.0/8
+              servicePrefix: 172.16.0.0/12
+            openstack:
+              computeAvailabilityZone: nova
+              externalNetworkID: c9d130bc-301d-45c0-9328-a6964af65579
+              volumeAvailabilityZone: nova
+            workloadPools:
+            - autoscaling:
+                maximumReplicas: 3
+                minimumReplicas: 0
+              machine:
+                disk:
+                  size: 50
+                flavorName: g.4.highmem.a100.1g.10gb
+                imageName: eck-230714-4bef8ab1
+                replicas: 3
+                version: v1.27.2
+              name: default
   responses:
     acceptedResponse:
       description: |-

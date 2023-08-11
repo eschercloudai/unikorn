@@ -223,11 +223,16 @@ func (o *options) convertParameter(parameter *openapi3.Parameter, spellchecker *
 
 // convertContent does spellchecking and returns the internal representation.
 func (o *options) convertContent(content string, media *openapi3.MediaType) *document.Content {
-	return &document.Content{
+	c := &document.Content{
 		Type:    content,
 		Example: media.Example,
-		Schema:  media.Schema.Value,
 	}
+
+	if media.Schema != nil {
+		c.Schema = media.Schema.Value
+	}
+
+	return c
 }
 
 // cconvertRequestBod does spellchecking and returns the internal representation.
@@ -242,10 +247,6 @@ func (o *options) convertRequestBody(requestBody *openapi3.RequestBody, spellche
 	}
 
 	for content, media := range requestBody.Content {
-		if content != "application/json" && content != "application/x-www-form-urlencoded" {
-			continue
-		}
-
 		b.Content = o.convertContent(content, media)
 	}
 
@@ -264,10 +265,6 @@ func (o *options) convertResponse(status string, response *openapi3.Response, sp
 	}
 
 	for content, media := range response.Content {
-		if content != "application/json" && content != "application/x-www-form-urlencoded" {
-			continue
-		}
-
 		r.Content = o.convertContent(content, media)
 	}
 
@@ -478,30 +475,32 @@ func formatParameters(parameters document.ParameterList, f formatter.Formatter) 
 
 // formatRequestBody emits a details section (hidden by default)
 // that includes a description, schema and example.
-func formatRequestBody(requstBody *document.RequestBody, f formatter.Formatter) {
-	if requstBody == nil {
+func formatRequestBody(requestBody *document.RequestBody, f formatter.Formatter) {
+	if requestBody == nil {
 		return
 	}
 
 	f.Details("Request Body", func() {
-		f.P(requstBody.Description)
+		f.P(requestBody.Description)
 
-		if requstBody.Content == nil {
+		if requestBody.Content == nil {
 			return
 		}
 
-		if requstBody.Content.Schema != nil {
+		f.P("The content type is \"" + requestBody.Content.Type + "\".")
+
+		if requestBody.Content.Schema != nil {
 			f.H5("Fields")
 			f.P("This describes the request body object in terms of the JSON path specification that will be familiar to Kubernetes users. Where a child element is an array, it has been substituted with a \"0\", representing the first element indexed from zero.")
 
 			f.Table()
 			f.TH("JSON Path", "Type", "Required", "Description")
-			formatSchema(requstBody.Content.Schema, f, true, "")
+			formatSchema(requestBody.Content.Schema, f, true, "")
 			f.TableEnd()
 		}
 
-		if requstBody.Content.Example != nil {
-			example, err := json.MarshalIndent(requstBody.Content.Example, "", "  ")
+		if requestBody.Content.Example != nil {
+			example, err := json.MarshalIndent(requestBody.Content.Example, "", "  ")
 			if err != nil {
 				fmt.Println("unable to generate example for request body")
 				return
@@ -522,6 +521,8 @@ func formatResponse(r *document.Response, f formatter.Formatter) {
 		if r.Content == nil {
 			return
 		}
+
+		f.P("The content type is \"" + r.Content.Type + "\".")
 
 		if r.Content.Schema != nil {
 			f.H5("Fields")
