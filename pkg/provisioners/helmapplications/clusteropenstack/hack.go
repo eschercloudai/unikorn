@@ -117,7 +117,7 @@ func resourceExistsUnstructured(o unstructured.Unstructured, names []string) boo
 // workload pool.
 func machineDeploymentForWorkloadPool(objects []unstructured.Unstructured, name string) (*unstructured.Unstructured, error) {
 	for i, object := range objects {
-		if value, ok := object.GetAnnotations()["topology.eschercloud.ai/node-pool"]; ok {
+		if value, ok := object.GetAnnotations()["pool.eschercloud.ai/name"]; ok {
 			if value == name {
 				return &objects[i], nil
 			}
