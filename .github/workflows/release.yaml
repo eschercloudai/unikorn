@@ -34,7 +34,7 @@ jobs:
     - name: Build SBOMS
       run: go run ./hack/sbom
     - name: Build Documentation
-      run: go run ./hack/docs -o docs/server-api.md
+      run: sudo apt -y install wbritish && go run ./hack/docs -o docs/server-api.md
     - name: Rename Release Assets
       run: cp bin/unikornctl bin/unikornctl-linux-amd64
     - name: Release
