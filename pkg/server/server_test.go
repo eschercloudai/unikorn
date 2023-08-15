@@ -933,7 +933,7 @@ func TestApiV1ClustersCreate(t *testing.T) {
 			Version:    "v1.28.0",
 			Replicas:   3,
 			ImageName:  "ubuntu-24.04-lts",
-			FlavorName: "strawberry",
+			FlavorName: flavorName,
 		},
 		WorkloadPools: generated.KubernetesClusterWorkloadPools{
 			{
@@ -942,7 +942,7 @@ func TestApiV1ClustersCreate(t *testing.T) {
 					Version:    "v1.28.0",
 					Replicas:   3,
 					ImageName:  "ubuntu-24.04-lts",
-					FlavorName: "strawberry",
+					FlavorName: flavorName,
 				},
 			},
 		},
@@ -997,7 +997,7 @@ func TestApiV1ClustersCreateExisting(t *testing.T) {
 			Version:    "v1.28.0",
 			Replicas:   3,
 			ImageName:  "ubuntu-24.04-lts",
-			FlavorName: "strawberry",
+			FlavorName: flavorName,
 		},
 		WorkloadPools: generated.KubernetesClusterWorkloadPools{
 			{
@@ -1006,7 +1006,7 @@ func TestApiV1ClustersCreateExisting(t *testing.T) {
 					Version:    "v1.28.0",
 					Replicas:   3,
 					ImageName:  "ubuntu-24.04-lts",
-					FlavorName: "strawberry",
+					FlavorName: flavorName,
 				},
 			},
 		},
@@ -1056,7 +1056,7 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 			Version:    "v1.28.0",
 			Replicas:   3,
 			ImageName:  "ubuntu-24.04-lts",
-			FlavorName: "strawberry",
+			FlavorName: flavorName,
 		},
 		WorkloadPools: generated.KubernetesClusterWorkloadPools{
 			{
@@ -1065,7 +1065,7 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 					Version:    "v1.28.0",
 					Replicas:   3,
 					ImageName:  "ubuntu-24.04-lts",
-					FlavorName: "strawberry",
+					FlavorName: flavorName,
 				},
 			},
 		},
@@ -1250,7 +1250,7 @@ func TestApiV1ClustersUpdate(t *testing.T) {
 			Version:    "v1.28.0",
 			Replicas:   3,
 			ImageName:  "ubuntu-24.04-lts",
-			FlavorName: "strawberry",
+			FlavorName: flavorName,
 		},
 		WorkloadPools: generated.KubernetesClusterWorkloadPools{
 			{
@@ -1259,7 +1259,7 @@ func TestApiV1ClustersUpdate(t *testing.T) {
 					Version:    "v1.28.0",
 					Replicas:   3,
 					ImageName:  "ubuntu-24.04-lts",
-					FlavorName: "strawberry",
+					FlavorName: flavorName,
 				},
 			},
 		},
@@ -1311,7 +1311,7 @@ func TestApiV1ClustersUpdateNotFound(t *testing.T) {
 			Version:    "v1.28.0",
 			Replicas:   3,
 			ImageName:  "ubuntu-24.04-lts",
-			FlavorName: "strawberry",
+			FlavorName: flavorName,
 		},
 		WorkloadPools: generated.KubernetesClusterWorkloadPools{
 			{
@@ -1320,7 +1320,7 @@ func TestApiV1ClustersUpdateNotFound(t *testing.T) {
 					Version:    "v1.28.0",
 					Replicas:   3,
 					ImageName:  "ubuntu-24.04-lts",
-					FlavorName: "strawberry",
+					FlavorName: flavorName,
 				},
 			},
 		},
@@ -1407,6 +1407,30 @@ func TestApiV1ProvidersOpenstackProjects(t *testing.T) {
 	assert.Equal(t, projectName, results[0].Name)
 }
 
+// TestApiV1ProvidersOpenstackProjectsUnauthorized tests an unauthorized response
+// from a request is propagated to the client correctly.
+func TestApiV1ProvidersOpenstackProjectsUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	// Override...
+	RegisterIdentityV3AuthProjectsUnauthorized(tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackProjectsWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+}
+
 // TestApiV1ProvidersOpenstackFlavors tests OpenStack flavors can be listed.
 func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 	t.Parallel()
@@ -1426,11 +1450,37 @@ func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 	results := *response.JSON200
 
 	// NOTE: server converts from MiB to GiB of memory.
-	assert.Equal(t, 1, len(results))
+	assert.Equal(t, 4, len(results))
 	assert.Equal(t, flavorID, results[0].Id)
+	assert.Equal(t, flavorName, results[0].Name)
 	assert.Equal(t, flavorCpus, results[0].Cpus)
 	assert.Equal(t, flavorMemory>>10, results[0].Memory)
 	assert.Equal(t, flavorDisk, results[0].Disk)
+	assert.Equal(t, flavorName2, results[1].Name)
+	assert.Equal(t, flavorName3, results[2].Name)
+	assert.Equal(t, flavorName4, results[3].Name)
+}
+
+// TestApiV1ProvidersOpenstackFlavorsUnauthorized tests an unauthorized response
+// from a request is propagated to the client correctly.
+func TestApiV1ProvidersOpenstackFlavorsUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterComputeV2FlavorsUnauthorized(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackFlavorsWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, serverErr.Error, generated.AccessDenied)
 }
 
 // TestApiV1ProvidersOpenstackImages tests OpenStack images can be listed.
@@ -1465,6 +1515,28 @@ func TestApiV1ProvidersOpenstackImages(t *testing.T) {
 	assert.Equal(t, imageGpuVersion, results[0].Versions.NvidiaDriver)
 }
 
+// TestApiV1ProvidersOpenstackImagesUnauthorized tests an unauthorized response
+// from a request is propagated to the client correctly.
+func TestApiV1ProvidersOpenstackImagesUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2ImagesUnauthorized(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackImagesWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+}
+
 // TestApiV1ProvidersOpenstackAvailabilityZonesCompute tests OpenStack compute AZscan be listed.
 func TestApiV1ProvidersOpenstackAvailabilityZonesCompute(t *testing.T) {
 	t.Parallel()
@@ -1485,6 +1557,28 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesCompute(t *testing.T) {
 
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, computeAvailabilityZoneName, results[0].Name)
+}
+
+// TestApiV1ProvidersOpenstackAvailabilityZonesComputeUnauthorized tests an unauthorized response
+// from a request is propagated to the client correctly.
+func TestApiV1ProvidersOpenstackAvailabilityZonesComputeUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterComputeV2AvailabilityZoneUnauthorized(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesComputeWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, serverErr.Error, generated.AccessDenied)
 }
 
 // TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage tests OpenStack block storage AZscan be listed.
@@ -1509,6 +1603,28 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(t *testing.T) {
 	assert.Equal(t, blockStorageAvailabilityZone, results[0].Name)
 }
 
+// TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorageUnauthorized tests an unauthorized response
+// from a request is propagated to the client correctly.
+func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorageUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterBlockStorageV3AvailabilityZoneUnauthorized(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+}
+
 // TestApiV1ProvidersOpenstackExternalNetworks tests OpenStack external networks can be listed.
 func TestApiV1ProvidersOpenstackExternalNetworks(t *testing.T) {
 	t.Parallel()
@@ -1531,6 +1647,28 @@ func TestApiV1ProvidersOpenstackExternalNetworks(t *testing.T) {
 	assert.Equal(t, externalNetworkID, results[0].Id)
 }
 
+// TestApiV1ProvidersOpenstackExternalNetworksUnauthorized tests an unauthorized response
+// from a request is propagated to the client correctly.
+func TestApiV1ProvidersOpenstackExternalNetworksUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterNetworkV2NetworksUnauthorized(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackExternalNetworksWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+}
+
 // TestApiV1ProvidersOpenstackKeyPairs tests OpenStack key pairs can be listed.
 func TestApiV1ProvidersOpenstackKeyPairs(t *testing.T) {
 	t.Parallel()
@@ -1551,4 +1689,26 @@ func TestApiV1ProvidersOpenstackKeyPairs(t *testing.T) {
 
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, keyPairName, results[0].Name)
+}
+
+// TestApiV1ProvidersOpenstackKeyPairsUnauthorized tests an unauthorized response
+// from a request is propagated to the client correctly.
+func TestApiV1ProvidersOpenstackKeyPairsUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterComputeV2KeypairsUnauthorized(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ProvidersOpenstackKeyPairsWithResponse(context.TODO())
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, serverErr.Error, generated.AccessDenied)
 }
