@@ -20,9 +20,11 @@ import (
 	goerrors "errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/applicationcredentials"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -38,6 +40,29 @@ import (
 var (
 	ErrResourceNotFound = goerrors.New("resource not found")
 )
+
+// covertError takes a generic gophercloud error and converts it into something
+// more useful to our clients.
+// / NOTE: at present we're only concerned with 401s because it reacts badly with
+// the UI if we return a 500, when a 401 would cause a reauthentication and make
+// the bad behaviour go away.
+func covertError(err error) error {
+	var err401 gophercloud.ErrDefault401
+
+	if goerrors.As(err, &err401) {
+		return errors.OAuth2AccessDenied("provider request denied").WithError(err)
+	}
+
+	var err403 gophercloud.ErrDefault403
+
+	if goerrors.As(err, &err403) {
+		return errors.HTTPForbidden("provider request forbidden, ensure you have the correct roles assigned to your user")
+	}
+
+	v := reflect.ValueOf(err)
+
+	return errors.OAuth2ServerError("provider error unhandled: " + v.Type().Name()).WithError(err)
+}
 
 // Openstack provides an HTTP handler for Openstack resources.
 type Openstack struct {
@@ -231,7 +256,7 @@ func (o *Openstack) ListAvailabilityZonesCompute(r *http.Request) (generated.Ope
 
 	result, err := client.AvailabilityZones(r.Context())
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list availability zones").WithError(err)
+		return nil, covertError(err)
 	}
 
 	azs := make(generated.OpenstackAvailabilityZones, len(result))
@@ -251,7 +276,7 @@ func (o *Openstack) ListAvailabilityZonesBlockStorage(r *http.Request) (generate
 
 	result, err := client.AvailabilityZones(r.Context())
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list availability zones").WithError(err)
+		return nil, covertError(err)
 	}
 
 	azs := make(generated.OpenstackAvailabilityZones, len(result))
@@ -271,7 +296,7 @@ func (o *Openstack) ListExternalNetworks(r *http.Request) (interface{}, error) {
 
 	result, err := client.ExternalNetworks(r.Context())
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list external networks").WithError(err)
+		return nil, covertError(err)
 	}
 
 	externalNetworks := make(generated.OpenstackExternalNetworks, len(result))
@@ -357,7 +382,7 @@ func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, er
 
 	result, err := client.Flavors(r.Context())
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list flavors").WithError(err)
+		return nil, covertError(err)
 	}
 
 	// Get rid of baremetal flavors.
@@ -427,7 +452,7 @@ func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, erro
 
 	result, err := client.Images(r.Context(), o.options.Key.key)
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list images").WithError(err)
+		return nil, covertError(err)
 	}
 
 	images := make(generated.OpenstackImages, len(result))
@@ -486,7 +511,7 @@ func (o *Openstack) ListAvailableProjects(r *http.Request) (generated.OpenstackP
 
 	result, err := client.ListAvailableProjects(r.Context())
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list projects").WithError(err)
+		return nil, covertError(err)
 	}
 
 	projects := make(generated.OpenstackProjects, len(result))
@@ -511,7 +536,7 @@ func (o *Openstack) ListKeyPairs(r *http.Request) (generated.OpenstackKeyPairs, 
 
 	result, err := client.KeyPairs(r.Context())
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list key pairs").WithError(err)
+		return nil, covertError(err)
 	}
 
 	keyPairs := generated.OpenstackKeyPairs{}
@@ -559,7 +584,7 @@ func (o *Openstack) GetApplicationCredential(r *http.Request, name string) (*app
 
 	result, err := client.ListApplicationCredentials(r.Context(), user)
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed list application credentials").WithError(err)
+		return nil, covertError(err)
 	}
 
 	match, err := findApplicationCredential(result, name)
@@ -585,7 +610,7 @@ func (o *Openstack) CreateApplicationCredential(r *http.Request, name string, ro
 
 	result, err := client.CreateApplicationCredential(r.Context(), user, name, description, roles)
 	if err != nil {
-		return nil, errors.HTTPForbidden("failed to create application credential, ensure you have the correct roles assigned to your user").WithError(err)
+		return nil, covertError(err)
 	}
 
 	return result, nil
@@ -604,7 +629,7 @@ func (o *Openstack) DeleteApplicationCredential(r *http.Request, name string) er
 
 	result, err := client.ListApplicationCredentials(r.Context(), user)
 	if err != nil {
-		return errors.OAuth2ServerError("failed list application credentials").WithError(err)
+		return covertError(err)
 	}
 
 	match, err := findApplicationCredential(result, name)
@@ -627,7 +652,7 @@ func (o *Openstack) GetServerGroup(r *http.Request, name string) (*servergroups.
 
 	result, err := client.ListServerGroups(r.Context())
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed to list server groups").WithError(err)
+		return nil, covertError(err)
 	}
 
 	filtered := util.Filter(result, func(group servergroups.ServerGroup) bool {
@@ -652,7 +677,7 @@ func (o *Openstack) CreateServerGroup(r *http.Request, name string) (*servergrou
 
 	result, err := client.CreateServerGroup(r.Context(), name, o.options.ServerGroupPolicy)
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed get create server group").WithError(err)
+		return nil, covertError(err)
 	}
 
 	return result, nil

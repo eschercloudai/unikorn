@@ -22,6 +22,15 @@ import (
 	"time"
 )
 
+// genericUnauthorized is returned by all APIs when the identity cannot be confirmed.
+const genericUnauthorized = `{
+  "error": {
+    "code": 401,
+    "message": "The request you have made requires authentication.",
+    "title": "Unauthorized"
+  }
+}`
+
 // v3AuthTokensSuccessResponse defines how we mock the OpenStack API.  Basically we'll
 // multiplex all services through a single endpoint for simplicity.
 // Important parts to pay attention to (in the context of gophercloud):
@@ -113,18 +122,6 @@ func v3AuthTokensSuccessResponse(tc *TestContext) []byte {
 }`)
 }
 
-// v3AuthTokensUnauthorizedResponse covers the response you get when either the username
-// or password are incorrect.
-func v3AuthTokensUnauthorizedResponse(*TestContext) []byte {
-	return []byte(`{
-	"error":{
-		"code": 401,
-		"message": "The request you have made requires authentication.",
-		"title": "Unauthorized"
-	}
-}`)
-}
-
 // RegisterIdentityV3AuthTokensPostSuccessHandler is called when we want to login, or do a
 // token exchange/rescoping.
 func RegisterIdentityV3AuthTokensPostSuccessHandler(tc *TestContext) {
@@ -161,7 +158,7 @@ func RegisterIdentityV3AuthTokensPostUnauthorizedHandler(tc *TestContext) {
 	tc.OpenstackRouter().Post("/identity/v3/auth/tokens", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		if _, err := w.Write(v3AuthTokensUnauthorizedResponse(tc)); err != nil {
+		if _, err := w.Write([]byte(genericUnauthorized)); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -307,6 +304,18 @@ func RegisterIdentityV3AuthProjects(tc *TestContext) {
 	})
 }
 
+func RegisterIdentityV3AuthProjectsUnauthorized(tc *TestContext) {
+	tc.OpenstackRouter().Get("/identity/v3/auth/projects", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		if _, err := w.Write([]byte(genericUnauthorized)); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
 // RegisterIdentityHandlers adds all the basic handlers required for token
 // acquisition.
 func RegisterIdentityHandlers(tc *TestContext) {
@@ -371,17 +380,61 @@ func RegisterImageV2Images(tc *TestContext) {
 	})
 }
 
+func RegisterImageV2ImagesUnauthorized(tc *TestContext) {
+	tc.OpenstackRouter().Get("/image/v2/images", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		if _, err := w.Write([]byte(genericUnauthorized)); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
 const flavorID = "f547e5e4-5d9e-4434-bb78-d43cabcce79c"
-const flavorName = "strawberry"
+const flavorName = "blueberry"
 const flavorCpus = 2
 const flavorMemory = 8 << 10
 const flavorDisk = 20
 
+const flavorName2 = "strawberry"
+const flavorName3 = "raspberry"
+const flavorName4 = "gooseberry"
+
+// flavorsDetail returns a load of different flavors, we expect these to
+// be sorted by the provider so things with a GPU come first, and then CPU
+// only flavors.  Those buckets are then sorted by the number of GPUs and
+// CPUs respectively, low to high.
 // NOTE: Extra specs are available in microversion 2.61 onward.
 func flavorsDetail() []byte {
 	return []byte(fmt.Sprintf(`{
 	"first": "/flavors/detail",
 	"flavors": [
+		{
+			"id": "6b1cede8-a814-4cf6-94c1-16ca5f51b1ec",
+			"name": "%s",
+			"vcpus": 2,
+			"ram": 8192,
+			"disk": 20
+		},
+		{	"id": "77bf7ac4-429e-45db-b101-5736ef1b8d3c",
+                        "name": "%s",
+                        "vcpus": 8,
+                        "ram": 32768,
+                        "disk": 20,
+                        "extra_specs": {
+                                "resources:VGPU": "2",
+                                "pci_passthrough:alias": "a100:2"
+                        }
+		},
+		{
+			"id": "2b037c3a-24c5-49b3-820a-c72c232d26a0",
+			"name": "%s",
+			"vcpus": 1,
+			"ram": 4096,
+			"disk": 20
+		},
 		{
 			"id": "%s",
 			"name": "%s",
@@ -394,7 +447,7 @@ func flavorsDetail() []byte {
 			}
 		}
 	]
-}`, flavorID, flavorName, flavorCpus, flavorMemory, flavorDisk))
+}`, flavorName4, flavorName2, flavorName3, flavorID, flavorName, flavorCpus, flavorMemory, flavorDisk))
 }
 
 func RegisterComputeV2FlavorsDetail(tc *TestContext) {
@@ -402,6 +455,18 @@ func RegisterComputeV2FlavorsDetail(tc *TestContext) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write(flavorsDetail()); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
+func RegisterComputeV2FlavorsUnauthorized(tc *TestContext) {
+	tc.OpenstackRouter().Get("/compute/flavors/detail", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		if _, err := w.Write([]byte(genericUnauthorized)); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -471,6 +536,18 @@ func RegisterComputeV2Keypairs(tc *TestContext) {
 	})
 }
 
+func RegisterComputeV2KeypairsUnauthorized(tc *TestContext) {
+	tc.OpenstackRouter().Get("/compute/os-keypairs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		if _, err := w.Write([]byte(genericUnauthorized)); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
 const computeAvailabilityZoneName = "danger_nova"
 
 func computeAvailabilityZones() []byte {
@@ -491,6 +568,18 @@ func RegisterComputeV2AvailabilityZone(tc *TestContext) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write(computeAvailabilityZones()); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
+func RegisterComputeV2AvailabilityZoneUnauthorized(tc *TestContext) {
+	tc.OpenstackRouter().Get("/compute/os-availability-zone", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		if _, err := w.Write([]byte(genericUnauthorized)); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -525,6 +614,18 @@ func RegisterBlockStorageV3AvailabilityZone(tc *TestContext) {
 	})
 }
 
+func RegisterBlockStorageV3AvailabilityZoneUnauthorized(tc *TestContext) {
+	tc.OpenstackRouter().Get("/blockstorage/os-availability-zone", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		if _, err := w.Write([]byte(genericUnauthorized)); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
 const externalNetworkID = "605eddb9-39e1-4309-972f-c62ced50f40f"
 
 func externalNetworks() []byte {
@@ -542,6 +643,18 @@ func RegisterNetworkV2Networks(tc *TestContext) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write(externalNetworks()); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
+func RegisterNetworkV2NetworksUnauthorized(tc *TestContext) {
+	tc.OpenstackRouter().Get("/network/v2.0/networks", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		if _, err := w.Write([]byte(genericUnauthorized)); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
