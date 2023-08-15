@@ -1940,6 +1940,7 @@ type PostApiV1ControlplanesControlPlaneNameClustersResponse struct {
 	HTTPResponse *http.Response
 	JSON400      *Oauth2Error
 	JSON401      *Oauth2Error
+	JSON403      *Oauth2Error
 	JSON409      *Oauth2Error
 	JSON500      *Oauth2Error
 }
@@ -3187,6 +3188,13 @@ func ParsePostApiV1ControlplanesControlPlaneNameClustersResponse(rsp *http.Respo
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Oauth2Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Oauth2Error

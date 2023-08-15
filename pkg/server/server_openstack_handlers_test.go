@@ -31,6 +31,14 @@ const genericUnauthorized = `{
   }
 }`
 
+const genericForbidden = `{
+  "error": {
+    "code": 403,
+    "message": "You are not authorized to perform the requested action.",
+    "title": "Forbidden"
+  }
+}`
+
 // v3AuthTokensSuccessResponse defines how we mock the OpenStack API.  Basically we'll
 // multiplex all services through a single endpoint for simplicity.
 // Important parts to pay attention to (in the context of gophercloud):
@@ -277,6 +285,18 @@ func RegisterIdentityV3UserApplicationCredentials(tc *TestContext) {
 	})
 }
 
+func RegisterIdentityV3UserApplicationCredentialsForbidden(tc *TestContext) {
+	tc.OpenstackRouter().Post("/identity/v3/users/{user_id}/application_credentials", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		if _, err := w.Write([]byte(genericForbidden)); err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+		}
+	})
+}
+
 const projectID = "63051c2c-4d9e-40c0-bf57-93907a61b738"
 const projectName = "foo"
 
@@ -462,7 +482,7 @@ func RegisterComputeV2FlavorsDetail(tc *TestContext) {
 	})
 }
 
-func RegisterComputeV2FlavorsUnauthorized(tc *TestContext) {
+func RegisterComputeV2FlavorsDetailUnauthorized(tc *TestContext) {
 	tc.OpenstackRouter().Get("/compute/flavors/detail", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
