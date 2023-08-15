@@ -309,10 +309,6 @@ func (o *Openstack) ListExternalNetworks(r *http.Request) (interface{}, error) {
 	return externalNetworks, nil
 }
 
-func (o *Openstack) FlavorGPUs(flavor *openstack.Flavor) (*openstack.GPUMeta, error) {
-	return openstack.FlavorGPUs(flavor)
-}
-
 // convertFlavor traslates from Openstack's mess into our API types.
 func convertFlavor(flavor *openstack.Flavor) (*generated.OpenstackFlavor, error) {
 	f := &generated.OpenstackFlavor{

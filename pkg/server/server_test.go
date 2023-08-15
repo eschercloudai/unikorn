@@ -898,6 +898,44 @@ func TestApiV1ControlPlanesDeleteNotFound(t *testing.T) {
 	assert.Equal(t, serverErr.Error, generated.NotFound)
 }
 
+// createClusterRequest is a basic request that can be shared across tests.
+// NOTE: obviously if you want to mutate this in any way you may want to find
+// a way to deep copy it first!  You would win a prize for removing the nolint
+// tag below...
+//
+//nolint:gochecknoglobals
+var createClusterRequest = &generated.KubernetesCluster{
+	Name: "foo",
+	ApplicationBundle: generated.ApplicationBundle{
+		Name: "foo",
+	},
+	Network: generated.KubernetesClusterNetwork{
+		DnsNameservers: []string{
+			"8.8.8.8",
+		},
+		NodePrefix:    "192.168.0.0/24",
+		ServicePrefix: "172.16.0.0/12",
+		PodPrefix:     "10.0.0.0/8",
+	},
+	ControlPlane: generated.OpenstackMachinePool{
+		Version:    "v1.28.0",
+		Replicas:   3,
+		ImageName:  "ubuntu-24.04-lts",
+		FlavorName: flavorName,
+	},
+	WorkloadPools: generated.KubernetesClusterWorkloadPools{
+		{
+			Name: "foo",
+			Machine: generated.OpenstackMachinePool{
+				Version:    "v1.28.0",
+				Replicas:   3,
+				ImageName:  "ubuntu-24.04-lts",
+				FlavorName: flavorName,
+			},
+		},
+	},
+}
+
 // TestApiV1ClustersCreate tests that a cluster can be created
 // in a control plane.
 func TestApiV1ClustersCreate(t *testing.T) {
@@ -916,39 +954,7 @@ func TestApiV1ClustersCreate(t *testing.T) {
 
 	unikornClient := MustNewScopedClient(t, tc)
 
-	request := &generated.KubernetesCluster{
-		Name: "foo",
-		ApplicationBundle: generated.ApplicationBundle{
-			Name: "foo",
-		},
-		Network: generated.KubernetesClusterNetwork{
-			DnsNameservers: []string{
-				"8.8.8.8",
-			},
-			NodePrefix:    "192.168.0.0/24",
-			ServicePrefix: "172.16.0.0/12",
-			PodPrefix:     "10.0.0.0/8",
-		},
-		ControlPlane: generated.OpenstackMachinePool{
-			Version:    "v1.28.0",
-			Replicas:   3,
-			ImageName:  "ubuntu-24.04-lts",
-			FlavorName: flavorName,
-		},
-		WorkloadPools: generated.KubernetesClusterWorkloadPools{
-			{
-				Name: "foo",
-				Machine: generated.OpenstackMachinePool{
-					Version:    "v1.28.0",
-					Replicas:   3,
-					ImageName:  "ubuntu-24.04-lts",
-					FlavorName: flavorName,
-				},
-			},
-		},
-	}
-
-	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBody(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(request))
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBody(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(createClusterRequest))
 	assert.HTTPResponse(t, response, http.StatusAccepted, err)
 
 	defer response.Body.Close()
@@ -959,6 +965,64 @@ func TestApiV1ClustersCreate(t *testing.T) {
 	assert.MapSet(t, resource.Labels, constants.VersionLabel)
 	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
 	assert.MapSet(t, resource.Labels, constants.ControlPlaneLabel)
+}
+
+// TestApiV1ClustersCreateUnauthorized tests a keystone token expiring during a
+// request errors in the right way.
+// NOTE: this assumes other implicit calls such as those to images, server groups
+// and application credentials all use the same error processing.
+func TestApiV1ClustersCreateUnauthorized(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetailUnauthorized(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(createClusterRequest))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.NotNil(t, response.JSON401)
+
+	serverErr := *response.JSON401
+
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
+}
+
+// TestApiV1ClustersCreateForbidden tests the use of an API that, while authenticated,
+// is not allowed by current user role assignments.  We typically see this with
+// federation where you cannot create an application credential at all.
+func TestApiV1ClustersCreateForbidden(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterIdentityV3UserApplicationCredentialsForbidden(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(createClusterRequest))
+	assert.HTTPResponse(t, response.HTTPResponse, http.StatusForbidden, err)
+	assert.NotNil(t, response.JSON403)
+
+	serverErr := *response.JSON403
+
+	assert.Equal(t, generated.Forbidden, serverErr.Error)
 }
 
 // TestApiV1ClustersCreateExisting tests creating a cluster when one exists
@@ -980,39 +1044,7 @@ func TestApiV1ClustersCreateExisting(t *testing.T) {
 
 	unikornClient := MustNewScopedClient(t, tc)
 
-	request := &generated.KubernetesCluster{
-		Name: "foo",
-		ApplicationBundle: generated.ApplicationBundle{
-			Name: "foo",
-		},
-		Network: generated.KubernetesClusterNetwork{
-			DnsNameservers: []string{
-				"8.8.8.8",
-			},
-			NodePrefix:    "192.168.0.0/24",
-			ServicePrefix: "172.16.0.0/12",
-			PodPrefix:     "10.0.0.0/8",
-		},
-		ControlPlane: generated.OpenstackMachinePool{
-			Version:    "v1.28.0",
-			Replicas:   3,
-			ImageName:  "ubuntu-24.04-lts",
-			FlavorName: flavorName,
-		},
-		WorkloadPools: generated.KubernetesClusterWorkloadPools{
-			{
-				Name: "foo",
-				Machine: generated.OpenstackMachinePool{
-					Version:    "v1.28.0",
-					Replicas:   3,
-					ImageName:  "ubuntu-24.04-lts",
-					FlavorName: flavorName,
-				},
-			},
-		},
-	}
-
-	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(request))
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(createClusterRequest))
 	assert.HTTPResponse(t, response.HTTPResponse, http.StatusConflict, err)
 	assert.NotNil(t, response.JSON409)
 
@@ -1039,39 +1071,7 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 
 	unikornClient := MustNewScopedClient(t, tc)
 
-	request := &generated.KubernetesCluster{
-		Name: "foo",
-		ApplicationBundle: generated.ApplicationBundle{
-			Name: "foo",
-		},
-		Network: generated.KubernetesClusterNetwork{
-			DnsNameservers: []string{
-				"8.8.8.8",
-			},
-			NodePrefix:    "192.168.0.0/24",
-			ServicePrefix: "172.16.0.0/12",
-			PodPrefix:     "10.0.0.0/8",
-		},
-		ControlPlane: generated.OpenstackMachinePool{
-			Version:    "v1.28.0",
-			Replicas:   3,
-			ImageName:  "ubuntu-24.04-lts",
-			FlavorName: flavorName,
-		},
-		WorkloadPools: generated.KubernetesClusterWorkloadPools{
-			{
-				Name: "foo",
-				Machine: generated.OpenstackMachinePool{
-					Version:    "v1.28.0",
-					Replicas:   3,
-					ImageName:  "ubuntu-24.04-lts",
-					FlavorName: flavorName,
-				},
-			},
-		},
-	}
-
-	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), "foo", "application/json", NewJSONReader(request))
+	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), "foo", "application/json", NewJSONReader(createClusterRequest))
 	assert.HTTPResponse(t, response.HTTPResponse, http.StatusInternalServerError, err)
 	assert.NotNil(t, response.JSON500)
 
@@ -1428,7 +1428,7 @@ func TestApiV1ProvidersOpenstackProjectsUnauthorized(t *testing.T) {
 
 	serverErr := *response.JSON401
 
-	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
 }
 
 // TestApiV1ProvidersOpenstackFlavors tests OpenStack flavors can be listed.
@@ -1470,7 +1470,7 @@ func TestApiV1ProvidersOpenstackFlavorsUnauthorized(t *testing.T) {
 	defer cleanup()
 
 	RegisterIdentityHandlers(tc)
-	RegisterComputeV2FlavorsUnauthorized(tc)
+	RegisterComputeV2FlavorsDetailUnauthorized(tc)
 
 	unikornClient := MustNewScopedClient(t, tc)
 
@@ -1480,7 +1480,7 @@ func TestApiV1ProvidersOpenstackFlavorsUnauthorized(t *testing.T) {
 
 	serverErr := *response.JSON401
 
-	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
 }
 
 // TestApiV1ProvidersOpenstackImages tests OpenStack images can be listed.
@@ -1534,7 +1534,7 @@ func TestApiV1ProvidersOpenstackImagesUnauthorized(t *testing.T) {
 
 	serverErr := *response.JSON401
 
-	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
 }
 
 // TestApiV1ProvidersOpenstackAvailabilityZonesCompute tests OpenStack compute AZscan be listed.
@@ -1578,7 +1578,7 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesComputeUnauthorized(t *testing.
 
 	serverErr := *response.JSON401
 
-	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
 }
 
 // TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage tests OpenStack block storage AZscan be listed.
@@ -1622,7 +1622,7 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorageUnauthorized(t *tes
 
 	serverErr := *response.JSON401
 
-	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
 }
 
 // TestApiV1ProvidersOpenstackExternalNetworks tests OpenStack external networks can be listed.
@@ -1666,7 +1666,7 @@ func TestApiV1ProvidersOpenstackExternalNetworksUnauthorized(t *testing.T) {
 
 	serverErr := *response.JSON401
 
-	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
 }
 
 // TestApiV1ProvidersOpenstackKeyPairs tests OpenStack key pairs can be listed.
@@ -1710,5 +1710,5 @@ func TestApiV1ProvidersOpenstackKeyPairsUnauthorized(t *testing.T) {
 
 	serverErr := *response.JSON401
 
-	assert.Equal(t, serverErr.Error, generated.AccessDenied)
+	assert.Equal(t, generated.AccessDenied, serverErr.Error)
 }
