@@ -32,13 +32,12 @@ import (
 	"time"
 
 	chi "github.com/go-chi/chi/v5"
+	"github.com/spf13/pflag"
 	"golang.org/x/oauth2"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server"
-	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
-	"github.com/eschercloudai/unikorn/pkg/server/authorization/keystone"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/testutil/assert"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
@@ -231,21 +230,32 @@ func mustSetupOpenstackServer(t *testing.T) (net.Addr, *http.Server, chi.Router)
 func mustSetupUnikornServer(t *testing.T, openstack net.Addr, client client.WithWatch) (net.Addr, *http.Server) {
 	t.Helper()
 
-	s := &server.Server{
-		JoseOptions: jose.Options{
-			TLSKeyPath:  privKeyFile,
-			TLSCertPath: pubKeyFile,
-		},
-		KeystoneOptions: keystone.Options{
-			Endpoint:      "http://" + openstack.String() + "/identity",
-			Domain:        "Default",
-			CACertificate: []byte("it's fake mon"),
-		},
+	goFlagSet := flag.NewFlagSet(t.Name(), flag.PanicOnError)
+
+	flagSet := pflag.NewFlagSet(t.Name(), pflag.PanicOnError)
+	flagSet.AddGoFlagSet(goFlagSet)
+
+	s := &server.Server{}
+
+	s.AddFlags(goFlagSet, flagSet)
+
+	flags := []string{
+		"--jose-tls-cert=" + pubKeyFile,
+		"--jose-tls-key=" + privKeyFile,
+		"--keystone-endpoint=http://" + openstack.String() + "/identity",
+		"--image-signing-key=LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUhZd0VBWUhLb1pJemowQ0FRWUZLNEVFQUNJRFlnQUVmOGs4RVY1TUg4M1BncThYd0JGUTd5YkU2NTEzRlh0awpHaG1jalp4WmYzbU5QOE0vb3VBbE0vZHdYWGpFeXZTNlJhVHdoT3A0aTdHL3VvbE5ZL0RJSCt1elc2VXNxR3VHClFpSW11Tm9BdzFSS1NQcEtyNWlJVXU2eEc1cDR3U3E5Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=",
+		"--flavors-exclude-property=resources:CUSTOM_BAREMETAL",
+		"--flavors-gpu-descriptor=property=resources:VGPU,expression=^(\\d+)$",
+		"--flavors-gpu-descriptor=property=pci_passthrough:alias,expression=^a100:(\\d+)$",
 	}
 
-	if err := s.HandlerOptions.Openstack.Key.Set("LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUhZd0VBWUhLb1pJemowQ0FRWUZLNEVFQUNJRFlnQUVmOGs4RVY1TUg4M1BncThYd0JGUTd5YkU2NTEzRlh0awpHaG1jalp4WmYzbU5QOE0vb3VBbE0vZHdYWGpFeXZTNlJhVHdoT3A0aTdHL3VvbE5ZL0RJSCt1elc2VXNxR3VHClFpSW11Tm9BdzFSS1NQcEtyNWlJVXU2eEc1cDR3U3E5Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo="); err != nil {
+	if err := flagSet.Parse(flags); err != nil {
 		t.Fatal(err)
 	}
+
+	// Override any flag defaults we need to.
+	s.Options.RequestTimeout = 0
+	s.KeystoneOptions.CACertificate = []byte("it's fake mon")
 
 	if debug {
 		s.SetupLogging()

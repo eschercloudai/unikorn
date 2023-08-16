@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
-	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
@@ -178,7 +177,7 @@ func (o *Openstack) ComputeClient(r *http.Request) (*openstack.ComputeClient, er
 		return client, nil
 	}
 
-	client, err := openstack.NewComputeClient(openstack.NewTokenProvider(o.endpoint, token))
+	client, err := openstack.NewComputeClient(&o.options.ComputeOptions, openstack.NewTokenProvider(o.endpoint, token))
 	if err != nil {
 		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
 	}
@@ -310,7 +309,7 @@ func (o *Openstack) ListExternalNetworks(r *http.Request) (interface{}, error) {
 }
 
 // convertFlavor traslates from Openstack's mess into our API types.
-func convertFlavor(flavor *openstack.Flavor) (*generated.OpenstackFlavor, error) {
+func convertFlavor(client *openstack.ComputeClient, flavor *openstack.Flavor) (*generated.OpenstackFlavor, error) {
 	f := &generated.OpenstackFlavor{
 		Id:     flavor.ID,
 		Name:   flavor.Name,
@@ -319,7 +318,7 @@ func convertFlavor(flavor *openstack.Flavor) (*generated.OpenstackFlavor, error)
 		Disk:   flavor.Disk,
 	}
 
-	gpu, err := openstack.FlavorGPUs(flavor)
+	gpu, err := client.FlavorGPUs(flavor)
 	if err != nil {
 		return nil, errors.OAuth2ServerError("unable to get GPU flavor metadata").WithError(err)
 	}
@@ -381,16 +380,10 @@ func (o *Openstack) ListFlavors(r *http.Request) (generated.OpenstackFlavors, er
 		return nil, covertError(err)
 	}
 
-	// Get rid of baremetal flavors.
-	// TODO: reject based on an expression of some kind?
-	result = util.Filter(result, func(f openstack.Flavor) bool {
-		return !strings.Contains(f.Name, "baremetal")
-	})
-
 	flavors := make(generated.OpenstackFlavors, len(result))
 
 	for i := range result {
-		flavor, err := convertFlavor(&result[i])
+		flavor, err := convertFlavor(client, &result[i])
 		if err != nil {
 			return nil, err
 		}

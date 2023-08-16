@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -31,24 +32,98 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/util"
 )
 
 var (
 	// ErrParseError is for when we cannot parse Openstack data correctly.
 	ErrParseError = errors.New("unable to parse value")
+
+	// ErrFlag is raised when options parsing fails.
+	ErrFlag = errors.New("unable to parse flag")
+
+	// ErrExpression is raised at runtime when expression evaluation fails.
+	ErrExpression = errors.New("expression must contain exactly one sub match that yields a number string")
 )
+
+// flavorsGPUDescriptor describes how to determine the number of GPUs from a falvor.
+// At present, this is based on properties, but we could perhaps use the name in
+// future with a "type" parameter.
+type flavorsGPUDescriptor struct {
+	// propertyName is the property to look for.
+	propertyName string
+	// expression defines how to extract the number of GPUs from the chosen field.
+	expression string
+}
+
+type flavorsGPUDescriptorVar struct {
+	descriptors []flavorsGPUDescriptor
+}
+
+func (v *flavorsGPUDescriptorVar) Type() string {
+	return "flavourGPUDescriptor"
+}
+
+func (v *flavorsGPUDescriptorVar) Set(s string) error {
+	pairs := map[string]string{}
+
+	for _, field := range strings.Split(s, ",") {
+		parts := strings.Split(field, "=")
+		if len(parts) != 2 {
+			return fmt.Errorf("%w: expected a key=value pair for %s", ErrFlag, field)
+		}
+
+		pairs[parts[0]] = parts[1]
+	}
+
+	if _, ok := pairs["property"]; !ok {
+		return fmt.Errorf("%w: property name required", ErrFlag)
+	}
+
+	if _, ok := pairs["expression"]; !ok {
+		return fmt.Errorf("%w: expression required", ErrFlag)
+	}
+
+	desc := flavorsGPUDescriptor{
+		propertyName: pairs["property"],
+		expression:   pairs["expression"],
+	}
+
+	v.descriptors = append(v.descriptors, desc)
+
+	return nil
+}
+
+func (v *flavorsGPUDescriptorVar) String() string {
+	return "[]"
+}
+
+// ComputeOptions allows things like filtering to be configured.
+type ComputeOptions struct {
+	// flavorsExclusions allow exclusion of certain flavors e.g. baremetal nodes.
+	flavorsExclusions []string
+	// flavorsGPUDescriptors allows the extraction of GPU information from a flavor.
+	flavorsGPUDescriptors flavorsGPUDescriptorVar
+}
+
+func (o *ComputeOptions) AddFlags(f *pflag.FlagSet) {
+	f.StringSliceVar(&o.flavorsExclusions, "flavors-exclude-property", nil, "Exclude flavours with the selected property key.  May be specified more than once.")
+	f.Var(&o.flavorsGPUDescriptors, "flavors-gpu-descriptor", "Defines how to extract GPU information from a flavor.  Expects the value to be in the form property=foo,expression=bar, where property is the property name to look for, and expression defines how to extract the number of GPUs e.g. ^(\\d+)$.  Exactly one sub string match is required in the expression.  May be specified more than once.")
+}
 
 // ComputeClient wraps the generic client because gophercloud is unsafe.
 type ComputeClient struct {
-	client *gophercloud.ServiceClient
+	options *ComputeOptions
+	client  *gophercloud.ServiceClient
 }
 
 // NewComputeClient provides a simple one-liner to start computing.
-func NewComputeClient(provider Provider) (*ComputeClient, error) {
+func NewComputeClient(options *ComputeOptions, provider Provider) (*ComputeClient, error) {
 	providerClient, err := provider.Client()
 	if err != nil {
 		return nil, err
@@ -64,7 +139,8 @@ func NewComputeClient(provider Provider) (*ComputeClient, error) {
 	client.Microversion = "2.93"
 
 	c := &ComputeClient{
-		client: client,
+		options: options,
+		client:  client,
 	}
 
 	return c, nil
@@ -143,26 +219,22 @@ func (c *ComputeClient) Flavors(ctx context.Context) ([]Flavor, error) {
 		return nil, err
 	}
 
-	return ExtractFlavors(page)
-}
-
-// Flavor returns a single flavor.
-func (c *ComputeClient) Flavor(ctx context.Context, name string) (*Flavor, error) {
-	// Arse, OS only deals in IDs, we deal in human readable names.
-	flavors, err := c.Flavors(ctx)
+	flavors, err := ExtractFlavors(page)
 	if err != nil {
 		return nil, err
 	}
 
-	for i, flavor := range flavors {
-		if flavor.Name == name {
-			f := &flavors[i]
-
-			return f, nil
+	flavors = util.Filter(flavors, func(flavor Flavor) bool {
+		for _, exclude := range c.options.flavorsExclusions {
+			if _, ok := flavor.ExtraSpecs[exclude]; ok {
+				return false
+			}
 		}
-	}
 
-	return nil, fmt.Errorf("%w: unable to find flavor %s", ErrResourceNotFound, name)
+		return true
+	})
+
+	return flavors, nil
 }
 
 // GPUMeta describes GPUs.
@@ -173,43 +245,51 @@ type GPUMeta struct {
 	GPUs int
 }
 
+// extraSpecToGPUs evaluates the falvor extra spec and tries to derive
+// the number of GPUs, returns -1 if none are found.
+func (c *ComputeClient) extraSpecToGPUs(name, value string) (int, error) {
+	for _, desc := range c.options.flavorsGPUDescriptors.descriptors {
+		if desc.propertyName != name {
+			continue
+		}
+
+		re, err := regexp.Compile(desc.expression)
+		if err != nil {
+			return -1, err
+		}
+
+		matches := re.FindStringSubmatch(value)
+		if matches == nil {
+			continue
+		}
+
+		if len(matches) != 2 {
+			return -1, ErrExpression
+		}
+
+		i, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return -1, fmt.Errorf("%w: %s", ErrExpression, err.Error())
+		}
+
+		return i, nil
+	}
+
+	return -1, nil
+}
+
 // FlavorGPUs returns metadata about GPUs, e.g. the number of GPUs.  Sadly there is absolutely
 // no way of assiging metadata to flavors without having to add those same values to your host
 // aggregates, so we have to have knowledge of flavors built in somewhere.
-func FlavorGPUs(flavor *Flavor) (*GPUMeta, error) {
-	// There are some well known extra specs defined in:
-	// https://docs.openstack.org/nova/latest/configuration/extra-specs.html
-	//
-	// MIG instances will have specs that look like:
-	//   "resources:VGPU": "1", "trait:CUSTOM_A100D_2_20C": "required"
-	if value, ok := flavor.ExtraSpecs["resources:VGPU"]; ok {
-		gpus, err := strconv.Atoi(value)
+func (c *ComputeClient) FlavorGPUs(flavor *Flavor) (*GPUMeta, error) {
+	for name, value := range flavor.ExtraSpecs {
+		gpus, err := c.extraSpecToGPUs(name, value)
 		if err != nil {
 			return nil, err
 		}
 
-		meta := &GPUMeta{
-			GPUs: gpus,
-		}
-
-		return meta, nil
-	}
-
-	// Full GPUs will be totally different, luckily the
-	//   "pci_passthrough:alias": "a100:2"
-	if value, ok := flavor.ExtraSpecs["pci_passthrough:alias"]; ok {
-		parts := strings.Split(value, ":")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("%w: GPU flavor %s metadata malformed", ErrParseError, flavor.Name)
-		}
-
-		if parts[0] != "a100" {
-			return nil, fmt.Errorf("%w: unknown PCI device class %s", ErrParseError, parts[0])
-		}
-
-		gpus, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, err
+		if gpus == -1 {
+			continue
 		}
 
 		meta := &GPUMeta{

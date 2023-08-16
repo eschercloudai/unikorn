@@ -454,7 +454,6 @@ func flavorsDetail() []byte {
                         "ram": 32768,
                         "disk": 20,
                         "extra_specs": {
-                                "resources:VGPU": "2",
                                 "pci_passthrough:alias": "a100:2"
                         }
 		},
@@ -464,6 +463,16 @@ func flavorsDetail() []byte {
 			"vcpus": 1,
 			"ram": 4096,
 			"disk": 20
+		},
+		{
+			"id": "d7f75b0f-888c-4fed-a807-2cbbee7d5afe",
+			"name": "g.baremetal",
+			"vcpus": 64,
+			"ram": 524228,
+			"disk": 12000,
+			"extra_specs": {
+				"resources:CUSTOM_BAREMETAL": "1"
+			}
 		},
 		{
 			"id": "%s",

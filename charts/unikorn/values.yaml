@@ -85,6 +85,18 @@ server:
     endpoint: "https://nl1.eschercloud.com:5000"
     userDomain: "Default"
 
+  flavors:
+    # Reject any flavors with the following properties.
+    excludeProperties:
+    - resources:CUSTOM_BAREMETAL
+    # Extract GPU counts from the following properties using the
+    # provided regular expressions.
+    gpuDescriptors:
+    - property: resources:VGPU
+      expression: '^(\d+)$'
+    - property: pci_passthrough:alias
+      expression: '^a100:(\d+)$'
+
   # SSO authorization configuration.
   # authorization:
   #   backend:

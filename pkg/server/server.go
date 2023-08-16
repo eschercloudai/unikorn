@@ -60,13 +60,14 @@ type Server struct {
 	OAuth2Options oauth2.Options
 }
 
-func (s *Server) AddFlags(flags *pflag.FlagSet) {
-	s.Options.AddFlags(pflag.CommandLine)
-	s.ZapOptions.BindFlags(flag.CommandLine)
-	s.HandlerOptions.AddFlags(pflag.CommandLine)
-	s.JoseOptions.AddFlags(pflag.CommandLine)
-	s.KeystoneOptions.AddFlags(pflag.CommandLine)
-	s.OAuth2Options.AddFlags(pflag.CommandLine)
+func (s *Server) AddFlags(goflags *flag.FlagSet, flags *pflag.FlagSet) {
+	s.ZapOptions.BindFlags(goflags)
+
+	s.Options.AddFlags(flags)
+	s.HandlerOptions.AddFlags(flags)
+	s.JoseOptions.AddFlags(flags)
+	s.KeystoneOptions.AddFlags(flags)
+	s.OAuth2Options.AddFlags(flags)
 }
 
 func (s *Server) SetupLogging() {
