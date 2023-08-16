@@ -245,30 +245,37 @@ func RegisterIdentityV3User(tc *TestContext) {
 	})
 }
 
-// emptyApplicationCredentials is what you get when you list credentials and
-// there are none.
-//
-//nolint:gosec
-const emptyApplicationCredentials = `{
+// applicationCredentials is what you get when you list credentials.
+// Start with one as that flexes more code.
+func applicationCredentials() []byte {
+	return []byte(`{
 	"links": {},
-	"application_credentials": []
-}`
+	"application_credentials": [
+		{
+			"id": "75f56f78-18e0-4f60-83c4-7109cafe3fd1",
+			"name": "foo-foo"
+		}
+	]
+}`)
+}
 
 // applicationCredentialCreate is what you get when you create an application
 // credential.  Please note this is the ONLY time it will return the secret.
-const applicationCredentialCreate = `{
+func applicationCredentialCreate() []byte {
+	return []byte(`{
 	"application_credential": {
 		"id": "69a5f849-5112-44b7-9424-64ee0f30c23d",
-		"name": "foo",
+		"name": "foo-foo",
 		"secret": "shhhh"
 	}
-}`
+}`)
+}
 
 func RegisterIdentityV3UserApplicationCredentials(tc *TestContext) {
 	tc.OpenstackRouter().Get("/identity/v3/users/{user_id}/application_credentials", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(emptyApplicationCredentials)); err != nil {
+		if _, err := w.Write(applicationCredentials()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
@@ -277,11 +284,14 @@ func RegisterIdentityV3UserApplicationCredentials(tc *TestContext) {
 	tc.OpenstackRouter().Post("/identity/v3/users/{user_id}/application_credentials", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if _, err := w.Write([]byte(applicationCredentialCreate)); err != nil {
+		if _, err := w.Write(applicationCredentialCreate()); err != nil {
 			if debug {
 				fmt.Println(err)
 			}
 		}
+	})
+	tc.OpenstackRouter().Delete("/identity/v3/users/{user_id}/application_credentials/{credential_id}", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
 	})
 }
 
