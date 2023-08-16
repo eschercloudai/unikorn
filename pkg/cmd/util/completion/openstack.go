@@ -74,7 +74,7 @@ func OpenstackExternalNetworkCompletionFunc(cloud *string) func(*cobra.Command, 
 // OpenstackSSHKeyCompletionFunc lists any matching ssh key pairs by name.
 func OpenstackSSHKeyCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.NewComputeClient(openstack.NewCloudsProvider(*cloud))
+		client, err := openstack.NewComputeClient(&openstack.ComputeOptions{}, openstack.NewCloudsProvider(*cloud))
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -101,7 +101,7 @@ func OpenstackSSHKeyCompletionFunc(cloud *string) func(*cobra.Command, []string,
 // OpenstackFlavorCompletionFunc lists any matching flavors by name.
 func OpenstackFlavorCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.NewComputeClient(openstack.NewCloudsProvider(*cloud))
+		client, err := openstack.NewComputeClient(&openstack.ComputeOptions{}, openstack.NewCloudsProvider(*cloud))
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -151,7 +151,7 @@ func OpenstackImageCompletionFunc(cloud *string) func(*cobra.Command, []string, 
 // OpenstackComputeAvailabilityZoneCompletionFunc lists any matching availability zones by name.
 func OpenstackComputeAvailabilityZoneCompletionFunc(cloud *string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		client, err := openstack.NewComputeClient(openstack.NewCloudsProvider(*cloud))
+		client, err := openstack.NewComputeClient(&openstack.ComputeOptions{}, openstack.NewCloudsProvider(*cloud))
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

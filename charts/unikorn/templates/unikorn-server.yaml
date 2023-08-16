@@ -125,6 +125,14 @@ spec:
         {{- if .Values.server.keystone.userDomain -}}
           {{ printf "- --keystone-user-domain-name=%s" .Values.server.keystone.userDomain | nindent 8 }}
         {{- end }}
+        {{- with $flavors := .Values.server.flavors }}
+          {{- range $excludedProperty := $flavors.excludeProperties }}
+            {{ printf "- --flavors-exclude-property=%s" $excludedProperty | nindent 8 }}
+          {{- end }}
+          {{- range $gpuDescriptor := $flavors.gpuDescriptors }}
+            {{ printf "- --flavors-gpu-descriptor=property=%s,expression=%s" $gpuDescriptor.property $gpuDescriptor.expression | nindent 8 }}
+          {{- end }}
+        {{- end }}
         {{- with $auth := .Values.server.authorization }}
           {{- with $backend := $auth.backend }}
             {{- with $oidc := $backend.oidc }}

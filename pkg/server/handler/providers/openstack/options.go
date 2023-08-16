@@ -25,6 +25,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
+
+	"github.com/eschercloudai/unikorn/pkg/providers/openstack"
 )
 
 var (
@@ -83,6 +85,7 @@ func (v *PublicKeyVar) Type() string {
 }
 
 type Options struct {
+	ComputeOptions    openstack.ComputeOptions
 	Key               PublicKeyVar
 	ServerGroupPolicy string
 	// applicationCredentialRoles sets the roles an application credential
@@ -91,6 +94,7 @@ type Options struct {
 }
 
 func (o *Options) AddFlags(f *pflag.FlagSet) {
+	o.ComputeOptions.AddFlags(f)
 	f.Var(&o.Key, "image-signing-key", "Key used to verify valid images for use with the platform")
 	f.StringVar(&o.ServerGroupPolicy, "server-group-policy", "soft-anti-affinity", "Scheduling policy to use for server groups")
 	f.StringSliceVar(&o.ApplicationCredentialRoles, "application-credential-roles", nil, "A role to be added to application credentials on creation.  May be specified more than once.")

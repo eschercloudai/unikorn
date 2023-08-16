@@ -38,7 +38,7 @@ import (
 // start is the entry point to server.
 func start() {
 	s := &server.Server{}
-	s.AddFlags(pflag.CommandLine)
+	s.AddFlags(flag.CommandLine, pflag.CommandLine)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
