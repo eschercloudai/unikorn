@@ -61,20 +61,6 @@ func verifyImage(image *images.Image, key *ecdsa.PublicKey) bool {
 		return false
 	}
 
-	// Legacy behaviour (for unikornctl only) that accepts images if
-	// they have Kubernetes and Nvidia driver versions.
-	if key == nil {
-		if value, ok := image.Properties["k8s"]; !ok || value == "" {
-			return false
-		}
-
-		if value, ok := image.Properties["gpu"]; !ok || value == "" {
-			return false
-		}
-
-		return true
-	}
-
 	// These will be digitally signed by Baski when created, so we only trust
 	// those images.
 	signatureRaw, ok := image.Properties["digest"]

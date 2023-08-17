@@ -247,6 +247,7 @@ func mustSetupUnikornServer(t *testing.T, openstack net.Addr, client client.With
 		"--flavors-exclude-property=resources:CUSTOM_BAREMETAL",
 		"--flavors-gpu-descriptor=property=resources:VGPU,expression=^(\\d+)$",
 		"--flavors-gpu-descriptor=property=pci_passthrough:alias,expression=^a100:(\\d+)$",
+		"--application-credential-roles=_member_,member,load-balancer_member",
 	}
 
 	if err := flagSet.Parse(flags); err != nil {
