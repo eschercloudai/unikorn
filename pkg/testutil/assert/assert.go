@@ -27,7 +27,7 @@ func Equal[T comparable](t *testing.T, expected, actual T) {
 	t.Helper()
 
 	if expected != actual {
-		t.Fatalf("assertion failure: expected %v, got %v", expected, actual)
+		t.Fatalf("assertion failure: expected '%v', got '%v'", expected, actual)
 	}
 }
 
@@ -36,7 +36,7 @@ func NotEqual[T comparable](t *testing.T, expected, actual T) {
 	t.Helper()
 
 	if expected == actual {
-		t.Fatalf("assertion failure: got %v unexpectedly", expected)
+		t.Fatalf("assertion failure: got '%v' unexpectedly", expected)
 	}
 }
 
@@ -46,6 +46,24 @@ func NilError(t *testing.T, err error) {
 
 	if err != nil {
 		t.Fatalf("assertion failure: unexpected error: %v", err)
+	}
+}
+
+// NilSlice is a terse way of crapping out if a slice is not-nil.
+func NilSlice[T any](t *testing.T, v []T) {
+	t.Helper()
+
+	if v != nil {
+		t.Fatalf("assertion failure: non-nil slice: %v", v)
+	}
+}
+
+// Nil is a terse way of crapping out if a pointer is not nil.
+func Nil[T any](t *testing.T, v *T) {
+	t.Helper()
+
+	if v != nil {
+		t.Fatalf("assertion failure: non-nil pointer: %v", v)
 	}
 }
 

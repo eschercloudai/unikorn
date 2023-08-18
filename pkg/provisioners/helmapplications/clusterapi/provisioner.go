@@ -17,10 +17,9 @@ limitations under the License.
 package clusterapi
 
 import (
+	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,27 +40,23 @@ func New(client client.Client, resource application.MutuallyExclusiveResource, h
 }
 
 // Customize implments the application.Customizer interface.
-func (p *Provisioner) Customize(version *string, object *unstructured.Unstructured) error {
+func (p *Provisioner) Customize(version *string, application *argoprojv1.Application) error {
 	// TODO: this is very ArgoCD specific.
-	ignoreDifferences := []interface{}{
-		map[string]interface{}{
-			"group": "rbac.authorization.k8s.io",
-			"kind":  "ClusterRole",
-			"jsonPointers": []interface{}{
+	application.Spec.IgnoreDifferences = []argoprojv1.ApplicationIgnoreDifference{
+		{
+			Group: "rbac.authorization.k8s.io",
+			Kind:  "ClusterRole",
+			JSONPointers: []string{
 				"/rules",
 			},
 		},
-		map[string]interface{}{
-			"group": "apiextensions.k8s.io",
-			"kind":  "CustomResourceDefinition",
-			"jsonPointers": []interface{}{
+		{
+			Group: "apiextensions.k8s.io",
+			Kind:  "CustomResourceDefinition",
+			JSONPointers: []string{
 				"/spec/conversion/webhook/clientConfig/caBundle",
 			},
 		},
-	}
-
-	if err := unstructured.SetNestedField(object.Object, ignoreDifferences, "spec", "ignoreDifferences"); err != nil {
-		return err
 	}
 
 	return nil
