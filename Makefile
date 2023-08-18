@@ -90,7 +90,7 @@ OPENAPI_CODEGEN_VERSION=v1.12.4
 GENAPIBASE = github.com/eschercloudai/unikorn/pkg/apis
 
 # This is the list of APIs to generate clients for.
-GENAPIS = $(GENAPIBASE)/unikorn/v1alpha1
+GENAPIS = $(GENAPIBASE)/unikorn/v1alpha1,$(GENAPIBASE)/argoproj/v1alpha1
 
 # These are generic arguments that need to be passed to client generation.
 GENARGS = --go-header-file hack/boilerplate.go.txt --output-base ../../..
@@ -158,7 +158,7 @@ $(PREFIX)/%: $(BINDIR)/%
 $(CRDDIR): $(APISRC)
 	@mkdir -p $@
 	@go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-	$(GOBIN)/controller-gen crd:crdVersions=v1 paths=./pkg/apis/... output:dir=$@
+	$(GOBIN)/controller-gen crd:crdVersions=v1 paths=./pkg/apis/unikorn/... output:dir=$@
 	@touch $(CRDDIR)
 
 # Generate a clientset to interact with our custom resources.

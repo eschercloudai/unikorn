@@ -19,14 +19,15 @@ package application
 import (
 	"context"
 	"errors"
+	"reflect"
 
+	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
-	"github.com/eschercloudai/unikorn/pkg/readiness"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -85,7 +86,7 @@ type ValuesGenerator interface {
 // Customizer is a generic generator interface that implemnets raw customizations to
 // the application template.  Try to avoid using this.
 type Customizer interface {
-	Customize(version *string, object *unstructured.Unstructured) error
+	Customize(version *string, application *argoprojv1.Application) error
 }
 
 // Provisioner deploys an application that is keyed to a specific resource.
@@ -176,15 +177,19 @@ func (p *Provisioner) getLabels() (labels.Set, error) {
 
 // getReleaseName uses the release name in the application spec by default
 // but allows the generator to override it.
-func (p *Provisioner) getReleaseName() *string {
-	name := p.application.Spec.Release
+func (p *Provisioner) getReleaseName() string {
+	var name string
+
+	if p.application.Spec.Release != nil {
+		name = *p.application.Spec.Release
+	}
 
 	if p.generator != nil {
 		if releaseNamer, ok := p.generator.(ReleaseNamer); ok {
 			override := releaseNamer.ReleaseName()
 
 			if override != "" {
-				name = &override
+				name = override
 			}
 		}
 	}
@@ -194,13 +199,13 @@ func (p *Provisioner) getReleaseName() *string {
 
 // getParameters constructs a full list of Helm parameters by taking those provided
 // in the application spec, and appending any that the generator yields.
-func (p *Provisioner) getParameters() ([]interface{}, error) {
-	parameters := make([]interface{}, 0, len(p.application.Spec.Parameters))
+func (p *Provisioner) getParameters() ([]argoprojv1.HelmParameter, error) {
+	parameters := make([]argoprojv1.HelmParameter, 0, len(p.application.Spec.Parameters))
 
 	for _, parameter := range p.application.Spec.Parameters {
-		parameters = append(parameters, map[string]interface{}{
-			"name":  parameter.Name,
-			"value": parameter.Value,
+		parameters = append(parameters, argoprojv1.HelmParameter{
+			Name:  *parameter.Name,
+			Value: *parameter.Value,
 		})
 	}
 
@@ -212,12 +217,18 @@ func (p *Provisioner) getParameters() ([]interface{}, error) {
 			}
 
 			for name, value := range p {
-				parameters = append(parameters, map[string]interface{}{
-					"name":  name,
-					"value": value,
+				parameters = append(parameters, argoprojv1.HelmParameter{
+					Name:  name,
+					Value: value,
 				})
 			}
 		}
+	}
+
+	// Tempting as it is to delete this, this ensures we can get a zero value
+	// out of this function.
+	if len(parameters) == 0 {
+		return nil, nil
 	}
 
 	return parameters, nil
@@ -271,32 +282,27 @@ func (p *Provisioner) getDestinationNamespace() string {
 }
 
 // getSyncOptions accumulates any synchronization options.
-func (p *Provisioner) getSyncOptions() []interface{} {
-	var options []interface{}
+func (p *Provisioner) getSyncOptions() []argoprojv1.ApplicationSyncOption {
+	var options []argoprojv1.ApplicationSyncOption
 
 	if p.application.Spec.CreateNamespace != nil && *p.application.Spec.CreateNamespace {
-		options = append(options, "CreateNamespace=true")
+		options = append(options, argoprojv1.CreateNamespace)
 	}
 
 	if p.application.Spec.ServerSideApply != nil && *p.application.Spec.ServerSideApply {
-		options = append(options, "ServerSideApply=true")
+		options = append(options, argoprojv1.ServerSideApply)
 	}
 
 	return options
 }
 
 // generateResource converts the provided object to a canonical unstructured form.
-func (p *Provisioner) generateResource() (*unstructured.Unstructured, error) {
+//
+//nolint:cyclop
+func (p *Provisioner) generateResource() (*argoprojv1.Application, error) {
 	labels, err := p.getLabels()
 	if err != nil {
 		return nil, err
-	}
-
-	// TODO: temportary hack to add "kind" to the labels.
-	labelsMap := make(map[string]interface{}, len(labels))
-
-	for k, v := range labels {
-		labelsMap[k] = v
 	}
 
 	parameters, err := p.getParameters()
@@ -309,72 +315,79 @@ func (p *Provisioner) generateResource() (*unstructured.Unstructured, error) {
 		return nil, err
 	}
 
-	object := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "argoproj.io/v1alpha1",
-			"kind":       "Application",
-			"metadata": map[string]interface{}{
-				"generateName": p.Name + "-",
-				"namespace":    namespace,
-				"labels":       labelsMap,
+	helm := &argoprojv1.ApplicationSourceHelm{
+		ReleaseName: p.getReleaseName(),
+		Parameters:  parameters,
+		Values:      values,
+	}
+
+	application := &argoprojv1.Application{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: p.Name + "-",
+			Namespace:    namespace,
+			Labels:       labels,
+		},
+		Spec: argoprojv1.ApplicationSpec{
+			Project: "default",
+			Source: argoprojv1.ApplicationSource{
+				RepoURL:        *p.application.Spec.Repo,
+				TargetRevision: *p.application.Spec.Version,
 			},
-			"spec": map[string]interface{}{
-				"project": "default",
-				"source": map[string]interface{}{
-					"repoURL":        p.application.Spec.Repo,
-					"chart":          p.application.Spec.Chart,
-					"path":           p.application.Spec.Path,
-					"targetRevision": p.application.Spec.Version,
-					"helm": map[string]interface{}{
-						"releaseName": p.getReleaseName(),
-						"parameters":  parameters,
-						"values":      values,
-					},
-				},
-				"destination": map[string]interface{}{
-					"name":      p.getDestinationName(),
-					"namespace": p.getDestinationNamespace(),
-				},
-				"syncPolicy": map[string]interface{}{
-					"automated": map[string]interface{}{
-						"selfHeal": true,
-						"prune":    true,
-					},
-					"syncOptions": p.getSyncOptions(),
+			Destination: argoprojv1.ApplicationDestination{
+				Name:      p.getDestinationName(),
+				Namespace: p.getDestinationNamespace(),
+			},
+			SyncPolicy: argoprojv1.ApplicationSyncPolicy{
+				Automated: &argoprojv1.ApplicationSyncAutomation{
+					SelfHeal: true,
+					Prune:    true,
 				},
 			},
 		},
 	}
 
+	if !reflect.ValueOf(*helm).IsZero() {
+		application.Spec.Source.Helm = helm
+	}
+
+	if p.application.Spec.Chart != nil {
+		application.Spec.Source.Chart = *p.application.Spec.Chart
+	}
+
+	if p.application.Spec.Path != nil {
+		application.Spec.Source.Path = *p.application.Spec.Path
+	}
+
+	syncOptions := p.getSyncOptions()
+
+	if len(syncOptions) != 0 {
+		application.Spec.SyncPolicy.SyncOptions = syncOptions
+	}
+
 	if p.generator != nil {
 		if customization, ok := p.generator.(Customizer); ok {
-			if err := customization.Customize(p.application.Spec.Interface, object); err != nil {
+			if err := customization.Customize(p.application.Spec.Interface, application); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	return object, nil
+	return application, nil
 }
 
-// findApplication looks up any existing resource using a label selector, you must use
+// FindApplication looks up any existing resource using a label selector, you must use
 // generated names here as it's a multi-tenant platform, argo enforces the use of a single
 // namespace, and we want users to be able to define their own names irrespective
 // of other users.
-func (p *Provisioner) findApplication(ctx context.Context) (*unstructured.Unstructured, error) {
-	resources := &unstructured.UnstructuredList{
-		Object: map[string]interface{}{
-			"apiVersion": "argoproj.io/v1alpha1",
-			"kind":       "Application",
-		},
-	}
+func (p *Provisioner) FindApplication(ctx context.Context) (*argoprojv1.Application, error) {
+	var resources argoprojv1.ApplicationList
 
 	l, err := p.getLabels()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := p.client.List(ctx, resources, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(l)}); err != nil {
+	if err := p.client.List(ctx, &resources, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(l)}); err != nil {
 		return nil, err
 	}
 
@@ -404,7 +417,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	// Resource, after provisioning, should be set to either the existing resource
 	// or the newly created one.  The point here is the API will have filled in
 	// the name so we can perform readiness checks.
-	resource, err := p.findApplication(ctx)
+	resource, err := p.FindApplication(ctx)
 	if err != nil {
 		// Something bad has happened.
 		if !errors.Is(err, ErrItemNotFound) {
@@ -413,7 +426,6 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	// TODO: can probably just use controllerutil.CreateOrPatch.
-	//nolint:nestif
 	if resource == nil {
 		log.Info("creating new application", "application", p.Name)
 
@@ -427,21 +439,14 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 		// Replace the specification with what we expect.
 		temp := resource.DeepCopy()
-		temp.Object["spec"] = required.Object["spec"]
-
-		// TODO: temportary hack to add "kind" to the labels.
-		labels, _, err := unstructured.NestedMap(required.Object, "metadata", "labels")
-		if err != nil {
-			return err
-		}
-
-		if err := unstructured.SetNestedMap(temp.Object, labels, "metadata", "labels"); err != nil {
-			return err
-		}
+		temp.Labels = required.Labels
+		temp.Spec = required.Spec
 
 		if err := p.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
 			return err
 		}
+
+		resource = temp
 	}
 
 	log.Info("checking application health", "application", p.Name)
@@ -449,7 +454,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	// NOTE: This isn't necessarily accurate, take CAPI clusters for instance,
 	// that's just a bunch of CRs, and they are instantly healthy until
 	// CAPI/CAPO take note and start making status updates...
-	if err := readiness.NewApplicationHealthy(p.client, resource).Check(ctx); err != nil {
+	if resource.Status.Health == nil || resource.Status.Health.Status != argoprojv1.Healthy {
 		log.Info("application not healthy, yielding", "application", p.Name)
 
 		return provisioners.ErrYield
@@ -466,7 +471,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning application", "application", p.Name)
 
-	resource, err := p.findApplication(ctx)
+	resource, err := p.FindApplication(ctx)
 	if err != nil {
 		if errors.Is(err, ErrItemNotFound) {
 			log.Info("application deleted", "application", p.Name)
@@ -496,7 +501,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	// Try to work around a race during deletion as per
 	// https://github.com/argoproj/argo-cd/issues/12943
-	unstructured.RemoveNestedField(temp.Object, "spec", "syncPolicy", "automated")
+	temp.Spec.SyncPolicy.Automated = nil
 
 	if err := p.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
 		return err
@@ -508,5 +513,9 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	return provisioners.ErrYield
+	if !p.backgroundDelete {
+		return provisioners.ErrYield
+	}
+
+	return nil
 }
