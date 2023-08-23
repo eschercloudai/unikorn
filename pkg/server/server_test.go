@@ -33,13 +33,13 @@ import (
 
 	chi "github.com/go-chi/chi/v5"
 	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
-	"github.com/eschercloudai/unikorn/pkg/testutil/assert"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -346,7 +346,7 @@ func MustNewUnscopedToken(t *testing.T, tc *TestContext) string {
 	}
 
 	token, err := config.PasswordCredentialsToken(context.TODO(), "foo", "bar")
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 	assert.NotEqual(t, token.AccessToken, "")
 
 	return token.AccessToken
@@ -366,7 +366,7 @@ func MustNewClient(t *testing.T, tc *TestContext, token string) *generated.Clien
 	t.Helper()
 
 	client, err := generated.NewClientWithResponses("http://"+tc.UnikornServerEndpoint(), generated.WithRequestEditorFn(bearerTokenInjector(token)))
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	return client
 }
@@ -391,7 +391,8 @@ func MustNewScopedClient(t *testing.T, tc *TestContext) *generated.ClientWithRes
 	}
 
 	response, err := MustNewUnscopedClient(t, tc).PostApiV1AuthTokensTokenWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(scope))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusCreated, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusCreated, response.HTTPResponse.StatusCode)
 
 	return MustNewClient(t, tc, response.JSON201.AccessToken)
 }
@@ -404,14 +405,14 @@ func MustDoRequestWithForm(t *testing.T, method, url string, form url.Values) *h
 	body := bytes.NewBufferString(form.Encode())
 
 	request, err := http.NewRequestWithContext(context.TODO(), method, url, body)
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	client := &http.Client{}
 
 	response, err := client.Do(request)
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	return response
 }
@@ -428,7 +429,7 @@ func AssertOauth2Error(t *testing.T, response *http.Response, errorType generate
 	var serverErr generated.Oauth2Error
 
 	err := decoder.Decode(&serverErr)
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	assert.Equal(t, errorType, serverErr.Error)
 }
@@ -512,10 +513,11 @@ func TestApiV1AuthTokensTokenBadRequest(t *testing.T) {
 	defer cleanup()
 
 	client, err := generated.NewClientWithResponses("http://" + tc.UnikornServerEndpoint())
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	response, err := client.PostApiV1AuthTokensTokenWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(&generated.TokenScope{}))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusBadRequest, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON400)
 
 	serverErr := *response.JSON400
@@ -532,10 +534,11 @@ func TestApiV1AuthTokensTokenUnauthorized(t *testing.T) {
 	defer cleanup()
 
 	client, err := generated.NewClientWithResponses("http://"+tc.UnikornServerEndpoint(), generated.WithRequestEditorFn(bearerTokenInjector("garbage")))
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	response, err := client.PostApiV1AuthTokensTokenWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(&generated.TokenScope{}))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401
@@ -556,21 +559,26 @@ func TestApiV1ProjectCreateAndDelete(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	createResponse, err := unikornClient.PostApiV1Project(context.TODO())
-	assert.HTTPResponse(t, createResponse, http.StatusAccepted, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusAccepted, createResponse.StatusCode)
 
 	defer createResponse.Body.Close()
 
 	var project unikornv1.Project
 
-	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
-	assert.MapSet(t, project.Labels, constants.VersionLabel)
+	assert.Nil(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
+	assert.Contains(t, project.Labels, constants.VersionLabel)
 
 	deleteResponse, err := unikornClient.DeleteApiV1Project(context.TODO())
-	assert.HTTPResponse(t, deleteResponse, http.StatusAccepted, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusAccepted, deleteResponse.StatusCode)
 
 	defer deleteResponse.Body.Close()
 
-	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project))
+	var statusErr *kerrors.StatusError
+
+	assert.ErrorAs(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &project), &statusErr)
+	assert.Equal(t, http.StatusNotFound, int(statusErr.ErrStatus.Code))
 }
 
 // TestApiV1ProjectCreateExisting tests a project cannot be created on top of an
@@ -588,7 +596,8 @@ func TestApiV1ProjectCreateExisting(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.PostApiV1ProjectWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusConflict, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusConflict, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON409)
 
 	serverErr := *response.JSON409
@@ -609,7 +618,8 @@ func TestApiV1ProjectDeleteNotFound(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.DeleteApiV1ProjectWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON404)
 
 	serverErr := *response.JSON404
@@ -639,15 +649,16 @@ func TestApiV1ControlPlanesCreate(t *testing.T) {
 	}
 
 	response, err := unikornClient.PostApiV1ControlplanesWithBody(context.TODO(), "application/json", NewJSONReader(request))
-	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusAccepted, response.StatusCode)
 
 	defer response.Body.Close()
 
 	var resource unikornv1.ControlPlane
 
-	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
-	assert.MapSet(t, resource.Labels, constants.VersionLabel)
-	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
+	assert.Nil(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+	assert.Contains(t, resource.Labels, constants.VersionLabel)
+	assert.Contains(t, resource.Labels, constants.ProjectLabel)
 }
 
 // TestApiV1ControlPlanesCreateExisting tests control plane creation when another
@@ -673,7 +684,8 @@ func TestApiV1ControlPlanesCreateExisting(t *testing.T) {
 	}
 
 	response, err := unikornClient.PostApiV1ControlplanesWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(request))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusConflict, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusConflict, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON409)
 
 	serverErr := *response.JSON409
@@ -701,7 +713,8 @@ func TestApiV1ControlPlanesCreateImplicitProject(t *testing.T) {
 	}
 
 	response, err := unikornClient.PostApiV1ControlplanesWithBodyWithResponse(context.TODO(), "application/json", NewJSONReader(request))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusInternalServerError, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusInternalServerError, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON500)
 
 	serverErr := *response.JSON500
@@ -713,8 +726,8 @@ func TestApiV1ControlPlanesCreateImplicitProject(t *testing.T) {
 	// integration testing.
 	var resource unikornv1.Project
 
-	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &resource))
-	assert.MapSet(t, resource.Labels, constants.VersionLabel)
+	assert.Nil(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &resource))
+	assert.Contains(t, resource.Labels, constants.VersionLabel)
 }
 
 // TestApiV1ControlPlanesGet tests a control plane can be retrieved and
@@ -735,7 +748,8 @@ func TestApiV1ControlPlanesGet(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameWithResponse(context.TODO(), "foo")
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	result := *response.JSON200
@@ -762,7 +776,8 @@ func TestApiV1ControlPlanesGetNotFound(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameWithResponse(context.TODO(), "foo")
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON404)
 
 	serverErr := *response.JSON404
@@ -788,7 +803,8 @@ func TestApiV1ControlPlanesList(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ControlplanesWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
@@ -821,13 +837,14 @@ func TestApiV1ControlPlanesUpdate(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.PutApiV1ControlplanesControlPlaneNameWithBody(context.TODO(), "foo", "application/json", NewJSONReader(request))
-	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusAccepted, response.StatusCode)
 
 	defer response.Body.Close()
 
 	var resource unikornv1.ControlPlane
 
-	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+	assert.Nil(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
 	assert.NotNil(t, resource.Spec.ApplicationBundle)
 	assert.Equal(t, *resource.Spec.ApplicationBundle, "foo")
 }
@@ -854,7 +871,8 @@ func TestApiV1ControlPlanesUpdateNotFound(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.PutApiV1ControlplanesControlPlaneNameWithBodyWithResponse(context.TODO(), "foo", "application/json", NewJSONReader(request))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON404)
 
 	serverErr := *response.JSON404
@@ -877,13 +895,17 @@ func TestApiV1ControlPlanesDelete(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.DeleteApiV1ControlplanesControlPlaneName(context.TODO(), "foo")
-	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusAccepted, response.StatusCode)
 
 	defer response.Body.Close()
 
 	var resource unikornv1.ControlPlane
 
-	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+	var statusErr *kerrors.StatusError
+
+	assert.ErrorAs(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource), &statusErr)
+	assert.Equal(t, http.StatusNotFound, int(statusErr.ErrStatus.Code))
 }
 
 // TestApiV1ControlPlanesDeleteNotFound tests that a deletion of a not found resource
@@ -901,7 +923,8 @@ func TestApiV1ControlPlanesDeleteNotFound(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.DeleteApiV1ControlplanesControlPlaneNameWithResponse(context.TODO(), "foo")
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON404)
 
 	serverErr := *response.JSON404
@@ -966,16 +989,17 @@ func TestApiV1ClustersCreate(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBody(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(createClusterRequest))
-	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusAccepted, response.StatusCode)
 
 	defer response.Body.Close()
 
 	var resource unikornv1.KubernetesCluster
 
-	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
-	assert.MapSet(t, resource.Labels, constants.VersionLabel)
-	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
-	assert.MapSet(t, resource.Labels, constants.ControlPlaneLabel)
+	assert.Nil(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
+	assert.Contains(t, resource.Labels, constants.VersionLabel)
+	assert.Contains(t, resource.Labels, constants.ProjectLabel)
+	assert.Contains(t, resource.Labels, constants.ControlPlaneLabel)
 }
 
 // TestApiV1ClustersCreateUnauthorized tests a keystone token expiring during a
@@ -999,7 +1023,8 @@ func TestApiV1ClustersCreateUnauthorized(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(createClusterRequest))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401
@@ -1028,7 +1053,8 @@ func TestApiV1ClustersCreateForbidden(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(createClusterRequest))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusForbidden, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusForbidden, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON403)
 
 	serverErr := *response.JSON403
@@ -1056,7 +1082,8 @@ func TestApiV1ClustersCreateExisting(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), controlPlane.Name, "application/json", NewJSONReader(createClusterRequest))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusConflict, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusConflict, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON409)
 
 	serverErr := *response.JSON409
@@ -1083,7 +1110,8 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.PostApiV1ControlplanesControlPlaneNameClustersWithBodyWithResponse(context.TODO(), "foo", "application/json", NewJSONReader(createClusterRequest))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusInternalServerError, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusInternalServerError, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON500)
 
 	serverErr := *response.JSON500
@@ -1092,9 +1120,9 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 
 	var resource unikornv1.ControlPlane
 
-	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
-	assert.MapSet(t, resource.Labels, constants.VersionLabel)
-	assert.MapSet(t, resource.Labels, constants.ProjectLabel)
+	assert.Nil(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
+	assert.Contains(t, resource.Labels, constants.VersionLabel)
+	assert.Contains(t, resource.Labels, constants.ProjectLabel)
 }
 
 // TestApiV1ClustersGet tests a cluster can be referenced by name.
@@ -1117,7 +1145,8 @@ func TestApiV1ClustersGet(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersClusterNameWithResponse(context.TODO(), controlPlane.Name, "foo")
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	result := *response.JSON200
@@ -1165,7 +1194,8 @@ func TestApiV1ClustersGetNotFound(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersClusterNameWithResponse(context.TODO(), controlPlane.Name, "foo")
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON404)
 
 	result := *response.JSON404
@@ -1193,7 +1223,8 @@ func TestApiV1ClustersList(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersWithResponse(context.TODO(), controlPlane.Name)
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
@@ -1277,13 +1308,14 @@ func TestApiV1ClustersUpdate(t *testing.T) {
 	}
 
 	response, err := unikornClient.PutApiV1ControlplanesControlPlaneNameClustersClusterNameWithBody(context.TODO(), controlPlane.Name, "foo", "application/json", NewJSONReader(request))
-	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusAccepted, response.StatusCode)
 
 	defer response.Body.Close()
 
 	var resource unikornv1.KubernetesCluster
 
-	assert.NilError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
+	assert.Nil(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
 	assert.Equal(t, *resource.Spec.ApplicationBundle, "foo")
 }
 
@@ -1338,7 +1370,8 @@ func TestApiV1ClustersUpdateNotFound(t *testing.T) {
 	}
 
 	response, err := unikornClient.PutApiV1ControlplanesControlPlaneNameClustersClusterNameWithBodyWithResponse(context.TODO(), controlPlane.Name, "foo", "application/json", NewJSONReader(request))
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON404)
 
 	serverErr := *response.JSON404
@@ -1363,13 +1396,17 @@ func TestApiV1ClustersDelete(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.DeleteApiV1ControlplanesControlPlaneNameClustersClusterName(context.TODO(), controlPlane.Name, "foo")
-	assert.HTTPResponse(t, response, http.StatusAccepted, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusAccepted, response.StatusCode)
 
 	defer response.Body.Close()
 
 	var resource unikornv1.KubernetesCluster
 
-	assert.KubernetesError(t, kerrors.IsNotFound, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource))
+	var statusErr *kerrors.StatusError
+
+	assert.ErrorAs(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: controlPlane.Status.Namespace, Name: "foo"}, &resource), &statusErr)
+	assert.Equal(t, http.StatusNotFound, int(statusErr.ErrStatus.Code))
 }
 
 // TestApiV1ClustersDeleteNotFound tests that the deletion of a non-existent cluster
@@ -1388,7 +1425,8 @@ func TestApiV1ClustersDeleteNotFound(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.DeleteApiV1ControlplanesControlPlaneNameClustersClusterNameWithResponse(context.TODO(), controlPlane.Name, "foo")
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusNotFound, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON404)
 
 	serverErr := *response.JSON404
@@ -1408,7 +1446,8 @@ func TestApiV1ProvidersOpenstackProjects(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackProjectsWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
@@ -1434,7 +1473,8 @@ func TestApiV1ProvidersOpenstackProjectsUnauthorized(t *testing.T) {
 	RegisterIdentityV3AuthProjectsUnauthorized(tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackProjectsWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401
@@ -1455,7 +1495,8 @@ func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackFlavorsWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
@@ -1486,7 +1527,8 @@ func TestApiV1ProvidersOpenstackFlavorsUnauthorized(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackFlavorsWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401
@@ -1507,13 +1549,14 @@ func TestApiV1ProvidersOpenstackImages(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackImagesWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
 
 	ts, err := time.Parse(time.RFC3339, imageTimestamp)
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	// NOTE: server converts kubernetes version to a proper semver so it's compatible
 	// with the CAPI kubeadm controller.
@@ -1540,7 +1583,8 @@ func TestApiV1ProvidersOpenstackImagesUnauthorized(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackImagesWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401
@@ -1561,7 +1605,8 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesCompute(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesComputeWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
@@ -1584,7 +1629,8 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesComputeUnauthorized(t *testing.
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesComputeWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401
@@ -1605,7 +1651,8 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
@@ -1628,7 +1675,8 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorageUnauthorized(t *tes
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackAvailabilityZonesBlockStorageWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401
@@ -1649,7 +1697,8 @@ func TestApiV1ProvidersOpenstackExternalNetworks(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackExternalNetworksWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
@@ -1672,7 +1721,8 @@ func TestApiV1ProvidersOpenstackExternalNetworksUnauthorized(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackExternalNetworksWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401
@@ -1693,7 +1743,8 @@ func TestApiV1ProvidersOpenstackKeyPairs(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackKeyPairsWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusOK, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON200)
 
 	results := *response.JSON200
@@ -1716,7 +1767,8 @@ func TestApiV1ProvidersOpenstackKeyPairsUnauthorized(t *testing.T) {
 	unikornClient := MustNewScopedClient(t, tc)
 
 	response, err := unikornClient.GetApiV1ProvidersOpenstackKeyPairsWithResponse(context.TODO())
-	assert.HTTPResponse(t, response.HTTPResponse, http.StatusUnauthorized, err)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusUnauthorized, response.HTTPResponse.StatusCode)
 	assert.NotNil(t, response.JSON401)
 
 	serverErr := *response.JSON401

@@ -16,6 +16,8 @@ limitations under the License.
 
 package provisioners
 
+//go:generate mockgen -destination=mock/interfaces.go . Provisioner
+
 import (
 	"context"
 

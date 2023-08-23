@@ -20,11 +20,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-	"github.com/eschercloudai/unikorn/pkg/testutil/assert"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,7 +71,7 @@ func mustGetApplication(t *testing.T, p *application.Provisioner) *argoprojv1.Ap
 	t.Helper()
 
 	application, err := p.FindApplication(context.TODO())
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	return application
 }
@@ -115,7 +116,7 @@ func TestApplicationCreateHelm(t *testing.T) {
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.NilSlice(t, application.Spec.SyncPolicy.SyncOptions)
+	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
 }
 
 // TestApplicationCreateHelmExtended tests that given the requested input the provisioner
@@ -209,8 +210,8 @@ func TestApplicationCreateGit(t *testing.T) {
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.NilSlice(t, application.Spec.SyncPolicy.SyncOptions)
-	assert.NilSlice(t, application.Spec.IgnoreDifferences)
+	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
+	assert.Nil(t, application.Spec.IgnoreDifferences)
 }
 
 const (
@@ -307,7 +308,7 @@ func TestApplicationCreateMutate(t *testing.T) {
 	assert.Equal(t, namespace, application.Spec.Destination.Namespace)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.NilSlice(t, application.Spec.SyncPolicy.SyncOptions)
+	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
 	assert.Equal(t, 1, len(application.Spec.IgnoreDifferences))
 	assert.Equal(t, mutatorIgnoreDifferencesGroup, application.Spec.IgnoreDifferences[0].Group)
 	assert.Equal(t, mutatorIgnoreDifferencesKind, application.Spec.IgnoreDifferences[0].Kind)
@@ -354,7 +355,7 @@ func TestApplicationUpdateAndDelete(t *testing.T) {
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.NilSlice(t, application.Spec.SyncPolicy.SyncOptions)
+	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
 
 	assert.Error(t, provisioner.Deprovision(context.TODO()), provisioners.ErrYield)
 
