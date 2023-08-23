@@ -75,6 +75,8 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		provisioner := p.provisioners[len(p.provisioners)-(i+1)]
 
 		if err := provisioner.Deprovision(ctx); err != nil {
+			log.Info("serial group member exited with error", "error", err, "group", p.Name, "provisioner", provisioner.ProvisionerName())
+
 			return err
 		}
 	}

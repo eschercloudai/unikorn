@@ -21,9 +21,10 @@ import (
 	"net"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/testutil/assert"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +49,7 @@ func mustCreateProjectFixture(t *testing.T, tc *TestContext, projectID string) *
 		},
 	}
 
-	assert.NilError(t, tc.KubernetesClient().Create(context.TODO(), namespace, &client.CreateOptions{}))
+	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), namespace, &client.CreateOptions{}))
 
 	project := &unikornv1.Project{
 		ObjectMeta: metav1.ObjectMeta{
@@ -66,7 +67,7 @@ func mustCreateProjectFixture(t *testing.T, tc *TestContext, projectID string) *
 		},
 	}
 
-	assert.NilError(t, tc.KubernetesClient().Create(context.TODO(), project, &client.CreateOptions{}))
+	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), project, &client.CreateOptions{}))
 
 	return project
 }
@@ -89,7 +90,7 @@ func mustCreateControlPlaneFixture(t *testing.T, tc *TestContext, namespace, nam
 		},
 	}
 
-	assert.NilError(t, tc.KubernetesClient().Create(context.TODO(), ns, &client.CreateOptions{}))
+	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), ns, &client.CreateOptions{}))
 
 	bundleVersion := controlPlaneApplicationBundleName
 
@@ -113,7 +114,7 @@ func mustCreateControlPlaneFixture(t *testing.T, tc *TestContext, namespace, nam
 		},
 	}
 
-	assert.NilError(t, tc.KubernetesClient().Create(context.TODO(), controlPlane, &client.CreateOptions{}))
+	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), controlPlane, &client.CreateOptions{}))
 
 	return controlPlane
 }
@@ -153,11 +154,11 @@ func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace
 	workloadPoolFlavor := flavorName
 
 	_, nodenetwork, err := net.ParseCIDR(clusterNodeNetwork)
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 	_, serviceNetwork, err := net.ParseCIDR(clusterServiceNetwork)
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 	_, podNetwork, err := net.ParseCIDR(clusterPodNetwork)
-	assert.NilError(t, err)
+	assert.Nil(t, err)
 
 	dnsNameserver := net.ParseIP(clusterDNSNameserver)
 
@@ -217,7 +218,7 @@ func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace
 		},
 	}
 
-	assert.NilError(t, tc.KubernetesClient().Create(context.TODO(), cluster, &client.CreateOptions{}))
+	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), cluster, &client.CreateOptions{}))
 }
 
 const (
@@ -243,7 +244,7 @@ func mustCreateControlPlaneApplicationBundleFixture(t *testing.T, tc *TestContex
 		},
 	}
 
-	assert.NilError(t, tc.KubernetesClient().Create(context.TODO(), bundle, &client.CreateOptions{}))
+	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), bundle, &client.CreateOptions{}))
 }
 
 const (
@@ -269,5 +270,5 @@ func mustKubernetesClusterApplicationBundleFixture(t *testing.T, tc *TestContext
 		},
 	}
 
-	assert.NilError(t, tc.KubernetesClient().Create(context.TODO(), bundle, &client.CreateOptions{}))
+	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), bundle, &client.CreateOptions{}))
 }

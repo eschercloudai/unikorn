@@ -207,4 +207,4 @@ validate-docs: $(SRVGENDIR)
 # This must pass or you will be denied by CI.
 .PHONY: license
 license:
-	go run ./hack/check_license -ignore $(PWD)/$(SRVGENDIR)
+	go run ./hack/check_license -ignore $(PWD)/$(SRVGENDIR) -ignore $(PWD)/pkg/provisioners/mock
