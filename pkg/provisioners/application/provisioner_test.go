@@ -18,14 +18,17 @@ package application_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/mock"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func toPointer[T any](t T) *T {
+	return &t
+}
 
 // testContext provides a common framework for test execution.
 type testContext struct {
@@ -76,8 +83,7 @@ func mustGetApplication(t *testing.T, p *application.Provisioner) *argoprojv1.Ap
 	return application
 }
 
-//nolint:gochecknoglobals
-var (
+const (
 	repo    = "foo"
 	chart   = "bar"
 	version = "baz"
@@ -95,16 +101,16 @@ func TestApplicationCreateHelm(t *testing.T) {
 			Name: "test",
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    &repo,
-			Chart:   &chart,
-			Version: &version,
+			Repo:    toPointer(repo),
+			Chart:   toPointer(chart),
+			Version: toPointer(version),
 		},
 	}
 
 	owner := &mutuallyExclusiveResource{}
 	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
 
-	assert.Error(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
+	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
 
 	application := mustGetApplication(t, provisioner)
 	assert.Equal(t, repo, application.Spec.Source.RepoURL)
@@ -124,37 +130,47 @@ func TestApplicationCreateHelm(t *testing.T) {
 func TestApplicationCreateHelmExtended(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
-
 	release := "epic"
 	parameter := "foo"
 	value := "bah"
-	theT := true
+	remoteClusterName := "bar"
+	remoteClusterLabel1 := "baz"
+	remoteClusterLabel2 := "cat"
+	remoteDestination := fmt.Sprintf("%s-%s:%s", remoteClusterName, remoteClusterLabel1, remoteClusterLabel2)
+
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	r := mock.NewMockRemoteCluster(c)
+	r.EXPECT().Name().Return(remoteClusterName)
+	r.EXPECT().Labels().Return([]string{remoteClusterLabel1, remoteClusterLabel2})
+
+	tc := mustNewTestContext(t)
 
 	app := &unikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    &repo,
-			Chart:   &chart,
-			Version: &version,
-			Release: &release,
+			Repo:    toPointer(repo),
+			Chart:   toPointer(chart),
+			Version: toPointer(version),
+			Release: toPointer(release),
 			Parameters: []unikornv1.HelmApplicationSpecParameter{
 				{
-					Name:  &parameter,
-					Value: &value,
+					Name:  toPointer(parameter),
+					Value: toPointer(value),
 				},
 			},
-			CreateNamespace: &theT,
-			ServerSideApply: &theT,
+			CreateNamespace: toPointer(true),
+			ServerSideApply: toPointer(true),
 		},
 	}
 
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
+	provisioner := application.New(tc.kubernetesClient, "foo", owner, app).OnRemote(r)
 
-	assert.Error(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
+	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
 
 	application := mustGetApplication(t, provisioner)
 	assert.Equal(t, repo, application.Spec.Source.RepoURL)
@@ -166,7 +182,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	assert.Equal(t, 1, len(application.Spec.Source.Helm.Parameters))
 	assert.Equal(t, parameter, application.Spec.Source.Helm.Parameters[0].Name)
 	assert.Equal(t, value, application.Spec.Source.Helm.Parameters[0].Value)
-	assert.Equal(t, "in-cluster", application.Spec.Destination.Name)
+	assert.Equal(t, remoteDestination, application.Spec.Destination.Name)
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
@@ -189,16 +205,16 @@ func TestApplicationCreateGit(t *testing.T) {
 			Name: "test",
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    &repo,
-			Path:    &path,
-			Version: &version,
+			Repo:    toPointer(repo),
+			Path:    toPointer(path),
+			Version: toPointer(version),
 		},
 	}
 
 	owner := &mutuallyExclusiveResource{}
 	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
 
-	assert.Error(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
+	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
 
 	application := mustGetApplication(t, provisioner)
 	assert.Equal(t, repo, application.Spec.Source.RepoURL)
@@ -282,9 +298,9 @@ func TestApplicationCreateMutate(t *testing.T) {
 			Name: "test",
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    &repo,
-			Chart:   &chart,
-			Version: &version,
+			Repo:    toPointer(repo),
+			Chart:   toPointer(chart),
+			Version: toPointer(version),
 		},
 	}
 
@@ -292,7 +308,7 @@ func TestApplicationCreateMutate(t *testing.T) {
 	generator := &mutator{}
 	provisioner := application.New(tc.kubernetesClient, "foo", owner, app).WithGenerator(generator).InNamespace(namespace)
 
-	assert.Error(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
+	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
 
 	application := mustGetApplication(t, provisioner)
 	assert.Equal(t, repo, application.Spec.Source.RepoURL)
@@ -328,21 +344,21 @@ func TestApplicationUpdateAndDelete(t *testing.T) {
 			Name: "test",
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    &repo,
-			Chart:   &chart,
-			Version: &version,
+			Repo:    toPointer(repo),
+			Chart:   toPointer(chart),
+			Version: toPointer(version),
 		},
 	}
 
 	owner := &mutuallyExclusiveResource{}
 	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
 
-	assert.Error(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
+	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
 
 	newVersion := "the best"
 	app.Spec.Version = &newVersion
 
-	assert.Error(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
+	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
 
 	application := mustGetApplication(t, provisioner)
 	assert.Nil(t, application.DeletionTimestamp)
@@ -357,8 +373,32 @@ func TestApplicationUpdateAndDelete(t *testing.T) {
 	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
 	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
 
-	assert.Error(t, provisioner.Deprovision(context.TODO()), provisioners.ErrYield)
+	assert.ErrorIs(t, provisioner.Deprovision(context.TODO()), provisioners.ErrYield)
 
 	application = mustGetApplication(t, provisioner)
 	assert.NotNil(t, application.DeletionTimestamp)
+}
+
+// TestApplicationDeleteNotFound tests the provisioner returns nil when an application
+// doesn't exist.
+func TestApplicationDeleteNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc := mustNewTestContext(t)
+
+	app := &unikornv1.HelmApplication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+		Spec: unikornv1.HelmApplicationSpec{
+			Repo:    toPointer(repo),
+			Chart:   toPointer(chart),
+			Version: toPointer(version),
+		},
+	}
+
+	owner := &mutuallyExclusiveResource{}
+	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
+
+	assert.Nil(t, provisioner.Deprovision(context.TODO()))
 }
