@@ -42,8 +42,10 @@ const (
 func GenerateName(generator provisioners.RemoteCluster) string {
 	name := generator.Name()
 
-	if len(generator.Labels()) != 0 {
-		name += "-" + strings.Join(generator.Labels(), ":")
+	labels := generator.Labels()
+
+	if len(labels) != 0 {
+		name += "-" + strings.Join(labels, ":")
 	}
 
 	return name
