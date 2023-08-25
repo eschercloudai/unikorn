@@ -20,6 +20,8 @@ import (
 	"context"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
+	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/conditional"
@@ -120,12 +122,12 @@ func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusterop
 	return clusteropenstack.NewRemoteClusterGenerator(client, p.cluster), nil
 }
 
-func (p *Provisioner) newClusterAutoscalerProvisioner() provisioners.Provisioner {
-	return clusterautoscaler.New(p.client, p.cluster, p.clusterAutoscalerApplication).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
+func (p *Provisioner) newClusterAutoscalerProvisioner(driver cd.Driver) provisioners.Provisioner {
+	return clusterautoscaler.New(driver, p.cluster, p.clusterAutoscalerApplication).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 }
 
-func (p *Provisioner) newClusterAutoscalerOpenStackProvisioner() provisioners.Provisioner {
-	return clusterautoscaleropenstack.New(p.client, p.cluster, p.clusterAutoscalerOpenStackApplication).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
+func (p *Provisioner) newClusterAutoscalerOpenStackProvisioner(driver cd.Driver) provisioners.Provisioner {
+	return clusterautoscaleropenstack.New(driver, p.cluster, p.clusterAutoscalerOpenStackApplication).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 }
 
 // getBootstrapProvisioner installs the remote cluster, cloud controller manager
@@ -133,17 +135,17 @@ func (p *Provisioner) newClusterAutoscalerOpenStackProvisioner() provisioners.Pr
 // installable without an worker nodes, thus all deployments must tolerate control
 // plane taints, and select control plane nodes to support zero-sized workload pools
 // correctly.
-func (p *Provisioner) getBootstrapProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
+func (p *Provisioner) getBootstrapProvisioner(ctx context.Context, driver cd.Driver) (provisioners.Provisioner, error) {
 	remote, err := p.getRemoteClusterGenerator(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	provisioner := serial.New("cluster add-ons",
-		remotecluster.New(p.client, remote),
+		remotecluster.New(driver, remote),
 		concurrent.New("cluster bootstrap",
-			cilium.New(p.client, p.cluster, p.ciliumApplication).OnRemote(remote).BackgroundDelete(),
-			openstackcloudprovider.New(p.client, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote).BackgroundDelete(),
+			cilium.New(driver, p.cluster, p.ciliumApplication).OnRemote(remote).BackgroundDelete(),
+			openstackcloudprovider.New(driver, p.cluster, p.openstackCloudProviderApplication).OnRemote(remote).BackgroundDelete(),
 		),
 	)
 
@@ -153,7 +155,7 @@ func (p *Provisioner) getBootstrapProvisioner(ctx context.Context) (provisioners
 // getAddonsProvisioner returns a generic provisioner for provisioning and deprovisioning.
 // Unlike bootstrap components, these don't necessarily need to be foreced onto the control
 // plane nodes, and we shouldn't be expected to foot the bill for everything.
-func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
+func (p *Provisioner) getAddonsProvisioner(ctx context.Context, driver cd.Driver) (provisioners.Provisioner, error) {
 	remote, err := p.getRemoteClusterGenerator(ctx)
 	if err != nil {
 		return nil, err
@@ -163,29 +165,29 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context) (provisioners.Pr
 	// the CNI and cloud provider in parallel.
 	provisioner := serial.New("cluster add-ons",
 		concurrent.New("cluster add-ons wave 1",
-			openstackplugincindercsi.New(p.client, p.cluster, p.openstackPluginCinderCSIApplication).OnRemote(remote).BackgroundDelete(),
-			metricsserver.New(p.client, p.cluster, p.metricsServerApplication).OnRemote(remote).BackgroundDelete(),
-			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(p.client, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote).BackgroundDelete()),
-			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New(p.client, p.cluster, p.nginxIngressApplication).OnRemote(remote).BackgroundDelete()),
+			openstackplugincindercsi.New(driver, p.cluster, p.openstackPluginCinderCSIApplication).OnRemote(remote).BackgroundDelete(),
+			metricsserver.New(driver, p.cluster, p.metricsServerApplication).OnRemote(remote).BackgroundDelete(),
+			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(driver, p.cluster, p.nvidiaGPUOperatorApplication).OnRemote(remote).BackgroundDelete()),
+			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New(driver, p.cluster, p.nginxIngressApplication).OnRemote(remote).BackgroundDelete()),
 			conditional.New("cert-manager", p.cluster.CertManagerEnabled,
 				serial.New("cert-manager",
-					certmanager.New(p.client, p.cluster, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
-					certmanagerissuers.New(p.client, p.cluster, p.certManagerIssuersApplication).OnRemote(remote).BackgroundDelete(),
+					certmanager.New(driver, p.cluster, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
+					certmanagerissuers.New(driver, p.cluster, p.certManagerIssuersApplication).OnRemote(remote).BackgroundDelete(),
 				),
 			),
-			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(p.client, p.cluster, p.longhornApplication).OnRemote(remote).BackgroundDelete()),
-			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(p.client, p.cluster, p.prometheusApplication).OnRemote(remote).BackgroundDelete()),
+			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(driver, p.cluster, p.longhornApplication).OnRemote(remote).BackgroundDelete()),
+			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(driver, p.cluster, p.prometheusApplication).OnRemote(remote).BackgroundDelete()),
 		),
 		concurrent.New("cluster add-ons wave 2",
-			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(p.client, p.cluster, p.kubernetesDashboardApplication, remote).OnRemote(remote).BackgroundDelete()),
+			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(driver, p.cluster, p.kubernetesDashboardApplication, remote).OnRemote(remote).BackgroundDelete()),
 		),
 	)
 
 	return provisioner, nil
 }
 
-func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
-	clusterProvisioner, err := clusteropenstack.New(ctx, p.client, p.cluster, p.clusterOpenstackApplication)
+func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (provisioners.Provisioner, error) {
+	clusterProvisioner, err := clusteropenstack.New(ctx, driver, p.cluster, p.clusterOpenstackApplication)
 	if err != nil {
 		return nil, err
 	}
@@ -193,12 +195,12 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 	// TODO: this is ugly, consider options pattern?
 	clusterProvisioner.OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 
-	bootstrapProvisioner, err := p.getBootstrapProvisioner(ctx)
+	bootstrapProvisioner, err := p.getBootstrapProvisioner(ctx, driver)
 	if err != nil {
 		return nil, err
 	}
 
-	addonsProvisioner, err := p.getAddonsProvisioner(ctx)
+	addonsProvisioner, err := p.getAddonsProvisioner(ctx, driver)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +217,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 		conditional.New("cluster-autoscaler",
 			p.cluster.AutoscalingEnabled,
 			concurrent.New("cluster-autoscaler",
-				p.newClusterAutoscalerProvisioner(),
+				p.newClusterAutoscalerProvisioner(driver),
 				// TODO: this came in 1.2.0, so is not present in 1.1.0 thus
 				// needs to be optional temporarily otherwise everything will break
 				// on older clusters.
@@ -223,7 +225,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 					func() bool {
 						return p.clusterAutoscalerOpenStackApplication != nil
 					},
-					p.newClusterAutoscalerOpenStackProvisioner(),
+					p.newClusterAutoscalerOpenStackProvisioner(driver),
 				),
 			),
 		),
@@ -235,7 +237,14 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	provisioner, err := p.getProvisioner(ctx)
+	client, err := argocd.NewInCluster(ctx, p.client)
+	if err != nil {
+		return err
+	}
+
+	driver := argocd.NewDriver(p.client, client)
+
+	provisioner, err := p.getProvisioner(ctx, driver)
 	if err != nil {
 		return err
 	}
@@ -249,7 +258,14 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	provisioner, err := p.getProvisioner(ctx)
+	client, err := argocd.NewInCluster(ctx, p.client)
+	if err != nil {
+		return err
+	}
+
+	driver := argocd.NewDriver(p.client, client)
+
+	provisioner, err := p.getProvisioner(ctx, driver)
 	if err != nil {
 		return err
 	}

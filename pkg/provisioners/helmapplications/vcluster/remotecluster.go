@@ -18,8 +18,9 @@ package vcluster
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/eschercloudai/unikorn/pkg/cd"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -52,24 +53,22 @@ func NewRemoteClusterGenerator(client client.Client, namespace string, labels []
 	}
 }
 
-// Name implements the remotecluster.Generator interface.
-func (g *RemoteClusterGenerator) Name() string {
-	return "vcluster"
-}
-
-// Labels mplements the remotecluster.Generator interface.
-func (g *RemoteClusterGenerator) Labels() []string {
-	// The instance name is implicit, for now.
-	labels := []string{"vcluster"}
-
-	labels = append(labels, g.labels...)
-
-	return labels
-}
-
-// Server implements the remotecluster.Generator interface.
-func (g *RemoteClusterGenerator) Server(_ context.Context) (string, error) {
-	return fmt.Sprintf("https://vcluster.%s", g.namespace), nil
+// ID implements the remotecluster.Generator interface.
+func (g *RemoteClusterGenerator) ID() *cd.ResourceIdentifier {
+	// TODO: the labels handling is a bit smelly,
+	return &cd.ResourceIdentifier{
+		Name: "vcluster",
+		Labels: []cd.ResourceIdentifierLabel{
+			{
+				Name:  constants.ControlPlaneLabel,
+				Value: g.labels[0],
+			},
+			{
+				Name:  constants.ProjectLabel,
+				Value: g.labels[1],
+			},
+		},
+	}
 }
 
 // Config implements the remotecluster.Generator interface.

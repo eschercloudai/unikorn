@@ -38,12 +38,3 @@ func VclusterRemoteLabelsFromCluster(cluster *unikornv1alpha1.KubernetesCluster)
 		cluster.Labels[constants.ProjectLabel],
 	}
 }
-
-// ClusterOpenstackLabelsFromCluster extracts a unique set of labels from the cluster
-// for a remote kubernetes cluster.
-func ClusterOpenstackLabelsFromCluster(cluster *unikornv1alpha1.KubernetesCluster) []string {
-	return []string{
-		cluster.Labels[constants.ControlPlaneLabel],
-		cluster.Labels[constants.ProjectLabel],
-	}
-}

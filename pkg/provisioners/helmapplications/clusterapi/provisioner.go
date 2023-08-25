@@ -17,11 +17,9 @@ limitations under the License.
 package clusterapi
 
 import (
-	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -35,14 +33,13 @@ type Provisioner struct{}
 var _ application.Customizer = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
-	return application.New(client, applicationName, resource, helm).WithGenerator(&Provisioner{})
+func New(driver cd.Driver, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
+	return application.New(driver, applicationName, resource, helm).WithGenerator(&Provisioner{})
 }
 
 // Customize implments the application.Customizer interface.
-func (p *Provisioner) Customize(version *string, application *argoprojv1.Application) error {
-	// TODO: this is very ArgoCD specific.
-	application.Spec.IgnoreDifferences = []argoprojv1.ApplicationIgnoreDifference{
+func (p *Provisioner) Customize(version *string) ([]cd.HelmApplicationField, error) {
+	fields := []cd.HelmApplicationField{
 		{
 			Group: "rbac.authorization.k8s.io",
 			Kind:  "ClusterRole",
@@ -59,5 +56,5 @@ func (p *Provisioner) Customize(version *string, application *argoprojv1.Applica
 		},
 	}
 
-	return nil
+	return fields, nil
 }

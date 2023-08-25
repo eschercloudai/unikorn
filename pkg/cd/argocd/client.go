@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package argocd
 
 import (
 	"context"
@@ -30,15 +30,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type APIClient struct {
+	client *argocdapi.APIClient
+}
+
 // NewInClusterOptions tries to derive the in-cluster ArgoCD options.
-func NewInClusterOptions(ctx context.Context, c client.Client, namespace string) (*argocdclient.Options, error) {
+func NewInClusterOptions(ctx context.Context, kubernetesClient client.Client, namespace string) (*argocdclient.Options, error) {
 	adminSecret := &corev1.Secret{}
-	if err := c.Get(ctx, client.ObjectKey{Name: "argocd-initial-admin-secret", Namespace: namespace}, adminSecret); err != nil {
+	if err := kubernetesClient.Get(ctx, client.ObjectKey{Name: "argocd-initial-admin-secret", Namespace: namespace}, adminSecret); err != nil {
 		return nil, err
 	}
 
 	serverSecret := &corev1.Secret{}
-	if err := c.Get(ctx, client.ObjectKey{Name: "argocd-secret", Namespace: namespace}, serverSecret); err != nil {
+	if err := kubernetesClient.Get(ctx, client.ObjectKey{Name: "argocd-secret", Namespace: namespace}, serverSecret); err != nil {
 		return nil, err
 	}
 
@@ -54,16 +58,20 @@ func NewInClusterOptions(ctx context.Context, c client.Client, namespace string)
 }
 
 // NewInCluster creates a new in-cluster client.
-func NewInCluster(ctx context.Context, c client.Client, namespace string) (*argocdapi.APIClient, error) {
-	options, err := NewInClusterOptions(ctx, c, namespace)
+func NewInCluster(ctx context.Context, kubernetesClient client.Client) (*APIClient, error) {
+	options, err := NewInClusterOptions(ctx, kubernetesClient, namespace)
 	if err != nil {
 		return nil, err
 	}
 
-	argocd, err := argocdclient.New(ctx, options)
+	client, err := argocdclient.New(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 
-	return argocd, nil
+	c := &APIClient{
+		client: client,
+	}
+
+	return c, nil
 }

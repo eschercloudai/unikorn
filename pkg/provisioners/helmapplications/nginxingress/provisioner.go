@@ -18,9 +18,8 @@ package nginxingress
 
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -31,6 +30,6 @@ const (
 type Provisioner struct{}
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
-	return application.New(client, applicationName, resource, helm).InNamespace("nginx-system")
+func New(driver cd.Driver, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
+	return application.New(driver, applicationName, resource, helm).InNamespace("nginx-system")
 }

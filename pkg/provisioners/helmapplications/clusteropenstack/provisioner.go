@@ -22,12 +22,11 @@ import (
 	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/util"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -39,8 +38,8 @@ const (
 type Provisioner struct {
 	provisioners.ProvisionerMeta
 
-	// client provides access to Kubernetes.
-	client client.Client
+	// driver is the CD driver that implments applications.
+	driver cd.Driver
 
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1.KubernetesCluster
@@ -60,7 +59,7 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(ctx context.Context, client client.Client, cluster *unikornv1.KubernetesCluster, application *unikornv1.HelmApplication) (*Provisioner, error) {
+func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesCluster, application *unikornv1.HelmApplication) (*Provisioner, error) {
 	// Add the SNAT address of the control plane's default route.
 	// Sadly, we are the only thing guaranteed to live behind the same
 	// router, the CLI tools and UI are or can be used anywhere, so
@@ -74,7 +73,7 @@ func New(ctx context.Context, client client.Client, cluster *unikornv1.Kubernete
 		ProvisionerMeta: provisioners.ProvisionerMeta{
 			Name: cluster.Name,
 		},
-		client:             client,
+		driver:             driver,
 		cluster:            cluster,
 		controlPlanePrefix: controlPlanePrefix,
 		application:        application,
@@ -320,7 +319,7 @@ func (p *Provisioner) ReleaseName() string {
 }
 
 func (p *Provisioner) getProvisioner() provisioners.Provisioner {
-	return application.New(p.client, applicationName, p.cluster, p.application).WithGenerator(p).OnRemote(p.remote).InNamespace(p.namespace)
+	return application.New(p.driver, applicationName, p.cluster, p.application).WithGenerator(p).OnRemote(p.remote).InNamespace(p.namespace)
 }
 
 // Provision implements the Provision interface.
