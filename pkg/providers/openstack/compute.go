@@ -136,7 +136,7 @@ func NewComputeClient(options *ComputeOptions, provider Provider) (*ComputeClien
 
 	// Need at least 2.15 for soft-anti-affinity policy.
 	// Need at least 2.64 for new server group interface.
-	client.Microversion = "2.93"
+	client.Microversion = "2.90"
 
 	c := &ComputeClient{
 		options: options,
