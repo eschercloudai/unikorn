@@ -16,10 +16,12 @@ limitations under the License.
 
 package provisioners
 
-//go:generate mockgen -destination=mock/interfaces.go . Provisioner
+//go:generate mockgen -source=interfaces.go -destination=mock/interfaces.go -package=mock
 
 import (
 	"context"
+
+	"github.com/eschercloudai/unikorn/pkg/cd"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -27,18 +29,8 @@ import (
 // Generator is an abstraction around the sources of remote
 // clusters e.g. a cluster API or vcluster Kubernetes instance.
 type RemoteCluster interface {
-	// Name is a unique name for the remote cluster provider. This,
-	// and labels, must be able to be procedurally generated in order to
-	// delete the remote by name, when the Server() is unavailable e.g
-	// derived from a deleted resource.
-	Name() string
-
-	// Labels define a set of strings that combine with the
-	// name to yield a unique remote cluster name.
-	Labels() []string
-
-	// Server is the URL for the remote cluster endpoint.
-	Server(ctx context.Context) (string, error)
+	// ID is the unique resource identifier for this remote cluster.
+	ID() *cd.ResourceIdentifier
 
 	// Config returns the client configuration (aka parsed Kubeconfig.)
 	Config(ctx context.Context) (*clientcmdapi.Config, error)

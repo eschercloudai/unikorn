@@ -207,7 +207,7 @@ func deleteForeignResources(ctx context.Context, c client.Client, objects []unst
 //
 //nolint:cyclop
 func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) error {
-	vc := vcluster.NewControllerRuntimeClient(p.client)
+	vc := vcluster.NewControllerRuntimeClient(p.driver.Client())
 
 	vclusterClient, err := vc.Client(ctx, p.cluster.Namespace, false)
 	if err != nil {

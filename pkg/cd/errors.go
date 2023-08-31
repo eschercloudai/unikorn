@@ -14,22 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provisioners
+package cd
 
 import (
 	"errors"
 )
 
 var (
-	// ErrYield is raised when a provision/deprovision optation could
-	// block for a long time, in particular the bits that wait for apllication
-	// available status.  This will trigger a controller to requeue the request.
-	// The key things are that workers are unblocked, allowing other reconciles
-	// to be triggered, and we can pick up an modifications (e.g. the cluster is
-	// gubbed - thanks CAPO - and we can delete it without waiting for 10m as the
-	// case used to be in the old world.
-	ErrYield = errors.New("controller timeout yield")
-
 	// ErrNotFound is when a resource is not found.
 	ErrNotFound = errors.New("resource not found")
 )

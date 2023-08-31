@@ -18,10 +18,9 @@ package metricsserver
 
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -35,10 +34,10 @@ type Provisioner struct{}
 var _ application.ValuesGenerator = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
+func New(driver cd.Driver, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
 	p := &Provisioner{}
 
-	return application.New(client, applicationName, resource, helm).WithGenerator(p).InNamespace("kube-system")
+	return application.New(driver, applicationName, resource, helm).WithGenerator(p).InNamespace("kube-system")
 }
 
 // Generate implements the application.Generator interface.

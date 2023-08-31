@@ -23,6 +23,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
+	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/generic"
@@ -160,17 +162,17 @@ func (p *Provisioner) getRemoteClusterGenerator(namespace string) *vcluster.Remo
 
 // getControlPlaneProvisioner returns a provisoner that encodes control plane
 // provisioning steps.
-func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.Provisioner {
+func (p *Provisioner) getControlPlaneProvisioner(driver cd.Driver, namespace string) provisioners.Provisioner {
 	remote := p.getRemoteClusterGenerator(namespace)
 
 	// Provision the vitual cluster, setup the remote cluster then
 	// install cert manager and cluster API into it.
 	return serial.New("control plane",
-		vcluster.New(p.client, p.controlPlane, p.vclusterApplication).InNamespace(namespace),
-		remotecluster.New(p.client, remote),
+		vcluster.New(driver, p.controlPlane, p.vclusterApplication).InNamespace(namespace),
+		remotecluster.New(driver, remote),
 		concurrent.New("cluster-api",
-			certmanager.New(p.client, p.controlPlane, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
-			clusterapi.New(p.client, p.controlPlane, p.clusterAPIApplication).OnRemote(remote).BackgroundDelete(),
+			certmanager.New(driver, p.controlPlane, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
+			clusterapi.New(driver, p.controlPlane, p.clusterAPIApplication).OnRemote(remote).BackgroundDelete(),
 		),
 	)
 }
@@ -189,13 +191,20 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	client, err := argocd.NewInCluster(ctx, p.client)
+	if err != nil {
+		return err
+	}
+
+	driver := argocd.NewDriver(p.client, client)
+
 	// Indicate the namespace is created before provisioning the rest.  This will inevitably
 	// yield as the components take some time to become healthy.  It does however give
 	// clusters an opportunity to be provisioned before the CP is fully up, reducing
 	// latency at the front-end.
 	p.controlPlane.Status.Namespace = namespace.Name
 
-	if err := p.getControlPlaneProvisioner(namespace.Name).Provision(ctx); err != nil {
+	if err := p.getControlPlaneProvisioner(driver, namespace.Name).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -226,8 +235,15 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
+	client, err := argocd.NewInCluster(ctx, p.client)
+	if err != nil {
+		return err
+	}
+
+	driver := argocd.NewDriver(p.client, client)
+
 	// Remove the control plane.
-	if err := p.getControlPlaneProvisioner(namespace.Name).Deprovision(ctx); err != nil {
+	if err := p.getControlPlaneProvisioner(driver, namespace.Name).Deprovision(ctx); err != nil {
 		return err
 	}
 
