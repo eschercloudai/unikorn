@@ -18,38 +18,14 @@ package application
 
 import (
 	"context"
-	"errors"
-	"reflect"
 
-	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/yaml"
-)
-
-const (
-	// namespace is where all the applications live.  By necessity at
-	// present.
-	// TODO: Make this dynamic.
-	namespace = "argocd"
-)
-
-var (
-	// ErrItemLengthMismatch is returned when items are listed but the
-	// wrong number are returned.  Given we are dealing with unique applications
-	// one or zero are expected.
-	ErrItemLengthMismatch = errors.New("item count not as expected")
-
-	// ErrItemNotFound is raised when we cannot find the droid we are looking for.
-	ErrItemNotFound = errors.New("item not found")
 )
 
 // MutuallyExclusiveResource is a generic interface over all resource types,
@@ -86,7 +62,7 @@ type ValuesGenerator interface {
 // Customizer is a generic generator interface that implemnets raw customizations to
 // the application template.  Try to avoid using this.
 type Customizer interface {
-	Customize(version *string, application *argoprojv1.Application) error
+	Customize(version *string) ([]cd.HelmApplicationField, error)
 }
 
 // Provisioner deploys an application that is keyed to a specific resource.
@@ -97,8 +73,8 @@ type Customizer interface {
 type Provisioner struct {
 	provisioners.ProvisionerMeta
 
-	// client provides access to Kubernetes.
-	client client.Client
+	// driver is the CD driver that implements applications.
+	driver cd.Driver
 
 	// remote is the remote cluster to deploy to.
 	remote provisioners.RemoteCluster
@@ -123,12 +99,12 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, name string, resource MutuallyExclusiveResource, application *unikornv1.HelmApplication) *Provisioner {
+func New(driver cd.Driver, name string, resource MutuallyExclusiveResource, application *unikornv1.HelmApplication) *Provisioner {
 	return &Provisioner{
 		ProvisionerMeta: provisioners.ProvisionerMeta{
 			Name: name,
 		},
-		client:      client,
+		driver:      driver,
 		resource:    resource,
 		application: application,
 	}
@@ -165,14 +141,28 @@ func (p *Provisioner) BackgroundDelete() *Provisioner {
 	return p
 }
 
-// getLabels returns a unique set of labels for the application.
-func (p *Provisioner) getLabels() (labels.Set, error) {
+func (p *Provisioner) getResourceID() (*cd.ResourceIdentifier, error) {
+	id := &cd.ResourceIdentifier{
+		Name: p.Name,
+	}
+
 	l, err := p.resource.ResourceLabels()
 	if err != nil {
 		return nil, err
 	}
 
-	return labels.Merge(l, labels.Set{constants.ApplicationLabel: p.Name}), nil
+	if len(l) > 0 {
+		id.Labels = make([]cd.ResourceIdentifierLabel, 0, len(l))
+
+		for k, v := range l {
+			id.Labels = append(id.Labels, cd.ResourceIdentifierLabel{
+				Name:  k,
+				Value: v,
+			})
+		}
+	}
+
+	return id, nil
 }
 
 // getReleaseName uses the release name in the application spec by default
@@ -199,11 +189,11 @@ func (p *Provisioner) getReleaseName() string {
 
 // getParameters constructs a full list of Helm parameters by taking those provided
 // in the application spec, and appending any that the generator yields.
-func (p *Provisioner) getParameters() ([]argoprojv1.HelmParameter, error) {
-	parameters := make([]argoprojv1.HelmParameter, 0, len(p.application.Spec.Parameters))
+func (p *Provisioner) getParameters() ([]cd.HelmApplicationParameter, error) {
+	parameters := make([]cd.HelmApplicationParameter, 0, len(p.application.Spec.Parameters))
 
 	for _, parameter := range p.application.Spec.Parameters {
-		parameters = append(parameters, argoprojv1.HelmParameter{
+		parameters = append(parameters, cd.HelmApplicationParameter{
 			Name:  *parameter.Name,
 			Value: *parameter.Value,
 		})
@@ -217,7 +207,7 @@ func (p *Provisioner) getParameters() ([]argoprojv1.HelmParameter, error) {
 			}
 
 			for name, value := range p {
-				parameters = append(parameters, argoprojv1.HelmParameter{
+				parameters = append(parameters, cd.HelmApplicationParameter{
 					Name:  name,
 					Value: value,
 				})
@@ -225,8 +215,7 @@ func (p *Provisioner) getParameters() ([]argoprojv1.HelmParameter, error) {
 		}
 	}
 
-	// Tempting as it is to delete this, this ensures we can get a zero value
-	// out of this function.
+	// Makes gomock happy as "nil" != "[]foo{}".
 	if len(parameters) == 0 {
 		return nil, nil
 	}
@@ -236,75 +225,46 @@ func (p *Provisioner) getParameters() ([]argoprojv1.HelmParameter, error) {
 
 // getValues delegates to the generator to get an option values.yaml file to
 // pass to Helm.
-func (p *Provisioner) getValues() (string, error) {
+func (p *Provisioner) getValues() (interface{}, error) {
 	if p.generator == nil {
-		return "", nil
+		//nolint:nilnil
+		return nil, nil
 	}
 
 	valuesGenerator, ok := p.generator.(ValuesGenerator)
 	if !ok {
-		return "", nil
+		//nolint:nilnil
+		return nil, nil
 	}
 
 	values, err := valuesGenerator.Values(p.application.Spec.Interface)
 	if err != nil {
-		return "", err
-	}
-
-	marshaled, err := yaml.Marshal(values)
-	if err != nil {
-		return "", err
-	}
-
-	return string(marshaled), nil
-}
-
-// getDestinationName returns the destination cluster name.
-func (p *Provisioner) getDestinationName() string {
-	name := "in-cluster"
-
-	if p.remote != nil {
-		name = remotecluster.GenerateName(p.remote)
-	}
-
-	return name
-}
-
-// getDestinationNamespace returns an explicit namespace if one is set.
-func (p *Provisioner) getDestinationNamespace() string {
-	namespace := ""
-
-	if p.namespace != "" {
-		namespace = p.namespace
-	}
-
-	return namespace
-}
-
-// getSyncOptions accumulates any synchronization options.
-func (p *Provisioner) getSyncOptions() []argoprojv1.ApplicationSyncOption {
-	var options []argoprojv1.ApplicationSyncOption
-
-	if p.application.Spec.CreateNamespace != nil && *p.application.Spec.CreateNamespace {
-		options = append(options, argoprojv1.CreateNamespace)
-	}
-
-	if p.application.Spec.ServerSideApply != nil && *p.application.Spec.ServerSideApply {
-		options = append(options, argoprojv1.ServerSideApply)
-	}
-
-	return options
-}
-
-// generateResource converts the provided object to a canonical unstructured form.
-//
-//nolint:cyclop
-func (p *Provisioner) generateResource() (*argoprojv1.Application, error) {
-	labels, err := p.getLabels()
-	if err != nil {
 		return nil, err
 	}
 
+	return values, nil
+}
+
+// getClusterID returns the destination cluster name.
+func (p *Provisioner) getClusterID() *cd.ResourceIdentifier {
+	if p.remote != nil {
+		return p.remote.ID()
+	}
+
+	return nil
+}
+
+// getNamespace returns an explicit namespace if one is set.
+func (p *Provisioner) getNamespace() string {
+	if p.namespace != "" {
+		return p.namespace
+	}
+
+	return ""
+}
+
+// generateApplication converts the provided object to a canonical form for a driver.
+func (p *Provisioner) generateApplication() (*cd.HelmApplication, error) {
 	parameters, err := p.getParameters()
 	if err != nil {
 		return nil, err
@@ -315,91 +275,44 @@ func (p *Provisioner) generateResource() (*argoprojv1.Application, error) {
 		return nil, err
 	}
 
-	helm := &argoprojv1.ApplicationSourceHelm{
-		ReleaseName: p.getReleaseName(),
-		Parameters:  parameters,
-		Values:      values,
-	}
-
-	application := &argoprojv1.Application{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: p.Name + "-",
-			Namespace:    namespace,
-			Labels:       labels,
-		},
-		Spec: argoprojv1.ApplicationSpec{
-			Project: "default",
-			Source: argoprojv1.ApplicationSource{
-				RepoURL:        *p.application.Spec.Repo,
-				TargetRevision: *p.application.Spec.Version,
-			},
-			Destination: argoprojv1.ApplicationDestination{
-				Name:      p.getDestinationName(),
-				Namespace: p.getDestinationNamespace(),
-			},
-			SyncPolicy: argoprojv1.ApplicationSyncPolicy{
-				Automated: &argoprojv1.ApplicationSyncAutomation{
-					SelfHeal: true,
-					Prune:    true,
-				},
-			},
-		},
-	}
-
-	if !reflect.ValueOf(*helm).IsZero() {
-		application.Spec.Source.Helm = helm
+	application := &cd.HelmApplication{
+		Repo:       *p.application.Spec.Repo,
+		Version:    *p.application.Spec.Version,
+		Release:    p.getReleaseName(),
+		Parameters: parameters,
+		Values:     values,
+		Cluster:    p.getClusterID(),
+		Namespace:  p.getNamespace(),
 	}
 
 	if p.application.Spec.Chart != nil {
-		application.Spec.Source.Chart = *p.application.Spec.Chart
+		application.Chart = *p.application.Spec.Chart
 	}
 
 	if p.application.Spec.Path != nil {
-		application.Spec.Source.Path = *p.application.Spec.Path
+		application.Path = *p.application.Spec.Path
 	}
 
-	syncOptions := p.getSyncOptions()
+	if p.application.Spec.CreateNamespace != nil {
+		application.CreateNamespace = *p.application.Spec.CreateNamespace
+	}
 
-	if len(syncOptions) != 0 {
-		application.Spec.SyncPolicy.SyncOptions = syncOptions
+	if p.application.Spec.ServerSideApply != nil {
+		application.ServerSideApply = *p.application.Spec.ServerSideApply
 	}
 
 	if p.generator != nil {
 		if customization, ok := p.generator.(Customizer); ok {
-			if err := customization.Customize(p.application.Spec.Interface, application); err != nil {
+			ignoredDifferences, err := customization.Customize(p.application.Spec.Interface)
+			if err != nil {
 				return nil, err
 			}
+
+			application.IgnoreDifferences = ignoredDifferences
 		}
 	}
 
 	return application, nil
-}
-
-// FindApplication looks up any existing resource using a label selector, you must use
-// generated names here as it's a multi-tenant platform, argo enforces the use of a single
-// namespace, and we want users to be able to define their own names irrespective
-// of other users.
-func (p *Provisioner) FindApplication(ctx context.Context) (*argoprojv1.Application, error) {
-	var resources argoprojv1.ApplicationList
-
-	l, err := p.getLabels()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := p.client.List(ctx, &resources, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(l)}); err != nil {
-		return nil, err
-	}
-
-	if len(resources.Items) == 0 {
-		return nil, ErrItemNotFound
-	}
-
-	if len(resources.Items) > 1 {
-		return nil, ErrItemLengthMismatch
-	}
-
-	return &resources.Items[0], nil
 }
 
 // Provision implements the Provision interface.
@@ -408,56 +321,19 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	log.Info("provisioning application", "application", p.Name)
 
-	// Convert the generic object type into unstructured for the next bit...
-	required, err := p.generateResource()
+	// Convert the generic object type into what's expected by the driver interface.
+	id, err := p.getResourceID()
 	if err != nil {
 		return err
 	}
 
-	// Resource, after provisioning, should be set to either the existing resource
-	// or the newly created one.  The point here is the API will have filled in
-	// the name so we can perform readiness checks.
-	resource, err := p.FindApplication(ctx)
+	application, err := p.generateApplication()
 	if err != nil {
-		// Something bad has happened.
-		if !errors.Is(err, ErrItemNotFound) {
-			return err
-		}
+		return err
 	}
 
-	// TODO: can probably just use controllerutil.CreateOrPatch.
-	if resource == nil {
-		log.Info("creating new application", "application", p.Name)
-
-		if err := p.client.Create(ctx, required); err != nil {
-			return err
-		}
-
-		resource = required
-	} else {
-		log.Info("updating existing application", "application", p.Name)
-
-		// Replace the specification with what we expect.
-		temp := resource.DeepCopy()
-		temp.Labels = required.Labels
-		temp.Spec = required.Spec
-
-		if err := p.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
-			return err
-		}
-
-		resource = temp
-	}
-
-	log.Info("checking application health", "application", p.Name)
-
-	// NOTE: This isn't necessarily accurate, take CAPI clusters for instance,
-	// that's just a bunch of CRs, and they are instantly healthy until
-	// CAPI/CAPO take note and start making status updates...
-	if resource.Status.Health == nil || resource.Status.Health.Status != argoprojv1.Healthy {
-		log.Info("application not healthy, yielding", "application", p.Name)
-
-		return provisioners.ErrYield
+	if err := p.driver.CreateOrUpdateHelmApplication(ctx, id, application); err != nil {
+		return err
 	}
 
 	log.Info("application provisioned", "application", p.Name)
@@ -471,50 +347,13 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning application", "application", p.Name)
 
-	resource, err := p.FindApplication(ctx)
+	id, err := p.getResourceID()
 	if err != nil {
-		if errors.Is(err, ErrItemNotFound) {
-			log.Info("application deleted", "application", p.Name)
-
-			return nil
-		}
-
 		return err
 	}
 
-	if resource.GetDeletionTimestamp() != nil {
-		if p.backgroundDelete {
-			return nil
-		}
-
-		log.Info("waiting for application deletion", "application", p.Name)
-
-		return provisioners.ErrYield
-	}
-
-	log.Info("adding application finalizer", "application", p.Name)
-
-	// Apply a finalizer to ensure synchronous deletion. See
-	// https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/
-	temp := resource.DeepCopy()
-	temp.SetFinalizers([]string{"resources-finalizer.argocd.argoproj.io"})
-
-	// Try to work around a race during deletion as per
-	// https://github.com/argoproj/argo-cd/issues/12943
-	temp.Spec.SyncPolicy.Automated = nil
-
-	if err := p.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
+	if err := p.driver.DeleteHelmApplication(ctx, id, p.backgroundDelete); err != nil {
 		return err
-	}
-
-	log.Info("deleting application", "application", p.Name)
-
-	if err := p.client.Delete(ctx, resource); err != nil {
-		return err
-	}
-
-	if !p.backgroundDelete {
-		return provisioners.ErrYield
 	}
 
 	return nil

@@ -18,10 +18,8 @@ package remotecluster
 
 import (
 	"context"
-	"strings"
 
-	argocdclient "github.com/eschercloudai/unikorn/pkg/argocd/client"
-	argocdcluster "github.com/eschercloudai/unikorn/pkg/argocd/cluster"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -30,26 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-const (
-	// namespace is where ArgoCD lives.
-	// TODO: Make this dynamic.
-	namespace = "argocd"
-)
-
-// GenerateName combines the generator's name and labels to form a unique
-// remote cluster name.
-func GenerateName(generator provisioners.RemoteCluster) string {
-	name := generator.Name()
-
-	labels := generator.Labels()
-
-	if len(labels) != 0 {
-		name += "-" + strings.Join(labels, ":")
-	}
-
-	return name
-}
 
 // GetClient gets a client from the remote generator.
 func GetClient(ctx context.Context, generator provisioners.RemoteCluster) (client.Client, error) {
@@ -70,20 +48,20 @@ func GetClient(ctx context.Context, generator provisioners.RemoteCluster) (clien
 type Provisioner struct {
 	provisioners.ProvisionerMeta
 
-	// client provides access to Kubernetes.
-	client client.Client
+	// driver is the CD driver that implements applications.
+	driver cd.Driver
 
 	// generator provides a method to derive cluster names and configuration.
 	generator provisioners.RemoteCluster
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, generator provisioners.RemoteCluster) *Provisioner {
+func New(driver cd.Driver, generator provisioners.RemoteCluster) *Provisioner {
 	return &Provisioner{
 		ProvisionerMeta: provisioners.ProvisionerMeta{
-			Name: GenerateName(generator),
+			Name: "remote-cluster",
 		},
-		client:    client,
+		driver:    driver,
 		generator: generator,
 	}
 }
@@ -91,32 +69,26 @@ func New(client client.Client, generator provisioners.RemoteCluster) *Provisione
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
 
+func (p *Provisioner) ID() *cd.ResourceIdentifier {
+	return p.generator.ID()
+}
+
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
 	log.Info("provisioning remote cluster", "remotecluster", p.Name)
 
-	argocd, err := argocdclient.NewInCluster(ctx, p.client, namespace)
-	if err != nil {
-		return err
-	}
-
-	server, err := p.generator.Server(ctx)
-	if err != nil {
-		return err
-	}
-
 	config, err := p.generator.Config(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Retry adding the cluster until ArgoCD deems it's ready, it'll 500 until that
-	// condition is met.  This allows the provisioner to be used to initialize remotes
-	// in parallel with them coming up as some providers require add-ons to be installed
-	// concurrently before a readiness check will succeed.
-	if err := argocdcluster.Upsert(ctx, argocd, p.Name, server, config); err != nil {
+	cluster := &cd.Cluster{
+		Config: config,
+	}
+
+	if err := p.driver.CreateOrUpdateCluster(ctx, p.generator.ID(), cluster); err != nil {
 		log.Info("remote cluster not ready, yielding", "remotecluster", p.Name)
 
 		return provisioners.ErrYield
@@ -133,12 +105,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning remote cluster", "remotecluster", p.Name)
 
-	argocd, err := argocdclient.NewInCluster(ctx, p.client, namespace)
-	if err != nil {
-		return err
-	}
-
-	if err := argocdcluster.Delete(ctx, argocd, p.Name); err != nil {
+	if err := p.driver.DeleteCluster(ctx, p.generator.ID()); err != nil {
 		return err
 	}
 

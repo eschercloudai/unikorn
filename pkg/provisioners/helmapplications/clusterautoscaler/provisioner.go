@@ -18,10 +18,9 @@ package clusterautoscaler
 
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -40,13 +39,13 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, resource *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
+func New(driver cd.Driver, resource *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
 	provisoner := &Provisioner{
 		clusterName:                 clusteropenstack.CAPIClusterName(resource),
 		clusterKubeconfigSecretName: clusteropenstack.KubeconfigSecretName(resource),
 	}
 
-	return application.New(client, applicationName, resource, helm).WithGenerator(provisoner)
+	return application.New(driver, applicationName, resource, helm).WithGenerator(provisoner)
 }
 
 // Ensure the Provisioner interface is implemented.

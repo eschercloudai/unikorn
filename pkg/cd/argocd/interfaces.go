@@ -14,20 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package prometheus
+package argocd
 
 import (
-	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"context"
+
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "prometheus"
-)
-
-// New returns a new initialized provisioner object.
-func New(driver cd.Driver, cluster *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
-	return application.New(driver, applicationName, cluster, helm).InNamespace("prometheus-system")
+type Client interface {
+	UpsertCluster(ctx context.Context, name, server string, config *clientcmdapi.Config) error
+	DeleteCluster(ctx context.Context, name string) error
 }

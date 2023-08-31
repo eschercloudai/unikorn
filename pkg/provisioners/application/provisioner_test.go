@@ -18,50 +18,24 @@ package application_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
+	"github.com/eschercloudai/unikorn/pkg/cd/mock"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/mock"
-	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
+	mockprovisioners "github.com/eschercloudai/unikorn/pkg/provisioners/mock"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func toPointer[T any](t T) *T {
 	return &t
-}
-
-// testContext provides a common framework for test execution.
-type testContext struct {
-	// kubernetesClient allows fake resources to be tested or mutated to
-	// trigger various testing scenarios.
-	kubernetesClient client.WithWatch
-}
-
-func mustNewTestContext(t *testing.T) *testContext {
-	t.Helper()
-
-	scheme, err := clientutil.NewScheme()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tc := &testContext{
-		kubernetesClient: fake.NewClientBuilder().WithScheme(scheme).Build(),
-	}
-
-	return tc
 }
 
 // mutuallyExclusiveResource defines an abstract type that is able to uniquely
@@ -72,17 +46,6 @@ func (m mutuallyExclusiveResource) ResourceLabels() (labels.Set, error) {
 	return labels.Set(m), nil
 }
 
-// mustGetApplication gets the Kubernetes Apllication resource for the
-// provisioner.
-func mustGetApplication(t *testing.T, p *application.Provisioner) *argoprojv1.Application {
-	t.Helper()
-
-	application, err := p.FindApplication(context.TODO())
-	assert.Nil(t, err)
-
-	return application
-}
-
 const (
 	repo    = "foo"
 	chart   = "bar"
@@ -90,11 +53,9 @@ const (
 )
 
 // TestApplicationCreateHelm tests that given the requested input the provisioner
-// creates an ArgoCD Application, and the fields are populated as expected.
+// creates a CD Application, and the fields are populated as expected.
 func TestApplicationCreateHelm(t *testing.T) {
 	t.Parallel()
-
-	tc := mustNewTestContext(t)
 
 	app := &unikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
@@ -107,22 +68,28 @@ func TestApplicationCreateHelm(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	driverAppID := &cd.ResourceIdentifier{
+		Name: "foo",
+	}
+
+	driverApp := &cd.HelmApplication{
+		Repo:    repo,
+		Chart:   chart,
+		Version: version,
+	}
+
+	driver := mock.NewMockDriver(c)
+	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
+
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
+	provisioner := application.New(driver, "foo", owner, app)
 
-	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
-
-	application := mustGetApplication(t, provisioner)
-	assert.Equal(t, repo, application.Spec.Source.RepoURL)
-	assert.Equal(t, chart, application.Spec.Source.Chart)
-	assert.Equal(t, "", application.Spec.Source.Path)
-	assert.Equal(t, version, application.Spec.Source.TargetRevision)
-	assert.Nil(t, application.Spec.Source.Helm)
-	assert.Equal(t, "in-cluster", application.Spec.Destination.Name)
-	assert.Equal(t, "", application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
+	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
 
 // TestApplicationCreateHelmExtended tests that given the requested input the provisioner
@@ -133,19 +100,13 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	release := "epic"
 	parameter := "foo"
 	value := "bah"
+	idLabel1 := "cow"
+	idLabel1Value := "moo"
 	remoteClusterName := "bar"
-	remoteClusterLabel1 := "baz"
+	remoteClusterLabel1 := "dog"
+	remoteClusterLabel1Value := "woof"
 	remoteClusterLabel2 := "cat"
-	remoteDestination := fmt.Sprintf("%s-%s:%s", remoteClusterName, remoteClusterLabel1, remoteClusterLabel2)
-
-	c := gomock.NewController(t)
-	defer c.Finish()
-
-	r := mock.NewMockRemoteCluster(c)
-	r.EXPECT().Name().Return(remoteClusterName)
-	r.EXPECT().Labels().Return([]string{remoteClusterLabel1, remoteClusterLabel2})
-
-	tc := mustNewTestContext(t)
+	remoteClusterLabel2value := "meow"
 
 	app := &unikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
@@ -167,36 +128,69 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 		},
 	}
 
-	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(tc.kubernetesClient, "foo", owner, app).OnRemote(r)
+	ctx := context.Background()
 
-	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
+	c := gomock.NewController(t)
+	defer c.Finish()
 
-	application := mustGetApplication(t, provisioner)
-	assert.Equal(t, repo, application.Spec.Source.RepoURL)
-	assert.Equal(t, chart, application.Spec.Source.Chart)
-	assert.Equal(t, "", application.Spec.Source.Path)
-	assert.Equal(t, version, application.Spec.Source.TargetRevision)
-	assert.NotNil(t, application.Spec.Source.Helm)
-	assert.Equal(t, release, application.Spec.Source.Helm.ReleaseName)
-	assert.Equal(t, 1, len(application.Spec.Source.Helm.Parameters))
-	assert.Equal(t, parameter, application.Spec.Source.Helm.Parameters[0].Name)
-	assert.Equal(t, value, application.Spec.Source.Helm.Parameters[0].Value)
-	assert.Equal(t, remoteDestination, application.Spec.Destination.Name)
-	assert.Equal(t, "", application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.Equal(t, 2, len(application.Spec.SyncPolicy.SyncOptions))
-	assert.Equal(t, argoprojv1.CreateNamespace, application.Spec.SyncPolicy.SyncOptions[0])
-	assert.Equal(t, argoprojv1.ServerSideApply, application.Spec.SyncPolicy.SyncOptions[1])
+	remoteID := &cd.ResourceIdentifier{
+		Name: remoteClusterName,
+		Labels: []cd.ResourceIdentifierLabel{
+			{
+				Name:  remoteClusterLabel1,
+				Value: remoteClusterLabel1Value,
+			},
+			{
+				Name:  remoteClusterLabel2,
+				Value: remoteClusterLabel2value,
+			},
+		},
+	}
+
+	r := mockprovisioners.NewMockRemoteCluster(c)
+	r.EXPECT().ID().Return(remoteID)
+
+	driverAppID := &cd.ResourceIdentifier{
+		Name: "foo",
+		Labels: []cd.ResourceIdentifierLabel{
+			{
+				Name:  idLabel1,
+				Value: idLabel1Value,
+			},
+		},
+	}
+
+	driverApp := &cd.HelmApplication{
+		Repo:    repo,
+		Chart:   chart,
+		Version: version,
+		Release: release,
+		Parameters: []cd.HelmApplicationParameter{
+			{
+				Name:  parameter,
+				Value: value,
+			},
+		},
+		Cluster:         remoteID,
+		CreateNamespace: true,
+		ServerSideApply: true,
+	}
+
+	driver := mock.NewMockDriver(c)
+	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
+
+	owner := &mutuallyExclusiveResource{
+		idLabel1: idLabel1Value,
+	}
+	provisioner := application.New(driver, "foo", owner, app).OnRemote(r)
+
+	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
 
 // TestApplicationCreateGit tests that given the requested input the provisioner
 // creates an ArgoCD Application, and the fields are populated as expected.
 func TestApplicationCreateGit(t *testing.T) {
 	t.Parallel()
-
-	tc := mustNewTestContext(t)
 
 	path := "bar"
 
@@ -211,23 +205,28 @@ func TestApplicationCreateGit(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	driverAppID := &cd.ResourceIdentifier{
+		Name: "foo",
+	}
+
+	driverApp := &cd.HelmApplication{
+		Repo:    repo,
+		Path:    path,
+		Version: version,
+	}
+
+	driver := mock.NewMockDriver(c)
+	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
+
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
+	provisioner := application.New(driver, "foo", owner, app)
 
-	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
-
-	application := mustGetApplication(t, provisioner)
-	assert.Equal(t, repo, application.Spec.Source.RepoURL)
-	assert.Equal(t, "", application.Spec.Source.Chart)
-	assert.Equal(t, path, application.Spec.Source.Path)
-	assert.Equal(t, version, application.Spec.Source.TargetRevision)
-	assert.Nil(t, application.Spec.Source.Helm)
-	assert.Equal(t, "in-cluster", application.Spec.Destination.Name)
-	assert.Equal(t, "", application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
-	assert.Nil(t, application.Spec.IgnoreDifferences)
+	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
 
 const (
@@ -243,8 +242,6 @@ const (
 var mutatorValues = map[string]string{
 	mutatorParameter: mutatorValue,
 }
-
-const mutatorValuesString = mutatorParameter + ": " + mutatorValue + "\n"
 
 // mutator does just that allows modifications of the application.
 type mutator struct{}
@@ -270,8 +267,8 @@ func (m *mutator) Values(version *string) (interface{}, error) {
 	return mutatorValues, nil
 }
 
-func (m *mutator) Customize(version *string, application *argoprojv1.Application) error {
-	application.Spec.IgnoreDifferences = []argoprojv1.ApplicationIgnoreDifference{
+func (m *mutator) Customize(version *string) ([]cd.HelmApplicationField, error) {
+	differences := []cd.HelmApplicationField{
 		{
 			Group: mutatorIgnoreDifferencesGroup,
 			Kind:  mutatorIgnoreDifferencesKind,
@@ -281,15 +278,13 @@ func (m *mutator) Customize(version *string, application *argoprojv1.Application
 		},
 	}
 
-	return nil
+	return differences, nil
 }
 
 // TestApplicationCreateMutate tests that given the requested input the provisioner
 // creates an ArgoCD Application, and the fields are populated as expected.
 func TestApplicationCreateMutate(t *testing.T) {
 	t.Parallel()
-
-	tc := mustNewTestContext(t)
 
 	namespace := "gerbils"
 
@@ -304,79 +299,46 @@ func TestApplicationCreateMutate(t *testing.T) {
 		},
 	}
 
-	owner := &mutuallyExclusiveResource{}
-	generator := &mutator{}
-	provisioner := application.New(tc.kubernetesClient, "foo", owner, app).WithGenerator(generator).InNamespace(namespace)
+	ctx := context.Background()
 
-	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
+	c := gomock.NewController(t)
+	defer c.Finish()
 
-	application := mustGetApplication(t, provisioner)
-	assert.Equal(t, repo, application.Spec.Source.RepoURL)
-	assert.Equal(t, chart, application.Spec.Source.Chart)
-	assert.Equal(t, "", application.Spec.Source.Path)
-	assert.Equal(t, version, application.Spec.Source.TargetRevision)
-	assert.NotNil(t, application.Spec.Source.Helm)
-	assert.Equal(t, mutatorRelease, application.Spec.Source.Helm.ReleaseName)
-	assert.Equal(t, 1, len(application.Spec.Source.Helm.Parameters))
-	assert.Equal(t, mutatorParameter, application.Spec.Source.Helm.Parameters[0].Name)
-	assert.Equal(t, mutatorValue, application.Spec.Source.Helm.Parameters[0].Value)
-	assert.Equal(t, mutatorValuesString, application.Spec.Source.Helm.Values)
-	assert.Equal(t, namespace, application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
-	assert.Equal(t, 1, len(application.Spec.IgnoreDifferences))
-	assert.Equal(t, mutatorIgnoreDifferencesGroup, application.Spec.IgnoreDifferences[0].Group)
-	assert.Equal(t, mutatorIgnoreDifferencesKind, application.Spec.IgnoreDifferences[0].Kind)
-	assert.Equal(t, 1, len(application.Spec.IgnoreDifferences[0].JSONPointers))
-	assert.Equal(t, mutatorIgnoreDifferencesPointer, application.Spec.IgnoreDifferences[0].JSONPointers[0])
-}
+	driverAppID := &cd.ResourceIdentifier{
+		Name: "foo",
+	}
 
-// TestApplicationUpdateAndDelete tests that given the requested input the provisioner
-// creates an ArgoCD Application, and the fields are populated as expected.
-func TestApplicationUpdateAndDelete(t *testing.T) {
-	t.Parallel()
-
-	tc := mustNewTestContext(t)
-
-	app := &unikornv1.HelmApplication{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
+	driverApp := &cd.HelmApplication{
+		Repo:      repo,
+		Chart:     chart,
+		Version:   version,
+		Release:   mutatorRelease,
+		Namespace: namespace,
+		Parameters: []cd.HelmApplicationParameter{
+			{
+				Name:  mutatorParameter,
+				Value: mutatorValue,
+			},
 		},
-		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    toPointer(repo),
-			Chart:   toPointer(chart),
-			Version: toPointer(version),
+		Values: mutatorValues,
+		IgnoreDifferences: []cd.HelmApplicationField{
+			{
+				Group: mutatorIgnoreDifferencesGroup,
+				Kind:  mutatorIgnoreDifferencesKind,
+				JSONPointers: []string{
+					mutatorIgnoreDifferencesPointer,
+				},
+			},
 		},
 	}
 
+	driver := mock.NewMockDriver(c)
+	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
+
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
+	provisioner := application.New(driver, "foo", owner, app).WithGenerator(&mutator{}).InNamespace(namespace)
 
-	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
-
-	newVersion := "the best"
-	app.Spec.Version = &newVersion
-
-	assert.ErrorIs(t, provisioner.Provision(context.TODO()), provisioners.ErrYield)
-
-	application := mustGetApplication(t, provisioner)
-	assert.Nil(t, application.DeletionTimestamp)
-	assert.Equal(t, repo, application.Spec.Source.RepoURL)
-	assert.Equal(t, chart, application.Spec.Source.Chart)
-	assert.Equal(t, "", application.Spec.Source.Path)
-	assert.Equal(t, newVersion, application.Spec.Source.TargetRevision)
-	assert.Nil(t, application.Spec.Source.Helm)
-	assert.Equal(t, "in-cluster", application.Spec.Destination.Name)
-	assert.Equal(t, "", application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
-	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
-
-	assert.ErrorIs(t, provisioner.Deprovision(context.TODO()), provisioners.ErrYield)
-
-	application = mustGetApplication(t, provisioner)
-	assert.NotNil(t, application.DeletionTimestamp)
+	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
 
 // TestApplicationDeleteNotFound tests the provisioner returns nil when an application
@@ -384,8 +346,6 @@ func TestApplicationUpdateAndDelete(t *testing.T) {
 func TestApplicationDeleteNotFound(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
-
 	app := &unikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
@@ -397,8 +357,20 @@ func TestApplicationDeleteNotFound(t *testing.T) {
 		},
 	}
 
-	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(tc.kubernetesClient, "foo", owner, app)
+	ctx := context.Background()
 
-	assert.Nil(t, provisioner.Deprovision(context.TODO()))
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	driverAppID := &cd.ResourceIdentifier{
+		Name: "foo",
+	}
+
+	driver := mock.NewMockDriver(c)
+	driver.EXPECT().DeleteHelmApplication(ctx, driverAppID, false).Return(provisioners.ErrYield)
+
+	owner := &mutuallyExclusiveResource{}
+	provisioner := application.New(driver, "foo", owner, app)
+
+	assert.ErrorIs(t, provisioner.Deprovision(ctx), provisioners.ErrYield)
 }

@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackcloudprovider"
@@ -30,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
 
@@ -41,21 +41,21 @@ const (
 
 // Provisioner provides helm configuration interfaces.
 type Provisioner struct {
-	// client is the Kubenetes client.
-	client client.Client
+	// driver is the CD driver that implments applications.
+	driver cd.Driver
 
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1.KubernetesCluster
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, cluster *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
+func New(driver cd.Driver, cluster *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
 	provisioner := &Provisioner{
-		client:  client,
+		driver:  driver,
 		cluster: cluster,
 	}
 
-	return application.New(client, applicationName, cluster, helm).WithGenerator(provisioner).InNamespace("ocp-system")
+	return application.New(driver, applicationName, cluster, helm).WithGenerator(provisioner).InNamespace("ocp-system")
 }
 
 // Ensure the Provisioner interface is implemented.
@@ -99,7 +99,9 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 	for i, class := range storageClasses {
 		var u unstructured.Unstructured
 
-		if err := p.client.Scheme().Convert(class, &u, nil); err != nil {
+		// While we could hard code the TypeMeta, it's better practice and safer
+		// to use the provided mechanisms.
+		if err := p.driver.Client().Scheme().Convert(class, &u, nil); err != nil {
 			return nil, err
 		}
 

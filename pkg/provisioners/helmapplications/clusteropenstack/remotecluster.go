@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
@@ -79,28 +80,26 @@ func NewRemoteClusterGenerator(client client.Client, cluster *unikornv1.Kubernet
 	}
 }
 
-// Name implements the remotecluster.Generator interface.
-func (g *RemoteClusterGenerator) Name() string {
-	return "kubernetes"
-}
-
-// Labels implements the remotecluster.Generator interface.
-func (g *RemoteClusterGenerator) Labels() []string {
-	labels := []string{g.cluster.Name}
-
-	labels = append(labels, provisioners.ClusterOpenstackLabelsFromCluster(g.cluster)...)
-
-	return labels
-}
-
-// Server implements the remotecluster.Generator interface.
-func (g *RemoteClusterGenerator) Server(ctx context.Context) (string, error) {
-	config, err := g.Config(ctx)
-	if err != nil {
-		return "", err
+// ID implements the remotecluster.Generator interface.
+func (g *RemoteClusterGenerator) ID() *cd.ResourceIdentifier {
+	// TODO: the labels handling is a bit smelly,
+	return &cd.ResourceIdentifier{
+		Name: "kubernetes",
+		Labels: []cd.ResourceIdentifierLabel{
+			{
+				Name:  constants.KubernetesClusterLabel,
+				Value: g.cluster.Name,
+			},
+			{
+				Name:  constants.ControlPlaneLabel,
+				Value: g.cluster.Labels[constants.ControlPlaneLabel],
+			},
+			{
+				Name:  constants.ProjectLabel,
+				Value: g.cluster.Labels[constants.ProjectLabel],
+			},
+		},
 	}
-
-	return config.Clusters[config.Contexts[config.CurrentContext].Cluster].Server, nil
 }
 
 // Config implements the remotecluster.Generator interface.
