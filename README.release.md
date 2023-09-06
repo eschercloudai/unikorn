@@ -1,4 +1,4 @@
-# Cuttng a Release Checklist
+# Cutting a Release Checklist
 
 * Update the `README.md` file to reflect the new version.
 * Update the helm `Chart.yaml` to reflect the new version.

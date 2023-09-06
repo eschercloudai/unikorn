@@ -260,6 +260,9 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 		"openstack": openstackValues,
 		"cluster": map[string]interface{}{
 			"taints": []interface{}{
+				// TODO: This is deprecated moving forward as the cilium operator provides these taints.
+				//   We can't remove it yet though as it'd break any deployments pre kubernetes-cluster-1.4.0
+
 				// This prevents things like coreDNS from coming up until
 				// the CNI is installed.
 				map[string]interface{}{

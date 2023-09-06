@@ -22,6 +22,28 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ApplicationBundle
 metadata:
+  name: control-plane-1.2.0
+spec:
+  kind: ControlPlane
+  version: 1.2.0
+  preview: true
+  applications:
+    - name: vcluster
+      reference:
+        kind: HelmApplication
+        name: vcluster-0.15.7-1
+    - name: cert-manager
+      reference:
+        kind: HelmApplication
+        name: cert-manager-1.12.4-1
+    - name: cluster-api
+      reference:
+        kind: HelmApplication
+        name: cluster-api-0.1.8-1
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: ApplicationBundle
+metadata:
   name: kubernetes-cluster-1.3.0
 spec:
   kind: KubernetesCluster
@@ -149,3 +171,70 @@ spec:
     reference:
       kind: HelmApplication
       name: kube-prometheus-stack-46.8.0-1
+
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: ApplicationBundle
+metadata:
+  name: kubernetes-cluster-1.4.0
+spec:
+  kind: KubernetesCluster
+  version: 1.4.0
+  preview: true
+  applications:
+  - name: cert-manager
+    reference:
+      kind: HelmApplication
+      name: cert-manager-1.12.4-1
+  - name: cert-manager-issuers
+    reference:
+      kind: HelmApplication
+      name: cert-manager-issuers-1.0.0-1
+  - name: cluster-openstack
+    reference:
+      kind: HelmApplication
+      name: cluster-openstack-0.3.25-1
+  - name: cilium
+    reference:
+      kind: HelmApplication
+      name: cilium-1.14.1-1
+  - name: openstack-cloud-provider
+    reference:
+      kind: HelmApplication
+      name: openstack-cloud-provider-2.28.0-1
+  - name: openstack-plugin-cinder-csi
+    reference:
+      kind: HelmApplication
+      name: openstack-plugin-cinder-csi-2.28.0-1
+  - name: metrics-server
+    reference:
+      kind: HelmApplication
+      name: metrics-server-3.11.0-1
+  - name: nvidia-gpu-operator
+    reference:
+      kind: HelmApplication
+      name: nvidia-gpu-operator-23.6.1-1
+  - name: cluster-autoscaler
+    reference:
+      kind: HelmApplication
+      name: cluster-autoscaler-1.27.2-1
+  - name: cluster-autoscaler-openstack
+    reference:
+      kind: HelmApplication
+      name: cluster-autoscaler-openstack-0.1.0-1
+  - name: nginx-ingress
+    reference:
+      kind: HelmApplication
+      name: ingress-nginx-4.7.1-1
+  - name: kubernetes-dashboard
+    reference:
+      kind: HelmApplication
+      name: kubernetes-dashboard-6.0.8-1
+  - name: longhorn
+    reference:
+      kind: HelmApplication
+      name: longhorn-1.5.1-1
+  - name: prometheus
+    reference:
+      kind: HelmApplication
+      name: kube-prometheus-stack-50.2.0-1

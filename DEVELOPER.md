@@ -23,7 +23,7 @@ make install
 ```
 
 Please note that the `install` target expects ~/bin to exist and be in your PATH.
-You can customize this with `sudo make install -e PREFIX /usr/loca/bin` if that is your desire.
+You can customize this with `sudo make install -e PREFIX /usr/local/bin` if that is your desire.
 
 #### Setting Up Shell Completion
 
@@ -83,7 +83,7 @@ helm install unikorn charts/unikorn --namespace unikorn --create-namespace --set
 #### LoadBalancer Service Support
 
 On local development environments, these services aren't supported out of the box.
-There's a script provided that will setup Metallb for you if require e.g. kubectl access to the CAPI control plane:
+There's a script provided that will set up Metallb for you if you require e.g. kubectl access to the CAPI control plane:
 
 ```shell
 go run hack/install_metallb

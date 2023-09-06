@@ -35,7 +35,7 @@ Unikorn is split up into domain specific micro-services:
 * Server is a RESTful interface that manages Unikorn resource types.
   It additionally exposes a limited, and opinionated, set of OpenStack interfaces that provide resources that are used to populate required fields in Unikorn resources.
   As it's intended as a public API e.g. for Terraform or a user interface, it integrates authn/authz functionality too.
-* UI is a user interface, and provides a seamless and intuative UX on top of server.
+* UI is a user interface, and provides a seamless and intuitive UX on top of server.
   This adds even more opinionation on top of the REST interface.
   This is hosted in a separate repository.
 * Monitor is a daemon that periodically polls Unikorn resource types, and provides functionality that cannot be triggered by reactive controllers.
@@ -232,7 +232,7 @@ spec:
   source:
     path: charts/unikorn
     repoURL: git@github.com:eschercloudai/unikorn
-    targetRevision: 0.3.48
+    targetRevision: 0.3.49
     helm:
       parameters:
       - name: dockerConfig
