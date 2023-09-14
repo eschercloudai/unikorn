@@ -62,7 +62,7 @@ func TestConcurrentProvision(t *testing.T) {
 	p2 := mock.NewMockProvisioner(c)
 	p2.EXPECT().Provision(ctx).Return(nil)
 
-	assert.Nil(t, concurrent.New("test", p1, p2).Provision(ctx))
+	assert.NoError(t, concurrent.New("test", p1, p2).Provision(ctx))
 }
 
 // TestConcurrentProvisionYieldFirst ensures all provisioners are
@@ -82,7 +82,7 @@ func TestConcurrentProvisionYieldFirst(t *testing.T) {
 	p2 := mock.NewMockProvisioner(c)
 	p2.EXPECT().Provision(ctx).Return(nil)
 
-	assert.Equal(t, provisioners.ErrYield, concurrent.New("test", p1, p2).Provision(ctx))
+	assert.ErrorIs(t, provisioners.ErrYield, concurrent.New("test", p1, p2).Provision(ctx))
 }
 
 // TestConcurrentProvisionYieldSecond ensures all provisioners are
@@ -102,7 +102,7 @@ func TestConcurrentProvisionYieldSecond(t *testing.T) {
 	p2.EXPECT().Provision(ctx).Return(provisioners.ErrYield)
 	p2.EXPECT().ProvisionerName().Return("")
 
-	assert.Equal(t, provisioners.ErrYield, concurrent.New("test", p1, p2).Provision(ctx))
+	assert.ErrorIs(t, provisioners.ErrYield, concurrent.New("test", p1, p2).Provision(ctx))
 }
 
 // TestConcurrentDeprovision expects the concurrent provisioner
@@ -121,7 +121,7 @@ func TestConcurrentDeprovision(t *testing.T) {
 	p2 := mock.NewMockProvisioner(c)
 	p2.EXPECT().Deprovision(ctx).Return(nil)
 
-	assert.Nil(t, concurrent.New("test", p1, p2).Deprovision(ctx))
+	assert.NoError(t, concurrent.New("test", p1, p2).Deprovision(ctx))
 }
 
 // TestConcurrentDeprovisionYieldFirst ensures all provisioners are
@@ -141,7 +141,7 @@ func TestConcurrentDeprovisionYieldFirst(t *testing.T) {
 	p2 := mock.NewMockProvisioner(c)
 	p2.EXPECT().Deprovision(ctx).Return(nil)
 
-	assert.Equal(t, provisioners.ErrYield, concurrent.New("test", p1, p2).Deprovision(ctx))
+	assert.ErrorIs(t, provisioners.ErrYield, concurrent.New("test", p1, p2).Deprovision(ctx))
 }
 
 // TestConcurrentDeprovisionYieldSecond ensures all provisioners are
@@ -161,5 +161,5 @@ func TestConcurrentDeprovisionYieldSecond(t *testing.T) {
 	p2.EXPECT().Deprovision(ctx).Return(provisioners.ErrYield)
 	p2.EXPECT().ProvisionerName().Return("")
 
-	assert.Equal(t, provisioners.ErrYield, concurrent.New("test", p1, p2).Deprovision(ctx))
+	assert.ErrorIs(t, provisioners.ErrYield, concurrent.New("test", p1, p2).Deprovision(ctx))
 }

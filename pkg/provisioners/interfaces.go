@@ -24,6 +24,8 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cd"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Generator is an abstraction around the sources of remote
@@ -53,6 +55,17 @@ type Provisioner interface {
 	// Deprovisioners should be gating, waiting for their resources
 	// to be removed before indicating success.
 	Deprovision(context.Context) error
+}
+
+// ManagerProvisioner top-level manager provisioners hook directly into
+// the controller runtime layer, and are a little special in that they
+// abstract away type specific things.
+type ManagerProvisioner interface {
+	Provisioner
+
+	// Object returns a reference to the generic object type, internally
+	// the provisioner will have a type specific version.
+	Object() client.Object
 }
 
 // ReadinessCheck is an abstract way of reasoning about the readiness of

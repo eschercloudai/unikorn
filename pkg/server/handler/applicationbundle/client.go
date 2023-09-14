@@ -67,7 +67,7 @@ func convertList(in []unikornv1.ApplicationBundle) []*generated.ApplicationBundl
 func (c *Client) listByKind(ctx context.Context, kind unikornv1.ApplicationBundleResourceKind) ([]*generated.ApplicationBundle, error) {
 	result := &unikornv1.ApplicationBundleList{}
 
-	if err := c.client.List(ctx, result, &client.ListOptions{}); err != nil {
+	if err := c.client.List(ctx, result); err != nil {
 		return nil, errors.OAuth2ServerError("failed to list application bundles").WithError(err)
 	}
 

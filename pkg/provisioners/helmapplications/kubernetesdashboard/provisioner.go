@@ -32,8 +32,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -70,7 +68,7 @@ func (p *Provisioner) remoteIngressIP(ctx context.Context) (net.IP, error) {
 
 	var services corev1.ServiceList
 
-	if err := c.List(ctx, &services, &client.ListOptions{}); err != nil {
+	if err := c.List(ctx, &services); err != nil {
 		return nil, err
 	}
 

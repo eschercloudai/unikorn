@@ -11,6 +11,7 @@ import (
 	cd "github.com/eschercloudai/unikorn/pkg/cd"
 	gomock "go.uber.org/mock/gomock"
 	api "k8s.io/client-go/tools/clientcmd/api"
+	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MockRemoteCluster is a mock of RemoteCluster interface.
@@ -128,6 +129,85 @@ func (m *MockProvisioner) ProvisionerName() string {
 func (mr *MockProvisionerMockRecorder) ProvisionerName() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProvisionerName", reflect.TypeOf((*MockProvisioner)(nil).ProvisionerName))
+}
+
+// MockManagerProvisioner is a mock of ManagerProvisioner interface.
+type MockManagerProvisioner struct {
+	ctrl     *gomock.Controller
+	recorder *MockManagerProvisionerMockRecorder
+}
+
+// MockManagerProvisionerMockRecorder is the mock recorder for MockManagerProvisioner.
+type MockManagerProvisionerMockRecorder struct {
+	mock *MockManagerProvisioner
+}
+
+// NewMockManagerProvisioner creates a new mock instance.
+func NewMockManagerProvisioner(ctrl *gomock.Controller) *MockManagerProvisioner {
+	mock := &MockManagerProvisioner{ctrl: ctrl}
+	mock.recorder = &MockManagerProvisionerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockManagerProvisioner) EXPECT() *MockManagerProvisionerMockRecorder {
+	return m.recorder
+}
+
+// Deprovision mocks base method.
+func (m *MockManagerProvisioner) Deprovision(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Deprovision", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Deprovision indicates an expected call of Deprovision.
+func (mr *MockManagerProvisionerMockRecorder) Deprovision(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Deprovision", reflect.TypeOf((*MockManagerProvisioner)(nil).Deprovision), arg0)
+}
+
+// Object mocks base method.
+func (m *MockManagerProvisioner) Object() client.Object {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Object")
+	ret0, _ := ret[0].(client.Object)
+	return ret0
+}
+
+// Object indicates an expected call of Object.
+func (mr *MockManagerProvisionerMockRecorder) Object() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Object", reflect.TypeOf((*MockManagerProvisioner)(nil).Object))
+}
+
+// Provision mocks base method.
+func (m *MockManagerProvisioner) Provision(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Provision", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Provision indicates an expected call of Provision.
+func (mr *MockManagerProvisionerMockRecorder) Provision(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Provision", reflect.TypeOf((*MockManagerProvisioner)(nil).Provision), arg0)
+}
+
+// ProvisionerName mocks base method.
+func (m *MockManagerProvisioner) ProvisionerName() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProvisionerName")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// ProvisionerName indicates an expected call of ProvisionerName.
+func (mr *MockManagerProvisionerMockRecorder) ProvisionerName() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProvisionerName", reflect.TypeOf((*MockManagerProvisioner)(nil).ProvisionerName))
 }
 
 // MockReadinessCheck is a mock of ReadinessCheck interface.

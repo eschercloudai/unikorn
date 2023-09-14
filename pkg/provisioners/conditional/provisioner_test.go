@@ -66,7 +66,7 @@ func TestConditionalProvision(t *testing.T) {
 	p := mock.NewMockProvisioner(c)
 	p.EXPECT().Provision(ctx).Return(nil)
 
-	assert.Nil(t, conditional.New("test", predicateTrue, p).Provision(ctx))
+	assert.NoError(t, conditional.New("test", predicateTrue, p).Provision(ctx))
 }
 
 // TestConditionalProvisionFalse tests that things are deprovisioned if asked to
@@ -82,7 +82,7 @@ func TestConditionalProvisionFalse(t *testing.T) {
 	p := mock.NewMockProvisioner(c)
 	p.EXPECT().Deprovision(ctx).Return(nil)
 
-	assert.Nil(t, conditional.New("test", predicateFalse, p).Provision(ctx))
+	assert.NoError(t, conditional.New("test", predicateFalse, p).Provision(ctx))
 }
 
 // TestConditionalProvisionError tests errors are propagated when an error occurs
@@ -129,7 +129,7 @@ func TestConditionalDeprovision(t *testing.T) {
 	p := mock.NewMockProvisioner(c)
 	p.EXPECT().Deprovision(ctx).Return(nil)
 
-	assert.Nil(t, conditional.New("test", predicateTrue, p).Deprovision(ctx))
+	assert.NoError(t, conditional.New("test", predicateTrue, p).Deprovision(ctx))
 }
 
 // TestConditionalDeprovisionFalse tests that things are deprovisioned when they aren't
@@ -147,7 +147,7 @@ func TestConditionalDeprovisionFalse(t *testing.T) {
 	p := mock.NewMockProvisioner(c)
 	p.EXPECT().Deprovision(ctx).Return(nil)
 
-	assert.Nil(t, conditional.New("test", predicateFalse, p).Deprovision(ctx))
+	assert.NoError(t, conditional.New("test", predicateFalse, p).Deprovision(ctx))
 }
 
 // TestConditionalDeprovisionError tests error propagation when enabled.
