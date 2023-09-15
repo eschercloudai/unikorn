@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -442,7 +443,7 @@ func formatSchema(schema *openapi3.Schema, f formatter.Formatter, required bool,
 		for _, name := range properties {
 			property := schema.Properties[name]
 
-			formatSchema(property.Value, f, util.In(schema.Required, name), fmt.Sprintf("%s.%s", jsonPath, name))
+			formatSchema(property.Value, f, slices.Contains(schema.Required, name), fmt.Sprintf("%s.%s", jsonPath, name))
 		}
 	case "array":
 		arrayItemRequired := false

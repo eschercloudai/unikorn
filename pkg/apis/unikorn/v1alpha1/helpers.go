@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"errors"
 	"net"
-	"sort"
 	"strings"
 	"time"
 
@@ -322,66 +321,18 @@ func (c *KubernetesCluster) NvidiaOperatorEnabled() bool {
 	return c.Spec.Features != nil && c.Spec.Features.NvidiaOperator != nil && *c.Spec.Features.NvidiaOperator
 }
 
-// Ensure type is sortable for stable deterministic output.
-var _ sort.Interface = &ProjectList{}
-
-func (l ProjectList) Len() int {
-	return len(l.Items)
+func CompareControlPlane(a, b ControlPlane) int {
+	return strings.Compare(a.Name, b.Name)
 }
 
-func (l ProjectList) Less(i, j int) bool {
-	return strings.Compare(l.Items[i].Name, l.Items[j].Name) == -1
+func CompareKubernetesCluster(a, b KubernetesCluster) int {
+	return strings.Compare(a.Name, b.Name)
 }
 
-func (l ProjectList) Swap(i, j int) {
-	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
-}
-
-// Ensure type is sortable for stable deterministic output.
-var _ sort.Interface = &ControlPlaneList{}
-
-func (l ControlPlaneList) Len() int {
-	return len(l.Items)
-}
-
-func (l ControlPlaneList) Less(i, j int) bool {
-	return strings.Compare(l.Items[i].Name, l.Items[j].Name) == -1
-}
-
-func (l ControlPlaneList) Swap(i, j int) {
-	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
-}
-
-// Ensure type is sortable for stable deterministic output.
-var _ sort.Interface = &KubernetesClusterList{}
-
-func (l KubernetesClusterList) Len() int {
-	return len(l.Items)
-}
-
-func (l KubernetesClusterList) Less(i, j int) bool {
-	return strings.Compare(l.Items[i].Name, l.Items[j].Name) == -1
-}
-
-func (l KubernetesClusterList) Swap(i, j int) {
-	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
-}
-
-// Ensure type is sortable for stable deterministic output.
-var _ sort.Interface = &ApplicationBundleList{}
-
-func (l ApplicationBundleList) Len() int {
-	return len(l.Items)
-}
-
-func (l ApplicationBundleList) Less(i, j int) bool {
+func CompareApplicationBundle(a, b ApplicationBundle) int {
 	// TODO: while this works now, it won't unless we parse and compare as
 	// a semantic version.
-	return strings.Compare(*l.Items[i].Spec.Version, *l.Items[j].Spec.Version) == -1
-}
-
-func (l ApplicationBundleList) Swap(i, j int) {
-	l.Items[i], l.Items[j] = l.Items[j], l.Items[i]
+	return strings.Compare(*a.Spec.Version, *b.Spec.Version)
 }
 
 // Get retrieves the named bundle.

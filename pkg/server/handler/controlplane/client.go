@@ -19,7 +19,7 @@ package controlplane
 import (
 	"context"
 	goerrors "errors"
-	"sort"
+	"slices"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
@@ -262,7 +262,7 @@ func (c *Client) List(ctx context.Context) ([]*generated.ControlPlane, error) {
 		return nil, errors.OAuth2ServerError("failed to list control planes").WithError(err)
 	}
 
-	sort.Stable(result)
+	slices.SortStableFunc(result.Items, unikornv1.CompareControlPlane)
 
 	out, err := c.convertList(ctx, result)
 	if err != nil {
