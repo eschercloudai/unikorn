@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -37,7 +38,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/util"
 )
 
 var (
@@ -224,14 +224,14 @@ func (c *ComputeClient) Flavors(ctx context.Context) ([]Flavor, error) {
 		return nil, err
 	}
 
-	flavors = util.Filter(flavors, func(flavor Flavor) bool {
+	flavors = slices.DeleteFunc(flavors, func(flavor Flavor) bool {
 		for _, exclude := range c.options.flavorsExclusions {
 			if _, ok := flavor.ExtraSpecs[exclude]; ok {
-				return false
+				return true
 			}
 		}
 
-		return true
+		return false
 	})
 
 	return flavors, nil

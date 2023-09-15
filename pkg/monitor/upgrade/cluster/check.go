@@ -19,7 +19,7 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"time"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
@@ -119,7 +119,7 @@ func (c *Checker) Check(ctx context.Context) error {
 		return errors.ErrNoBundles
 	}
 
-	sort.Stable(bundles)
+	slices.SortStableFunc(bundles.Items, unikornv1.CompareApplicationBundle)
 
 	// Pick the most recent as our upgrade target.
 	upgradeTarget := &bundles.Items[len(bundles.Items)-1]

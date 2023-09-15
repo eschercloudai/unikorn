@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"sort"
 
 	"github.com/gophercloud/gophercloud"
@@ -33,7 +34,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/authorization/oauth2"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
-	"github.com/eschercloudai/unikorn/pkg/util"
 )
 
 var (
@@ -644,8 +644,8 @@ func (o *Openstack) GetServerGroup(r *http.Request, name string) (*servergroups.
 		return nil, covertError(err)
 	}
 
-	filtered := util.Filter(result, func(group servergroups.ServerGroup) bool {
-		return group.Name == name
+	filtered := slices.DeleteFunc(result, func(group servergroups.ServerGroup) bool {
+		return group.Name != name
 	})
 
 	switch len(filtered) {

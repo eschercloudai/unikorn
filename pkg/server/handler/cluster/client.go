@@ -19,7 +19,7 @@ package cluster
 import (
 	"context"
 	"net/http"
-	"sort"
+	"slices"
 
 	"github.com/gophercloud/utils/openstack/clientconfig"
 
@@ -78,7 +78,7 @@ func (c *Client) List(ctx context.Context, controlPlaneName generated.ControlPla
 		return nil, errors.OAuth2ServerError("failed to list control planes").WithError(err)
 	}
 
-	sort.Stable(result)
+	slices.SortStableFunc(result.Items, unikornv1.CompareKubernetesCluster)
 
 	out, err := c.convertList(ctx, result)
 	if err != nil {

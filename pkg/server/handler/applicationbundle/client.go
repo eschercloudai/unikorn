@@ -18,7 +18,7 @@ package applicationbundle
 
 import (
 	"context"
-	"sort"
+	"slices"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
@@ -72,7 +72,8 @@ func (c *Client) listByKind(ctx context.Context, kind unikornv1.ApplicationBundl
 	}
 
 	resultByKind := result.ByKind(kind)
-	sort.Stable(resultByKind)
+
+	slices.SortStableFunc(resultByKind.Items, unikornv1.CompareApplicationBundle)
 
 	return convertList(resultByKind.Items), nil
 }
