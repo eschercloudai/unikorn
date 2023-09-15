@@ -28,6 +28,7 @@ linters:
   - godox
   - funlen
   - predeclared
+  - depguard
 linters-settings:
   gci:
     sections:
