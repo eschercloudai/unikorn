@@ -24,13 +24,10 @@ import (
 
 	"github.com/spf13/pflag"
 
-	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/managers/options"
 	utilclient "github.com/eschercloudai/unikorn/pkg/util/client"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	klog "k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,25 +59,6 @@ type ControllerFactory interface {
 	Upgrade(client.Client) error
 }
 
-// getScheme returns a scheme that knows about core Kubernetes and Unikorn types
-// that it can use to map between structured and unstructured resource definitions.
-// TODO: we'd really love to include ArgoCD here, but its dependency hell.
-// See https://github.com/argoproj/gitops-engine/issues/56 for a never ending
-// commentary on the underlying problem.
-func getScheme() (*runtime.Scheme, error) {
-	scheme := runtime.NewScheme()
-
-	if err := kubernetesscheme.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-
-	if err := unikornscheme.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-
-	return scheme, nil
-}
-
 // getManager returns a generic manager.
 func getManager() (manager.Manager, error) {
 	// Create a manager with leadership election to prevent split brain
@@ -90,7 +68,7 @@ func getManager() (manager.Manager, error) {
 		return nil, err
 	}
 
-	scheme, err := getScheme()
+	scheme, err := utilclient.NewScheme()
 	if err != nil {
 		return nil, err
 	}

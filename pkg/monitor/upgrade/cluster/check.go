@@ -105,7 +105,7 @@ func (c *Checker) Check(ctx context.Context) error {
 
 	allBundles := &unikornv1.ApplicationBundleList{}
 
-	if err := c.client.List(ctx, allBundles, &client.ListOptions{}); err != nil {
+	if err := c.client.List(ctx, allBundles); err != nil {
 		return err
 	}
 
@@ -126,7 +126,7 @@ func (c *Checker) Check(ctx context.Context) error {
 
 	resources := &unikornv1.KubernetesClusterList{}
 
-	if err := c.client.List(ctx, resources, &client.ListOptions{}); err != nil {
+	if err := c.client.List(ctx, resources); err != nil {
 		return err
 	}
 

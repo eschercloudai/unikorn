@@ -110,7 +110,7 @@ func (p *ResourceProvisioner) Provision(ctx context.Context) error {
 		}
 	}
 
-	log.Info("creating object", "key", objectKey)
+	log.Info("creating object", "name", p.resource.GetName(), "generateName", p.resource.GetGenerateName())
 
 	// This treats the resource as mutable, so updates will been seen by the caller.
 	// Especially useful if Kubenretes fills some things in for you, but just be
@@ -119,7 +119,7 @@ func (p *ResourceProvisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("object created", "key", objectKey)
+	log.Info("object created", "name", p.resource.GetName(), "generateName", p.resource.GetGenerateName())
 
 	return nil
 }

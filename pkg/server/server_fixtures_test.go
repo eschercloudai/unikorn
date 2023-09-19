@@ -28,8 +28,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // mustCreateProjectFixture creates a project, and its randomly named namespace
@@ -49,7 +47,7 @@ func mustCreateProjectFixture(t *testing.T, tc *TestContext, projectID string) *
 		},
 	}
 
-	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), namespace, &client.CreateOptions{}))
+	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), namespace))
 
 	project := &unikornv1.Project{
 		ObjectMeta: metav1.ObjectMeta{
@@ -57,17 +55,17 @@ func mustCreateProjectFixture(t *testing.T, tc *TestContext, projectID string) *
 		},
 		Status: unikornv1.ProjectStatus{
 			Namespace: namespace.Name,
-			Conditions: []unikornv1.ProjectCondition{
+			Conditions: []unikornv1.Condition{
 				{
-					Type:   unikornv1.ProjectConditionAvailable,
+					Type:   unikornv1.ConditionAvailable,
 					Status: corev1.ConditionTrue,
-					Reason: unikornv1.ProjectConditionReasonProvisioned,
+					Reason: unikornv1.ConditionReasonProvisioned,
 				},
 			},
 		},
 	}
 
-	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), project, &client.CreateOptions{}))
+	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), project))
 
 	return project
 }
@@ -90,7 +88,7 @@ func mustCreateControlPlaneFixture(t *testing.T, tc *TestContext, namespace, nam
 		},
 	}
 
-	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), ns, &client.CreateOptions{}))
+	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), ns))
 
 	bundleVersion := controlPlaneApplicationBundleName
 
@@ -104,17 +102,17 @@ func mustCreateControlPlaneFixture(t *testing.T, tc *TestContext, namespace, nam
 		},
 		Status: unikornv1.ControlPlaneStatus{
 			Namespace: ns.Name,
-			Conditions: []unikornv1.ControlPlaneCondition{
+			Conditions: []unikornv1.Condition{
 				{
-					Type:   unikornv1.ControlPlaneConditionAvailable,
+					Type:   unikornv1.ConditionAvailable,
 					Status: corev1.ConditionTrue,
-					Reason: unikornv1.ControlPlaneConditionReasonProvisioned,
+					Reason: unikornv1.ConditionReasonProvisioned,
 				},
 			},
 		},
 	}
 
-	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), controlPlane, &client.CreateOptions{}))
+	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), controlPlane))
 
 	return controlPlane
 }
@@ -154,11 +152,11 @@ func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace
 	workloadPoolFlavor := flavorName
 
 	_, nodenetwork, err := net.ParseCIDR(clusterNodeNetwork)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	_, serviceNetwork, err := net.ParseCIDR(clusterServiceNetwork)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	_, podNetwork, err := net.ParseCIDR(clusterPodNetwork)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	dnsNameserver := net.ParseIP(clusterDNSNameserver)
 
@@ -208,17 +206,17 @@ func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace
 			},
 		},
 		Status: unikornv1.KubernetesClusterStatus{
-			Conditions: []unikornv1.KubernetesClusterCondition{
+			Conditions: []unikornv1.Condition{
 				{
-					Type:   unikornv1.KubernetesClusterConditionAvailable,
+					Type:   unikornv1.ConditionAvailable,
 					Status: corev1.ConditionTrue,
-					Reason: unikornv1.KubernetesClusterConditionReasonProvisioned,
+					Reason: unikornv1.ConditionReasonProvisioned,
 				},
 			},
 		},
 	}
 
-	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), cluster, &client.CreateOptions{}))
+	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), cluster))
 }
 
 const (
@@ -244,7 +242,7 @@ func mustCreateControlPlaneApplicationBundleFixture(t *testing.T, tc *TestContex
 		},
 	}
 
-	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), bundle, &client.CreateOptions{}))
+	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), bundle))
 }
 
 const (
@@ -270,5 +268,5 @@ func mustKubernetesClusterApplicationBundleFixture(t *testing.T, tc *TestContext
 		},
 	}
 
-	assert.Nil(t, tc.KubernetesClient().Create(context.TODO(), bundle, &client.CreateOptions{}))
+	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), bundle))
 }

@@ -30,6 +30,9 @@ import (
 )
 
 // NewScheme returns a scheme with all types that are required by unikorn.
+// TODO: we'd really love to include ArgoCD here, but it's dependency hell.
+// See https://github.com/argoproj/gitops-engine/issues/56 for a never ending
+// commentary on the underlying problem.
 func NewScheme() (*runtime.Scheme, error) {
 	// Create a scheme and ensure it knows about Kubernetes and Unikorn
 	// resource types.

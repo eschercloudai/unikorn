@@ -21,6 +21,7 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/managers/common"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/cluster"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -97,9 +98,7 @@ var _ common.ControllerFactory = &Factory{}
 
 // Reconciler returns a new reconciler instance.
 func (*Factory) Reconciler(manager manager.Manager) reconcile.Reconciler {
-	return &reconciler{
-		client: manager.GetClient(),
-	}
+	return common.NewReconciler(manager.GetClient(), cluster.New)
 }
 
 // RegisterWatches adds any watches that would trigger a reconcile.

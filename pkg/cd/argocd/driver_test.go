@@ -60,7 +60,7 @@ func mustGetApplication(t *testing.T, tc *testContext, id *cd.ResourceIdentifier
 	t.Helper()
 
 	application, err := tc.driver.GetHelmApplication(context.TODO(), id)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	return application
 }
@@ -294,5 +294,5 @@ func TestApplicationDeleteNotFound(t *testing.T) {
 		Name: "test",
 	}
 
-	assert.Nil(t, tc.driver.DeleteHelmApplication(context.TODO(), id, false))
+	assert.NoError(t, tc.driver.DeleteHelmApplication(context.TODO(), id, false))
 }

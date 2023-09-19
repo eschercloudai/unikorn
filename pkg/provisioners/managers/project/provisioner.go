@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 
-	unikornv1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/generic"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
@@ -43,19 +43,22 @@ type Provisioner struct {
 	client client.Client
 
 	// project is the Kubernetes project we're provisioning.
-	project *unikornv1alpha1.Project
+	project unikornv1.Project
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, project *unikornv1alpha1.Project) *Provisioner {
+func New(client client.Client) provisioners.ManagerProvisioner {
 	return &Provisioner{
-		client:  client,
-		project: project,
+		client: client,
 	}
 }
 
-// Ensure the Provisioner interface is implemented.
-var _ provisioners.Provisioner = &Provisioner{}
+// Ensure the ManagerProvisioner interface is implemented.
+var _ provisioners.ManagerProvisioner = &Provisioner{}
+
+func (p *Provisioner) Object() client.Object {
+	return &p.project
+}
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {

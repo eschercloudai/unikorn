@@ -59,7 +59,7 @@ func TestSerialProvision(t *testing.T) {
 	p := mock.NewMockProvisioner(c)
 	p.EXPECT().Provision(ctx).Return(nil).Times(2)
 
-	assert.Nil(t, serial.New("test", p, p).Provision(ctx))
+	assert.NoError(t, serial.New("test", p, p).Provision(ctx))
 }
 
 // TestSerialProvisionYieldFirst ensures only the first provisioner is
@@ -76,7 +76,7 @@ func TestSerialProvisionYieldFirst(t *testing.T) {
 	p.EXPECT().Provision(ctx).Return(provisioners.ErrYield)
 	p.EXPECT().ProvisionerName().Return("")
 
-	assert.Equal(t, provisioners.ErrYield, serial.New("test", p, p).Provision(ctx))
+	assert.ErrorIs(t, provisioners.ErrYield, serial.New("test", p, p).Provision(ctx))
 }
 
 // TestSerialProvisionYieldSecond ensures all provisioners are
@@ -96,7 +96,7 @@ func TestSerialProvisionYieldSecond(t *testing.T) {
 	p2.EXPECT().Provision(ctx).Return(provisioners.ErrYield)
 	p2.EXPECT().ProvisionerName().Return("")
 
-	assert.Equal(t, provisioners.ErrYield, serial.New("test", p1, p2).Provision(ctx))
+	assert.ErrorIs(t, provisioners.ErrYield, serial.New("test", p1, p2).Provision(ctx))
 }
 
 // TestSerialDeprovision expects the serial provisioner
@@ -112,7 +112,7 @@ func TestSerialDeprovision(t *testing.T) {
 	p := mock.NewMockProvisioner(c)
 	p.EXPECT().Deprovision(ctx).Return(nil).Times(2)
 
-	assert.Nil(t, serial.New("test", p, p).Deprovision(ctx))
+	assert.NoError(t, serial.New("test", p, p).Deprovision(ctx))
 }
 
 // TestSerialDeprovisionYieldFirst ensures all provisioners are
@@ -133,7 +133,7 @@ func TestSerialDeprovisionYieldFirst(t *testing.T) {
 	p2 := mock.NewMockProvisioner(c)
 	p2.EXPECT().Deprovision(ctx).Return(nil)
 
-	assert.Equal(t, provisioners.ErrYield, serial.New("test", p1, p2).Deprovision(ctx))
+	assert.ErrorIs(t, provisioners.ErrYield, serial.New("test", p1, p2).Deprovision(ctx))
 }
 
 // TestSerialDeprovisionYieldSecond ensures all provisioners are
@@ -151,5 +151,5 @@ func TestSerialDeprovisionYieldSecond(t *testing.T) {
 	p.EXPECT().Deprovision(ctx).Return(provisioners.ErrYield)
 	p.EXPECT().ProvisionerName().Return("")
 
-	assert.Equal(t, provisioners.ErrYield, serial.New("test", p, p).Deprovision(ctx))
+	assert.ErrorIs(t, provisioners.ErrYield, serial.New("test", p, p).Deprovision(ctx))
 }

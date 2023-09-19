@@ -51,23 +51,39 @@ func IPv4AddressSliceFromIPSlice(in []net.IP) []IPv4Address {
 	return out
 }
 
-// LookupCondition scans the status conditions for an existing condition whose type
-// matches.  Returns the array index, or -1 if it doesn't exist.
-func (c *Project) LookupCondition(t ProjectConditionType) (*ProjectCondition, error) {
-	for i, condition := range c.Status.Conditions {
+// ConditionResource is an API type that has a set of conditions.
+type ConditionResource interface {
+	// LookupCondition scans the status conditions for an existing condition
+	// whose type matches.
+	LookupCondition(t ConditionType) (*Condition, error)
+
+	// UpdateCondition either adds or updates a condition in the control plane
+	// status. If the condition, status and message match an existing condition
+	// the update is ignored.
+	UpdateCondition(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string)
+}
+
+// These resources have managers, and must implment this generic interface.
+var _ ConditionResource = &Project{}
+var _ ConditionResource = &ControlPlane{}
+var _ ConditionResource = &KubernetesCluster{}
+
+// getCondition is a generic condition lookup function.
+func getCondition(conditions []Condition, t ConditionType) (*Condition, error) {
+	for i, condition := range conditions {
 		if condition.Type == t {
-			return &c.Status.Conditions[i], nil
+			return &conditions[i], nil
 		}
 	}
 
 	return nil, ErrStatusConditionLookup
 }
 
-// UpdateCondition either adds or updates a condition in the control plane status.
-// If the condition, status and message match an existing condition the update is
-// ignored.  Returns true if a modification has been made.
-func (c *Project) UpdateCondition(t ProjectConditionType, status corev1.ConditionStatus, reason ProjectConditionReason, message string) bool {
-	condition := ProjectCondition{
+// updateCondition either adds or updates a condition in the control plane
+// status. If the condition, status and message match an existing condition
+// the update is ignored.
+func updateCondition(conditions *[]Condition, t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
+	condition := Condition{
 		Type:               t,
 		Status:             status,
 		LastTransitionTime: metav1.Now(),
@@ -75,11 +91,11 @@ func (c *Project) UpdateCondition(t ProjectConditionType, status corev1.Conditio
 		Message:            message,
 	}
 
-	existingPtr, err := c.LookupCondition(t)
+	existingPtr, err := getCondition(*conditions, t)
 	if err != nil {
-		c.Status.Conditions = append(c.Status.Conditions, condition)
+		*conditions = append(*conditions, condition)
 
-		return true
+		return
 	}
 
 	// Do a shallow copy and set the same time, then do a shallow equality to
@@ -89,16 +105,20 @@ func (c *Project) UpdateCondition(t ProjectConditionType, status corev1.Conditio
 
 	if existing != condition {
 		*existingPtr = condition
-
-		return true
 	}
-
-	return false
 }
 
-// UpdateAvailableCondition updates the Available condition specifically.
-func (c *Project) UpdateAvailableCondition(status corev1.ConditionStatus, reason ProjectConditionReason, message string) bool {
-	return c.UpdateCondition(ProjectConditionAvailable, status, reason, message)
+// LookupCondition scans the status conditions for an existing condition whose type
+// matches.
+func (c *Project) LookupCondition(t ConditionType) (*Condition, error) {
+	return getCondition(c.Status.Conditions, t)
+}
+
+// UpdateCondition either adds or updates a condition in the control plane status.
+// If the condition, status and message match an existing condition the update is
+// ignored.
+func (c *Project) UpdateCondition(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
+	updateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
@@ -113,53 +133,16 @@ func (c *Project) ResourceLabels() (labels.Set, error) {
 }
 
 // LookupCondition scans the status conditions for an existing condition whose type
-// matches.  Returns the array index, or -1 if it doesn't exist.
-func (c *ControlPlane) LookupCondition(t ControlPlaneConditionType) (*ControlPlaneCondition, error) {
-	for i, condition := range c.Status.Conditions {
-		if condition.Type == t {
-			return &c.Status.Conditions[i], nil
-		}
-	}
-
-	return nil, ErrStatusConditionLookup
+// matches.
+func (c *ControlPlane) LookupCondition(t ConditionType) (*Condition, error) {
+	return getCondition(c.Status.Conditions, t)
 }
 
 // UpdateCondition either adds or updates a condition in the control plane status.
 // If the condition, status and message match an existing condition the update is
-// ignored.  Returns true if a modification has been made.
-func (c *ControlPlane) UpdateCondition(t ControlPlaneConditionType, status corev1.ConditionStatus, reason ControlPlaneConditionReason, message string) bool {
-	condition := ControlPlaneCondition{
-		Type:               t,
-		Status:             status,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-
-	existingPtr, err := c.LookupCondition(t)
-	if err != nil {
-		c.Status.Conditions = append(c.Status.Conditions, condition)
-
-		return true
-	}
-
-	// Do a shallow copy and set the same time, then do a shallow equality to
-	// see if we need an update.
-	existing := *existingPtr
-	existing.LastTransitionTime = condition.LastTransitionTime
-
-	if existing != condition {
-		*existingPtr = condition
-
-		return true
-	}
-
-	return false
-}
-
-// UpdateAvailableCondition updates the Available condition specifically.
-func (c *ControlPlane) UpdateAvailableCondition(status corev1.ConditionStatus, reason ControlPlaneConditionReason, message string) bool {
-	return c.UpdateCondition(ControlPlaneConditionAvailable, status, reason, message)
+// ignored.
+func (c *ControlPlane) UpdateCondition(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
+	updateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
@@ -180,11 +163,6 @@ func (c *ControlPlane) ResourceLabels() (labels.Set, error) {
 }
 
 func (c *ControlPlane) ApplicationBundleName() string {
-	// TODO: DELETE ME
-	if c.Spec.ApplicationBundle == nil {
-		return "control-plane-1.0.0"
-	}
-
 	return *c.Spec.ApplicationBundle
 }
 
@@ -197,53 +175,16 @@ func (c ControlPlane) UpgradeSpec() *ApplicationBundleAutoUpgradeSpec {
 }
 
 // LookupCondition scans the status conditions for an existing condition whose type
-// matches.  Returns the array index, or -1 if it doesn't exist.
-func (c *KubernetesCluster) LookupCondition(t KubernetesClusterConditionType) (*KubernetesClusterCondition, error) {
-	for i, condition := range c.Status.Conditions {
-		if condition.Type == t {
-			return &c.Status.Conditions[i], nil
-		}
-	}
-
-	return nil, ErrStatusConditionLookup
+// matches.
+func (c *KubernetesCluster) LookupCondition(t ConditionType) (*Condition, error) {
+	return getCondition(c.Status.Conditions, t)
 }
 
 // UpdateCondition either adds or updates a condition in the cluster status.
 // If the condition, status and message match an existing condition the update is
-// ignored.  Returns true if a modification has been made.
-func (c *KubernetesCluster) UpdateCondition(t KubernetesClusterConditionType, status corev1.ConditionStatus, reason KubernetesClusterConditionReason, message string) bool {
-	condition := KubernetesClusterCondition{
-		Type:               t,
-		Status:             status,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-
-	existingPtr, err := c.LookupCondition(t)
-	if err != nil {
-		c.Status.Conditions = append(c.Status.Conditions, condition)
-
-		return true
-	}
-
-	// Do a shallow copy and set the same time, then do a shallow equality to
-	// see if we need an update.
-	existing := *existingPtr
-	existing.LastTransitionTime = condition.LastTransitionTime
-
-	if existing != condition {
-		*existingPtr = condition
-
-		return true
-	}
-
-	return false
-}
-
-// UpdateAvailableCondition updates the Available condition specifically.
-func (c *KubernetesCluster) UpdateAvailableCondition(status corev1.ConditionStatus, reason KubernetesClusterConditionReason, message string) bool {
-	return c.UpdateCondition(KubernetesClusterConditionAvailable, status, reason, message)
+// ignored.
+func (c *KubernetesCluster) UpdateCondition(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
+	updateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
@@ -270,11 +211,6 @@ func (c *KubernetesCluster) ResourceLabels() (labels.Set, error) {
 }
 
 func (c *KubernetesCluster) ApplicationBundleName() string {
-	// TODO: DELETE ME
-	if c.Spec.ApplicationBundle == nil {
-		return "kubernetes-cluster-1.0.0"
-	}
-
 	return *c.Spec.ApplicationBundle
 }
 

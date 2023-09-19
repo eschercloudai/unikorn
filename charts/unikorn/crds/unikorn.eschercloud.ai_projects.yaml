@@ -53,6 +53,9 @@ spec:
               conditions:
                 description: Current service state of a project.
                 items:
+                  description: Condition is a generic condition type for use across
+                    all resource types. It's generic so that the underlying controller-manager
+                    functionality can be shared across all resources.
                   properties:
                     lastTransitionTime:
                       description: Last time the condition transitioned from one status
@@ -69,10 +72,10 @@ spec:
                       enum:
                       - Provisioning
                       - Provisioned
-                      - Canceled
-                      - Timedout
+                      - Cancelled
                       - Errored
                       - Deprovisioning
+                      - Deprovisioned
                       type: string
                     status:
                       description: Status is the status of the condition. Can be True,

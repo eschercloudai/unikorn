@@ -150,6 +150,62 @@ func (IPv4Prefix) OpenAPISchemaFormat() string {
 	return ""
 }
 
+// +kubebuilder:validation:Enum=Available
+type ConditionType string
+
+const (
+	// ConditionAvailable if not defined or false means that the
+	// resource is not ready, or is known to be in a bad state and should
+	// not be used.  When true, while not guaranteed to be fully functional.
+	ConditionAvailable ConditionType = "Available"
+)
+
+// ConditionReason defines the possible reasons of a resource
+// condition.  These are generic and may be used by any condition.
+// +kubebuilder:validation:Enum=Provisioning;Provisioned;Cancelled;Errored;Deprovisioning;Deprovisioned
+type ConditionReason string
+
+const (
+	// ConditionReasonProvisioning is used for the Available condition
+	// to indicate that a resource has been seen, it has no pre-existing condition
+	// and we assume it's being provisioned for the first time.
+	ConditionReasonProvisioning ConditionReason = "Provisioning"
+	// ConditionReasonProvisioned is used for the Available condition
+	// to mean that the resource is ready to be used.
+	ConditionReasonProvisioned ConditionReason = "Provisioned"
+	// ConditionReasonCancelled is used by a condition to
+	// indicate the controller was cancelled e.g. via a container shutdown.
+	ConditionReasonCancelled ConditionReason = "Cancelled"
+	// ConditionReasonErrored is used by a condition to
+	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
+	// If we see these, consider formulating a fix, for example a retry loop.
+	ConditionReasonErrored ConditionReason = "Errored"
+	// ConditionReasonDeprovisioning is used by a condition to
+	// indicate the controller has picked up a deprovision event.
+	ConditionReasonDeprovisioning ConditionReason = "Deprovisioning"
+	// ConditionReasonDeprovisioned is used by a condition to
+	// indicate we have finished deprovisioning and the Kubernetes
+	// garbage collector can remove the resource.
+	ConditionReasonDeprovisioned ConditionReason = "Deprovisioned"
+)
+
+// Condition is a generic condition type for use across all resource types.
+// It's generic so that the underlying controller-manager functionality can
+// be shared across all resources.
+type Condition struct {
+	// Type is the type of the condition.
+	Type ConditionType `json:"type"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status corev1.ConditionStatus `json:"status"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason ConditionReason `json:"reason"`
+	// Human-readable message indicating details about last transition.
+	Message string `json:"message"`
+}
+
 // ProjectList is a typed list of projects.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ProjectList struct {
@@ -185,61 +241,7 @@ type ProjectStatus struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// Current service state of a project.
-	Conditions []ProjectCondition `json:"conditions,omitempty"`
-}
-
-// +kubebuilder:validation:Enum=Available
-type ProjectConditionType string
-
-const (
-	// ProjectConditionAvailable if not defined or false means that the
-	// control plane is not ready, or is known to be in a bad state and should
-	// not be used.  When true, while not guaranteed to be fully functional, it
-	// will accept Kubernetes cluster creation requests that will be take care
-	// of by eventual consistency.
-	ProjectConditionAvailable ProjectConditionType = "Available"
-)
-
-// ProjectConditionReason defines the possible reasons of a control plane
-// condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Provisioned;Canceled;Timedout;Errored;Deprovisioning
-type ProjectConditionReason string
-
-const (
-	// ProjectConditionReasonProvisioning is used for the Available condition
-	// to indicate that a resource has been seen, it has no pre-existing condition
-	// and we assume it's being provisioned for the first time.
-	ProjectConditionReasonProvisioning ProjectConditionReason = "Provisioning"
-	// ProjectConditionReasonProvisioned is used for the Available condition
-	// to mean that the control plane is ready to be used.
-	ProjectConditionReasonProvisioned ProjectConditionReason = "Provisioned"
-	// ProjectConditionReasonCanceled is used by a condition to
-	// indicate the controller was cancelled e.g. via a container shutdown.
-	ProjectConditionReasonCanceled ProjectConditionReason = "Canceled"
-	// ProjectConditionReasonTimedout is used by a condition to
-	// indicate the controller timed out e.g. OpenStack is slow or broken.
-	ProjectConditionReasonTimedout ProjectConditionReason = "Timedout"
-	// ProjectConditionReasonErrored is used by a condition to
-	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
-	// If we see these, consider formulating a fix, for example a retry loop.
-	ProjectConditionReasonErrored ProjectConditionReason = "Errored"
-	// ProjectConditionReasonDeprovisioning is used by a condition to
-	// indicate the controller has picked up a deprovision event.
-	ProjectConditionReasonDeprovisioning ProjectConditionReason = "Deprovisioning"
-)
-
-type ProjectCondition struct {
-	// Type is the type of the condition.
-	Type ProjectConditionType `json:"type"`
-	// Status is the status of the condition.
-	// Can be True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-	// Unique, one-word, CamelCase reason for the condition's last transition.
-	Reason ProjectConditionReason `json:"reason"`
-	// Human-readable message indicating details about last transition.
-	Message string `json:"message"`
+	Conditions []Condition `json:"conditions,omitempty"`
 }
 
 // ControlPlaneList is a typed list of control planes.
@@ -276,9 +278,7 @@ type ControlPlaneSpec struct {
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
 	// ApplicationBundle defines the applications used to create the control plane.
 	// Change this to a new bundle to start an upgrade.
-	// TODO: delete the default.
-	// +kubebuilder:default=control-plane-1.0.0
-	ApplicationBundle *string `json:"applicationBundle,omitempty"`
+	ApplicationBundle *string `json:"applicationBundle"`
 	// ApplicationBundleAutoUpgrade enables automatic upgrade of application bundles.
 	// When no properties are set in the specification, the platform will automatically
 	// choose an upgrade time for your resource.  This will be before a working day
@@ -293,66 +293,7 @@ type ControlPlaneStatus struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// Current service state of a control plane.
-	Conditions []ControlPlaneCondition `json:"conditions,omitempty"`
-}
-
-// ControlPlaneConditionType defines the possible conditions a control plane
-// can have.
-// +kubebuilder:validation:Enum=Available
-type ControlPlaneConditionType string
-
-const (
-	// ControlPlaneConditionAvailable if not defined or false means that the
-	// control plane is not ready, or is known to be in a bad state and should
-	// not be used.  When true, while not guaranteed to be fully functional, it
-	// will accept Kubernetes cluster creation requests that will be take care
-	// of by eventual consistency.
-	ControlPlaneConditionAvailable ControlPlaneConditionType = "Available"
-)
-
-// ControlPlaneConditionReason defines the possible reasons of a control plane
-// condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Updating;Provisioned;Canceled;Timedout;Errored;Deprovisioning
-type ControlPlaneConditionReason string
-
-const (
-	// ControlPlaneConditionReasonProvisioning is used for the Available condition
-	// to indicate that a resource has been seen, it has no pre-existing condition
-	// and we assume it's being provisioned for the first time.
-	ControlPlaneConditionReasonProvisioning ControlPlaneConditionReason = "Provisioning"
-	// ControlPlaneConditionReasonUpdating is used when a non-provisioning
-	// reconcile is running.
-	ControlPlaneConditionReasonUpdating ControlPlaneConditionReason = "Updating"
-	// ControlPlaneConditionReasonProvisioned is used for the Available condition
-	// to mean that the control plane is ready to be used.
-	ControlPlaneConditionReasonProvisioned ControlPlaneConditionReason = "Provisioned"
-	// ControlPlaneConditionReasonCanceled is used by a condition to
-	// indicate the controller was cancelled e.g. via a container shutdown.
-	ControlPlaneConditionReasonCanceled ControlPlaneConditionReason = "Canceled"
-	// ControlPlaneConditionReasonTimedout is used by a condition to
-	// indicate the controller timed out e.g. OpenStack is slow or broken.
-	ControlPlaneConditionReasonTimedout ControlPlaneConditionReason = "Timedout"
-	// ControlPlaneConditionReasonErrored is used by a condition to
-	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
-	// If we see these, consider formulating a fix, for example a retry loop.
-	ControlPlaneConditionReasonErrored ControlPlaneConditionReason = "Errored"
-	// ControlPlaneConditionReasonDeprovisioning is used by a condition to
-	// indicate the controller has picked up a deprovision event.
-	ControlPlaneConditionReasonDeprovisioning ControlPlaneConditionReason = "Deprovisioning"
-)
-
-type ControlPlaneCondition struct {
-	// Type is the type of the condition.
-	Type ControlPlaneConditionType `json:"type"`
-	// Status is the status of the condition.
-	// Can be True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-	// Unique, one-word, CamelCase reason for the condition's last transition.
-	Reason ControlPlaneConditionReason `json:"reason"`
-	// Human-readable message indicating details about last transition.
-	Message string `json:"message"`
+	Conditions []Condition `json:"conditions,omitempty"`
 }
 
 // MachineGeneric contains common things across all pool types, including
@@ -500,9 +441,7 @@ type KubernetesClusterSpec struct {
 	Features *KubernetesClusterFeaturesSpec `json:"features,omitempty"`
 	// ApplicationBundle defines the applications used to create the cluster.
 	// Change this to a new bundle to start an upgrade.
-	// TODO: delete the default.
-	// +kubebuilder:default=kubernetes-cluster-1.0.0
-	ApplicationBundle *string `json:"applicationBundle,omitempty"`
+	ApplicationBundle *string `json:"applicationBundle"`
 	// ApplicationBundleAutoUpgrade enables automatic upgrade of application bundles.
 	// When no properties are set in the specification, the platform will automatically
 	// choose an upgrade time for your resource.  This will be before a working day
@@ -598,65 +537,7 @@ type KubernetesClusterStatus struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// Current service state of a Kubernetes cluster.
-	Conditions []KubernetesClusterCondition `json:"conditions,omitempty"`
-}
-
-// KubernetesClusterConditionType defines the possible conditions a control plane
-// can have.
-// +kubebuilder:validation:Enum=Available
-type KubernetesClusterConditionType string
-
-const (
-	// KubernetesClusterConditionAvailable if not defined or false means that the
-	// cluster is not ready, or is known to be in a bad state and should
-	// not be used.  When true, while not guaranteed to be fully functional, it
-	// will accept API requests.
-	KubernetesClusterConditionAvailable KubernetesClusterConditionType = "Available"
-)
-
-// KubernetesClusterConditionReason defines the possible reasons of a cluster
-// condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Updating;Provisioned;Canceled;Timedout;Errored;Deprovisioning
-type KubernetesClusterConditionReason string
-
-const (
-	// KubernetesClusterConditionReasonProvisioning is used for the Available condition
-	// to indicate that a resource has been seen, it has no pre-existing condition
-	// and we assume it's being provisioned for the first time.
-	KubernetesClusterConditionReasonProvisioning KubernetesClusterConditionReason = "Provisioning"
-	// KubernetesClusterConditionReasonUpdating is used when a non-provisioning
-	// reconcile is running.
-	KubernetesClusterConditionReasonUpdating KubernetesClusterConditionReason = "Updating"
-	// KubernetesClusterConditionReasonProvisioned is used for the Available condition
-	// to mean that the control plane is ready to be used.
-	KubernetesClusterConditionReasonProvisioned KubernetesClusterConditionReason = "Provisioned"
-	// KubernetesClusterConditionReasonCanceled is used by a condition to
-	// indicate the controller was cancelled e.g. via a container shutdown.
-	KubernetesClusterConditionReasonCanceled KubernetesClusterConditionReason = "Canceled"
-	// KubernetesClusterConditionReasonTimedout is used by a condition to
-	// indicate the controller timed out e.g. OpenStack is slow or broken.
-	KubernetesClusterConditionReasonTimedout KubernetesClusterConditionReason = "Timedout"
-	// KubernetesClusterConditionReasonErrored is used by a condition to
-	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
-	// If we see these, consider formulating a fix, for example a retry loop.
-	KubernetesClusterConditionReasonErrored KubernetesClusterConditionReason = "Errored"
-	// KubernetesClusterConditionReasonDeprovisioning is used by a condition to
-	// indicate the controller has picked up a deprovision event.
-	KubernetesClusterConditionReasonDeprovisioning KubernetesClusterConditionReason = "Deprovisioning"
-)
-
-type KubernetesClusterCondition struct {
-	// Type is the type of the condition.
-	Type KubernetesClusterConditionType `json:"type"`
-	// Status is the status of the condition.
-	// Can be True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-	// Unique, one-word, CamelCase reason for the condition's last transition.
-	Reason KubernetesClusterConditionReason `json:"reason"`
-	// Human-readable message indicating details about last transition.
-	Message string `json:"message"`
+	Conditions []Condition `json:"conditions,omitempty"`
 }
 
 // HelmApplicationList defines a list of Helm applications.

@@ -52,10 +52,8 @@ spec:
             description: ControlPlaneSpec defines any control plane specific options.
             properties:
               applicationBundle:
-                default: control-plane-1.0.0
-                description: 'ApplicationBundle defines the applications used to create
+                description: ApplicationBundle defines the applications used to create
                   the control plane. Change this to a new bundle to start an upgrade.
-                  TODO: delete the default.'
                 type: string
               applicationBundleAutoUpgrade:
                 description: ApplicationBundleAutoUpgrade enables automatic upgrade
@@ -239,6 +237,8 @@ spec:
                 description: Timeout defines how long a control plane is allowed to
                   provision for before a timeout is triggerd and the request aborts.
                 type: string
+            required:
+            - applicationBundle
             type: object
           status:
             description: ControlPlaneStatus defines the status of the project.
@@ -246,6 +246,9 @@ spec:
               conditions:
                 description: Current service state of a control plane.
                 items:
+                  description: Condition is a generic condition type for use across
+                    all resource types. It's generic so that the underlying controller-manager
+                    functionality can be shared across all resources.
                   properties:
                     lastTransitionTime:
                       description: Last time the condition transitioned from one status
@@ -261,12 +264,11 @@ spec:
                         last transition.
                       enum:
                       - Provisioning
-                      - Updating
                       - Provisioned
-                      - Canceled
-                      - Timedout
+                      - Cancelled
                       - Errored
                       - Deprovisioning
+                      - Deprovisioned
                       type: string
                     status:
                       description: Status is the status of the condition. Can be True,
