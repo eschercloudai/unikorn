@@ -42,6 +42,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
+	"github.com/eschercloudai/unikorn/pkg/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -53,20 +54,15 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
-	// controlPlaneRemote is the remote cluster to deploy to.
-	controlPlaneRemote provisioners.RemoteCluster
-
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster unikornv1.KubernetesCluster
 }
 
 // New returns a new initialized provisioner object.
 func New(client client.Client) provisioners.ManagerProvisioner {
-	provisioner := &Provisioner{
+	return &Provisioner{
 		client: client,
 	}
-
-	return provisioner
 }
 
 // Ensure the ManagerProvisioner interface is implemented.
@@ -85,14 +81,6 @@ func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusterop
 	}
 
 	return clusteropenstack.NewRemoteClusterGenerator(client, &p.cluster), nil
-}
-
-func (p *Provisioner) newClusterAutoscalerProvisioner(driver cd.Driver) provisioners.Provisioner {
-	return clusterautoscaler.New(driver, &p.cluster).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
-}
-
-func (p *Provisioner) newClusterAutoscalerOpenStackProvisioner(driver cd.Driver) provisioners.Provisioner {
-	return clusterautoscaleropenstack.New(driver, &p.cluster).OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 }
 
 // getBootstrapProvisioner installs the remote cluster, cloud controller manager
@@ -126,8 +114,8 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context, driver cd.Driver
 		return nil, err
 	}
 
-	// Provision the remote cluster, then once that's configured, install
-	// the CNI and cloud provider in parallel.
+	// TODO: we should be able to set OnRemote at the top level and have it propagated
+	// to clean this up (likewise BackgroundDelete).
 	provisioner := serial.New("cluster add-ons",
 		concurrent.New("cluster add-ons wave 1",
 			openstackplugincindercsi.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete(),
@@ -152,13 +140,12 @@ func (p *Provisioner) getAddonsProvisioner(ctx context.Context, driver cd.Driver
 }
 
 func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (provisioners.Provisioner, error) {
-	clusterProvisioner, err := clusteropenstack.New(ctx, driver, &p.cluster)
+	remote := vcluster.NewRemoteClusterGenerator(p.client, p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
+
+	controlPlanePrefix, err := util.GetNATPrefix(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: this is ugly, consider options pattern?
-	clusterProvisioner.OnRemote(p.controlPlaneRemote).InNamespace(p.cluster.Name)
 
 	bootstrapProvisioner, err := p.getBootstrapProvisioner(ctx, driver)
 	if err != nil {
@@ -176,14 +163,14 @@ func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (pro
 	// nodes to schedule onto.
 	provisioner := serial.New("kubernetes cluster",
 		concurrent.New("kubernetes cluster",
-			clusterProvisioner,
+			clusteropenstack.New(ctx, driver, &p.cluster, controlPlanePrefix).OnRemote(remote).InNamespace(p.cluster.Name),
 			bootstrapProvisioner,
 		),
 		conditional.New("cluster-autoscaler",
 			p.cluster.AutoscalingEnabled,
 			concurrent.New("cluster-autoscaler",
-				p.newClusterAutoscalerProvisioner(driver),
-				p.newClusterAutoscalerOpenStackProvisioner(driver),
+				clusterautoscaler.New(driver, &p.cluster).OnRemote(remote).InNamespace(p.cluster.Name),
+				clusterautoscaleropenstack.New(driver, &p.cluster).OnRemote(remote).InNamespace(p.cluster.Name),
 			),
 		),
 		addonsProvisioner,
@@ -194,10 +181,6 @@ func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (pro
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	// TODO: proabbly want to propagate this as a parameter lest we forget
-	// to initialise it...
-	p.controlPlaneRemote = vcluster.NewRemoteClusterGenerator(p.client, p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
-
 	client, err := argocd.NewInCluster(ctx, p.client)
 	if err != nil {
 		return err
@@ -219,8 +202,6 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	p.controlPlaneRemote = vcluster.NewRemoteClusterGenerator(p.client, p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
-
 	client, err := argocd.NewInCluster(ctx, p.client)
 	if err != nil {
 		return err
