@@ -17,7 +17,6 @@ limitations under the License.
 package certmanager
 
 import (
-	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 )
@@ -28,8 +27,8 @@ const (
 )
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
+func New(driver cd.Driver, resource application.MutuallyExclusiveResource) *application.Provisioner {
 	// Cert manager doesn't need any special handling, ensure it's installed in the specified
 	// remote and in the cert-manager namespace.
-	return application.New(driver, applicationName, resource, helm).InNamespace(applicationName)
+	return application.New(driver, applicationName, resource).InNamespace(applicationName)
 }

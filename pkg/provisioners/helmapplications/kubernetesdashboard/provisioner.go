@@ -23,7 +23,6 @@ import (
 	"net"
 	"strings"
 
-	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
@@ -52,12 +51,12 @@ type Provisioner struct {
 var _ application.ValuesGenerator = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication, remote provisioners.RemoteCluster) *application.Provisioner {
+func New(driver cd.Driver, resource application.MutuallyExclusiveResource, remote provisioners.RemoteCluster) *application.Provisioner {
 	p := &Provisioner{
 		remote: remote,
 	}
 
-	return application.New(driver, applicationName, resource, helm).WithGenerator(p).InNamespace("kube-system")
+	return application.New(driver, applicationName, resource).WithGenerator(p).InNamespace("kube-system")
 }
 
 func (p *Provisioner) remoteIngressIP(ctx context.Context) (net.IP, error) {

@@ -31,9 +31,10 @@ var (
 	ErrApplicationMissing = errors.New("bundle missing expected application")
 )
 
-// BundledType is a type, typically a custom resource, that has an attached
+// ApplicationBundleGetter is a type, typically a custom resource, that has an attached
 // application bundle.
-type BundledType interface {
+type ApplicationBundleGetter interface {
+	ApplicationBundleKind() unikornv1.ApplicationBundleResourceKind
 	ApplicationBundleName() string
 }
 
@@ -65,10 +66,10 @@ type Unbundler struct {
 	items []unbundleItem
 }
 
-func NewUnbundler(o BundledType, kind unikornv1.ApplicationBundleResourceKind) *Unbundler {
+func NewUnbundler(o ApplicationBundleGetter) *Unbundler {
 	return &Unbundler{
 		name: o.ApplicationBundleName(),
-		kind: kind,
+		kind: o.ApplicationBundleKind(),
 	}
 }
 

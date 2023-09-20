@@ -19,7 +19,6 @@ package vcluster
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
@@ -54,6 +53,6 @@ func init() {
 }
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource, helm *unikornv1.HelmApplication) *application.Provisioner {
-	return application.New(driver, applicationName, resource, helm)
+func New(driver cd.Driver, resource application.MutuallyExclusiveResource) *application.Provisioner {
+	return application.New(driver, applicationName, resource)
 }

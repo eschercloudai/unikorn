@@ -31,7 +31,12 @@ import (
 
 const (
 	// applicationName is the unique name of the application.
-	applicationName = "kubernetes-cluster"
+	applicationName = "cluster-openstack"
+
+	// legacyApplicationName is what the application needs to be called so it's
+	// not deleted and recreated, which would be quite catastrophic for an entire
+	// Kubernetes cluster!
+	legacyApplicationName = "kubernetes-cluster"
 )
 
 // Provisioner encapsulates control plane provisioning.
@@ -51,15 +56,12 @@ type Provisioner struct {
 	// to the cluster firewall if, required.
 	controlPlanePrefix string
 
-	// application is the application used to identify the Helm chart to use.
-	application *unikornv1.HelmApplication
-
 	// namespace defines where to install the application.
 	namespace string
 }
 
 // New returns a new initialized provisioner object.
-func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesCluster, application *unikornv1.HelmApplication) (*Provisioner, error) {
+func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesCluster) (*Provisioner, error) {
 	// Add the SNAT address of the control plane's default route.
 	// Sadly, we are the only thing guaranteed to live behind the same
 	// router, the CLI tools and UI are or can be used anywhere, so
@@ -76,7 +78,6 @@ func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesClu
 		driver:             driver,
 		cluster:            cluster,
 		controlPlanePrefix: controlPlanePrefix,
-		application:        application,
 	}
 
 	return provisioner, nil
@@ -322,7 +323,7 @@ func (p *Provisioner) ReleaseName() string {
 }
 
 func (p *Provisioner) getProvisioner() provisioners.Provisioner {
-	return application.New(p.driver, applicationName, p.cluster, p.application).WithGenerator(p).OnRemote(p.remote).InNamespace(p.namespace)
+	return application.New(p.driver, applicationName, p.cluster).WithApplicationName(legacyApplicationName).WithGenerator(p).OnRemote(p.remote).InNamespace(p.namespace)
 }
 
 // Provision implements the Provision interface.

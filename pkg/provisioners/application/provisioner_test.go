@@ -29,28 +29,93 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	mockprovisioners "github.com/eschercloudai/unikorn/pkg/provisioners/mock"
+	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func toPointer[T any](t T) *T {
 	return &t
 }
 
+const (
+	resourceBundleName = "bundle-x.y.z"
+	resourceBundleKind = unikornv1.ApplicationBundleResourceKindControlPlane
+)
+
 // mutuallyExclusiveResource defines an abstract type that is able to uniquely
 // identify itself with a set of labels.
 type mutuallyExclusiveResource labels.Set
+
+func (m mutuallyExclusiveResource) ApplicationBundleKind() unikornv1.ApplicationBundleResourceKind {
+	return resourceBundleKind
+}
+
+func (m mutuallyExclusiveResource) ApplicationBundleName() string {
+	return resourceBundleName
+}
 
 func (m mutuallyExclusiveResource) ResourceLabels() (labels.Set, error) {
 	return labels.Set(m), nil
 }
 
+// testContext provides a common framework for test execution.
+type testContext struct {
+	client client.Client
+}
+
+func mustNewTestContext(t *testing.T, objects ...client.Object) *testContext {
+	t.Helper()
+
+	scheme, err := clientutil.NewScheme()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tc := &testContext{
+		client: fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&unikornv1.Project{}).WithObjects(objects...).Build(),
+	}
+
+	return tc
+}
+
 const (
-	repo    = "foo"
-	chart   = "bar"
-	version = "baz"
+	applicationName         = "test"
+	overrideApplicationName = "testinate"
+	repo                    = "foo"
+	chart                   = "bar"
+	version                 = "baz"
 )
+
+func newBundle(applications ...*unikornv1.HelmApplication) *unikornv1.ApplicationBundle {
+	apps := make([]unikornv1.ApplicationBundleApplication, 0, len(applications))
+
+	for _, application := range applications {
+		apps = append(apps, unikornv1.ApplicationBundleApplication{
+			Name: toPointer(application.Name),
+			Reference: &unikornv1.ApplicationReference{
+				Kind: toPointer(unikornv1.ApplicationReferenceKindHelm),
+				Name: toPointer(application.Name),
+			},
+		})
+	}
+
+	bundle := &unikornv1.ApplicationBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourceBundleName,
+		},
+		Spec: unikornv1.ApplicationBundleSpec{
+			Kind:         toPointer(resourceBundleKind),
+			Applications: apps,
+		},
+	}
+
+	return bundle
+}
 
 // TestApplicationCreateHelm tests that given the requested input the provisioner
 // creates a CD Application, and the fields are populated as expected.
@@ -59,7 +124,7 @@ func TestApplicationCreateHelm(t *testing.T) {
 
 	app := &unikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
+			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
 			Repo:    toPointer(repo),
@@ -68,13 +133,14 @@ func TestApplicationCreateHelm(t *testing.T) {
 		},
 	}
 
+	tc := mustNewTestContext(t, app, newBundle(app))
 	ctx := context.Background()
 
 	c := gomock.NewController(t)
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: "foo",
+		Name: applicationName,
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -84,10 +150,11 @@ func TestApplicationCreateHelm(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
+	driver.EXPECT().Client().Return(tc.client)
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(driver, "foo", owner, app)
+	provisioner := application.New(driver, applicationName, owner)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
@@ -110,7 +177,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 
 	app := &unikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
+			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
 			Repo:    toPointer(repo),
@@ -128,6 +195,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 		},
 	}
 
+	tc := mustNewTestContext(t, app, newBundle(app))
 	ctx := context.Background()
 
 	c := gomock.NewController(t)
@@ -151,7 +219,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	r.EXPECT().ID().Return(remoteID)
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: "foo",
+		Name: overrideApplicationName,
 		Labels: []cd.ResourceIdentifierLabel{
 			{
 				Name:  idLabel1,
@@ -177,12 +245,13 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
+	driver.EXPECT().Client().Return(tc.client)
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
 	owner := &mutuallyExclusiveResource{
 		idLabel1: idLabel1Value,
 	}
-	provisioner := application.New(driver, "foo", owner, app).OnRemote(r)
+	provisioner := application.New(driver, applicationName, owner).OnRemote(r).WithApplicationName(overrideApplicationName)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
@@ -196,7 +265,7 @@ func TestApplicationCreateGit(t *testing.T) {
 
 	app := &unikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
+			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
 			Repo:    toPointer(repo),
@@ -205,13 +274,14 @@ func TestApplicationCreateGit(t *testing.T) {
 		},
 	}
 
+	tc := mustNewTestContext(t, app, newBundle(app))
 	ctx := context.Background()
 
 	c := gomock.NewController(t)
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: "foo",
+		Name: applicationName,
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -221,10 +291,11 @@ func TestApplicationCreateGit(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
+	driver.EXPECT().Client().Return(tc.client)
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(driver, "foo", owner, app)
+	provisioner := application.New(driver, applicationName, owner)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
@@ -290,7 +361,7 @@ func TestApplicationCreateMutate(t *testing.T) {
 
 	app := &unikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
+			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
 			Repo:    toPointer(repo),
@@ -299,13 +370,14 @@ func TestApplicationCreateMutate(t *testing.T) {
 		},
 	}
 
+	tc := mustNewTestContext(t, app, newBundle(app))
 	ctx := context.Background()
 
 	c := gomock.NewController(t)
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: "foo",
+		Name: applicationName,
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -333,10 +405,11 @@ func TestApplicationCreateMutate(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
+	driver.EXPECT().Client().Return(tc.client)
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(driver, "foo", owner, app).WithGenerator(&mutator{}).InNamespace(namespace)
+	provisioner := application.New(driver, applicationName, owner).WithGenerator(&mutator{}).InNamespace(namespace)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
@@ -346,31 +419,20 @@ func TestApplicationCreateMutate(t *testing.T) {
 func TestApplicationDeleteNotFound(t *testing.T) {
 	t.Parallel()
 
-	app := &unikornv1.HelmApplication{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
-		},
-		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    toPointer(repo),
-			Chart:   toPointer(chart),
-			Version: toPointer(version),
-		},
-	}
-
 	ctx := context.Background()
 
 	c := gomock.NewController(t)
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: "foo",
+		Name: applicationName,
 	}
 
 	driver := mock.NewMockDriver(c)
 	driver.EXPECT().DeleteHelmApplication(ctx, driverAppID, false).Return(provisioners.ErrYield)
 
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(driver, "foo", owner, app)
+	provisioner := application.New(driver, applicationName, owner)
 
 	assert.ErrorIs(t, provisioner.Deprovision(ctx), provisioners.ErrYield)
 }

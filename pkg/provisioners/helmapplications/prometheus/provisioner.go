@@ -17,7 +17,6 @@ limitations under the License.
 package prometheus
 
 import (
-	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 )
@@ -28,6 +27,6 @@ const (
 )
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, cluster *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
-	return application.New(driver, applicationName, cluster, helm).InNamespace("prometheus-system")
+func New(driver cd.Driver, resource application.MutuallyExclusiveResource) *application.Provisioner {
+	return application.New(driver, applicationName, resource).InNamespace("prometheus-system")
 }
