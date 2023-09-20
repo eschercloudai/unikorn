@@ -23,6 +23,7 @@ import (
 
 // VClusterRemoteLabelsFromControlPlane extracts a unique set of labels from the
 // control plane for a remote vcluster.
+// TODO: this should be an interface on the resource type.
 func VClusterRemoteLabelsFromControlPlane(controlPlane *unikornv1alpha1.ControlPlane) []string {
 	return []string{
 		controlPlane.Name,

@@ -26,7 +26,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-	"github.com/eschercloudai/unikorn/pkg/util"
 )
 
 const (
@@ -61,16 +60,7 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesCluster) (*Provisioner, error) {
-	// Add the SNAT address of the control plane's default route.
-	// Sadly, we are the only thing guaranteed to live behind the same
-	// router, the CLI tools and UI are or can be used anywhere, so
-	// we'll take on this hack.
-	controlPlanePrefix, err := util.GetNATPrefix(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesCluster, controlPlanePrefix string) *Provisioner {
 	provisioner := &Provisioner{
 		ProvisionerMeta: provisioners.ProvisionerMeta{
 			Name: cluster.Name,
@@ -80,7 +70,7 @@ func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesClu
 		controlPlanePrefix: controlPlanePrefix,
 	}
 
-	return provisioner, nil
+	return provisioner
 }
 
 // Ensure the Provisioner interface is implemented.
