@@ -162,6 +162,10 @@ func (c *ControlPlane) ResourceLabels() (labels.Set, error) {
 	return labels, nil
 }
 
+func (c *ControlPlane) ApplicationBundleKind() ApplicationBundleResourceKind {
+	return ApplicationBundleResourceKindControlPlane
+}
+
 func (c *ControlPlane) ApplicationBundleName() string {
 	return *c.Spec.ApplicationBundle
 }
@@ -208,6 +212,10 @@ func (c *KubernetesCluster) ResourceLabels() (labels.Set, error) {
 	}
 
 	return labels, nil
+}
+
+func (c *KubernetesCluster) ApplicationBundleKind() ApplicationBundleResourceKind {
+	return ApplicationBundleResourceKindKubernetesCluster
 }
 
 func (c *KubernetesCluster) ApplicationBundleName() string {

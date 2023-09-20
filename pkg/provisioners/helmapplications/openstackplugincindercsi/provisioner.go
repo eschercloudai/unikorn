@@ -49,13 +49,13 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, cluster *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
+func New(driver cd.Driver, cluster *unikornv1.KubernetesCluster) *application.Provisioner {
 	provisioner := &Provisioner{
 		driver:  driver,
 		cluster: cluster,
 	}
 
-	return application.New(driver, applicationName, cluster, helm).WithGenerator(provisioner).InNamespace("ocp-system")
+	return application.New(driver, applicationName, cluster).WithGenerator(provisioner).InNamespace("ocp-system")
 }
 
 // Ensure the Provisioner interface is implemented.

@@ -39,13 +39,13 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource *unikornv1.KubernetesCluster, helm *unikornv1.HelmApplication) *application.Provisioner {
+func New(driver cd.Driver, resource *unikornv1.KubernetesCluster) *application.Provisioner {
 	provisoner := &Provisioner{
 		clusterName:                 clusteropenstack.CAPIClusterName(resource),
 		clusterKubeconfigSecretName: clusteropenstack.KubeconfigSecretName(resource),
 	}
 
-	return application.New(driver, applicationName, resource, helm).WithGenerator(provisoner)
+	return application.New(driver, applicationName, resource).WithGenerator(provisoner)
 }
 
 // Ensure the Provisioner interface is implemented.

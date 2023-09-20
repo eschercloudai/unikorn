@@ -70,10 +70,6 @@ type Provisioner struct {
 
 	// controlPlane is the control plane CR this deployment relates to
 	controlPlane unikornv1.ControlPlane
-
-	vclusterApplication    *unikornv1.HelmApplication
-	certManagerApplication *unikornv1.HelmApplication
-	clusterAPIApplication  *unikornv1.HelmApplication
 }
 
 // New returns a new initialized provisioner object.
@@ -90,22 +86,6 @@ var _ provisioners.ManagerProvisioner = &Provisioner{}
 
 func (p *Provisioner) Object() client.Object {
 	return &p.controlPlane
-}
-
-// unbundleApplications gets application data required for provisioning.
-// TODO: We should really just put this in the application, then you don't
-// need to worry about missing any out, or not calling this function.
-func (p *Provisioner) unbundleApplications(ctx context.Context) error {
-	unbundler := util.NewUnbundler(&p.controlPlane, unikornv1.ApplicationBundleResourceKindControlPlane)
-	unbundler.AddApplication(&p.vclusterApplication, "vcluster")
-	unbundler.AddApplication(&p.certManagerApplication, "cert-manager")
-	unbundler.AddApplication(&p.clusterAPIApplication, "cluster-api")
-
-	if err := unbundler.Unbundle(ctx, p.client); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // provisionNamespace creates a namespace for the control plane so that clusters
@@ -178,11 +158,11 @@ func (p *Provisioner) getControlPlaneProvisioner(driver cd.Driver, namespace str
 	// Provision the vitual cluster, setup the remote cluster then
 	// install cert manager and cluster API into it.
 	return serial.New("control plane",
-		vcluster.New(driver, &p.controlPlane, p.vclusterApplication).InNamespace(namespace),
+		vcluster.New(driver, &p.controlPlane).InNamespace(namespace),
 		remotecluster.New(driver, remote),
 		concurrent.New("cluster-api",
-			certmanager.New(driver, &p.controlPlane, p.certManagerApplication).OnRemote(remote).BackgroundDelete(),
-			clusterapi.New(driver, &p.controlPlane, p.clusterAPIApplication).OnRemote(remote).BackgroundDelete(),
+			certmanager.New(driver, &p.controlPlane).OnRemote(remote).BackgroundDelete(),
+			clusterapi.New(driver, &p.controlPlane).OnRemote(remote).BackgroundDelete(),
 		),
 	)
 }
@@ -195,10 +175,6 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 	timer := prometheus.NewTimer(durationMetric)
 	defer timer.ObserveDuration()
-
-	if err := p.unbundleApplications(ctx); err != nil {
-		return err
-	}
 
 	namespace, err := p.provisionNamespace(ctx)
 	if err != nil {
@@ -229,10 +205,6 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	if err := p.unbundleApplications(ctx); err != nil {
-		return err
-	}
-
 	labels, err := p.controlPlane.ResourceLabels()
 	if err != nil {
 		return err
