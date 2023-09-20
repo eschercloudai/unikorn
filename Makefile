@@ -85,6 +85,8 @@ CODEGEN_VERSION=v0.27.3
 
 OPENAPI_CODEGEN_VERSION=v1.12.4
 
+MOCKGEN_VERSION=v0.3.0
+
 # This is the base directory to generate kubernetes API primitives from e.g.
 # clients and CRDs.
 GENAPIBASE = github.com/eschercloudai/unikorn/pkg/apis
@@ -122,6 +124,14 @@ $(BINDIR)/amd64-linux-gnu/%: $(SOURCES) $(GENDIR) $(SRVGENDIR) | $(BINDIR)/amd64
 
 $(BINDIR)/arm64-linux-gnu/%: $(SOURCES) $(GENDIR) | $(BINDIR)/arm64-linux-gnu
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(FLAGS) -o $@ $(CMDDIR)/$*/main.go
+
+# TODO: we may wamt to consider porting the rest of the CRD and client generation
+# stuff over... that said, we don't need the clients really do we, controller-runtime
+# does all the magic for us.
+.PHONY: generate
+generate:
+	@go install go.uber.org/mock/mockgen@$(MOCKGEN_VERSION)
+	go generate ./...
 
 # Installation target, to test out things like shell completion you'll
 # want to install it somewhere in your PATH.

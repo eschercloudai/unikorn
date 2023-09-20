@@ -20,9 +20,38 @@ package provisioners
 type ProvisionerMeta struct {
 	// Name is the name of the provisioner.
 	Name string
+
+	// Remote is the remote cluster a resource or group of resources
+	// belongs to.
+	Remote RemoteCluster
+
+	// BackgroundDelete means we don't care about whether it's deprovisioned
+	// successfully or not, especially useful for apps living in a
+	// remote cluster that going to get terminated anyway.
+	BackgroundDelete bool
 }
 
 // ProvisionerName implements the Provisioner interface.
 func (p *ProvisionerMeta) ProvisionerName() string {
 	return p.Name
+}
+
+func (p *ProvisionerMeta) OnRemote(remote RemoteCluster) {
+	p.Remote = remote
+}
+
+func (p *ProvisionerMeta) BackgroundDeletion() {
+	p.BackgroundDelete = true
+}
+
+// PropagateOptions allows provisioners to push options down to
+// all their children.
+func (p *ProvisionerMeta) PropagateOptions(provisioner Provisioner) {
+	if p.Remote != nil {
+		provisioner.OnRemote(p.Remote)
+	}
+
+	if p.BackgroundDelete {
+		provisioner.BackgroundDeletion()
+	}
 }

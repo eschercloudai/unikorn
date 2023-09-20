@@ -51,6 +51,8 @@ var _ provisioners.Provisioner = &Provisioner{}
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
+	p.PropagateOptions(p.provisioner)
+
 	if !p.condition() {
 		log.Info("conditional deprovision", "provisioner", p.Name)
 
@@ -62,5 +64,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
+	p.PropagateOptions(p.provisioner)
+
 	return p.provisioner.Deprovision(ctx)
 }

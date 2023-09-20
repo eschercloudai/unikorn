@@ -251,7 +251,9 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	owner := &mutuallyExclusiveResource{
 		idLabel1: idLabel1Value,
 	}
-	provisioner := application.New(driver, applicationName, owner).OnRemote(r).WithApplicationName(overrideApplicationName)
+
+	provisioner := application.New(driver, applicationName, owner).WithApplicationName(overrideApplicationName)
+	provisioner.OnRemote(r)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }

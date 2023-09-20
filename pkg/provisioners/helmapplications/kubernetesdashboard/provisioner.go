@@ -71,7 +71,7 @@ func (p *Provisioner) remoteIngressIP(ctx context.Context) (net.IP, error) {
 		return nil, err
 	}
 
-	// TODO: we privision this (for now) as a second wave from the ingress controller
+	// TODO: we provision this (for now) as a second wave from the ingress controller
 	// so we expect this to work.  If it doesn't it'll error.  Consider making this a
 	// parallel task and just yielding.
 	for _, service := range services.Items {

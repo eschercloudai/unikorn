@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type RemoteClusterGenerator struct {
+type RemoteCluster struct {
 	// client provides access to the Kubernetes instance where
 	// the vcluster resources live.
 	client client.Client
@@ -42,11 +42,11 @@ type RemoteClusterGenerator struct {
 }
 
 // Ensure this implements the remotecluster.Generator interface.
-var _ provisioners.RemoteCluster = &RemoteClusterGenerator{}
+var _ provisioners.RemoteCluster = &RemoteCluster{}
 
-// NewRemoteClusterGenerator return a new instance of a remote cluster generator.
-func NewRemoteClusterGenerator(client client.Client, namespace string, labels []string) *RemoteClusterGenerator {
-	return &RemoteClusterGenerator{
+// NewRemoteCluster return a new instance of a remote cluster generator.
+func NewRemoteCluster(client client.Client, namespace string, labels []string) *RemoteCluster {
+	return &RemoteCluster{
 		client:    client,
 		namespace: namespace,
 		labels:    labels,
@@ -54,7 +54,7 @@ func NewRemoteClusterGenerator(client client.Client, namespace string, labels []
 }
 
 // ID implements the remotecluster.Generator interface.
-func (g *RemoteClusterGenerator) ID() *cd.ResourceIdentifier {
+func (g *RemoteCluster) ID() *cd.ResourceIdentifier {
 	// TODO: the labels handling is a bit smelly,
 	return &cd.ResourceIdentifier{
 		Name: "vcluster",
@@ -72,6 +72,6 @@ func (g *RemoteClusterGenerator) ID() *cd.ResourceIdentifier {
 }
 
 // Config implements the remotecluster.Generator interface.
-func (g *RemoteClusterGenerator) Config(ctx context.Context) (*clientcmdapi.Config, error) {
+func (g *RemoteCluster) Config(ctx context.Context) (*clientcmdapi.Config, error) {
 	return NewControllerRuntimeClient(g.client).ClientConfig(ctx, g.namespace, false)
 }

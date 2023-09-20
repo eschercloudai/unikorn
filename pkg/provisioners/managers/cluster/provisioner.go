@@ -72,90 +72,80 @@ func (p *Provisioner) Object() client.Object {
 	return &p.cluster
 }
 
-// getRemoteClusterGenerator returns a generator capable of reading the cluster
+// getRemoteCluster returns a generator capable of reading the cluster
 // kubeconfig from the underlying control plane.
-func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusteropenstack.RemoteClusterGenerator, error) {
+func (p *Provisioner) getRemoteCluster(ctx context.Context) (*clusteropenstack.RemoteCluster, error) {
 	client, err := vcluster.NewControllerRuntimeClient(p.client).Client(ctx, p.cluster.Namespace, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return clusteropenstack.NewRemoteClusterGenerator(client, &p.cluster), nil
-}
-
-// getBootstrapProvisioner installs the remote cluster, cloud controller manager
-// and CNI in parallel with cluster creation.  NOTE: these applications MUST be
-// installable without an worker nodes, thus all deployments must tolerate control
-// plane taints, and select control plane nodes to support zero-sized workload pools
-// correctly.
-func (p *Provisioner) getBootstrapProvisioner(ctx context.Context, driver cd.Driver) (provisioners.Provisioner, error) {
-	remote, err := p.getRemoteClusterGenerator(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	provisioner := serial.New("cluster add-ons",
-		remotecluster.New(driver, remote),
-		concurrent.New("cluster bootstrap",
-			cilium.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete(),
-			openstackcloudprovider.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete(),
-		),
-	)
-
-	return provisioner, nil
-}
-
-// getAddonsProvisioner returns a generic provisioner for provisioning and deprovisioning.
-// Unlike bootstrap components, these don't necessarily need to be foreced onto the control
-// plane nodes, and we shouldn't be expected to foot the bill for everything.
-func (p *Provisioner) getAddonsProvisioner(ctx context.Context, driver cd.Driver) (provisioners.Provisioner, error) {
-	remote, err := p.getRemoteClusterGenerator(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: we should be able to set OnRemote at the top level and have it propagated
-	// to clean this up (likewise BackgroundDelete).
-	provisioner := serial.New("cluster add-ons",
-		concurrent.New("cluster add-ons wave 1",
-			openstackplugincindercsi.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete(),
-			metricsserver.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete(),
-			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete()),
-			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete()),
-			conditional.New("cert-manager", p.cluster.CertManagerEnabled,
-				serial.New("cert-manager",
-					certmanager.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete(),
-					certmanagerissuers.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete(),
-				),
-			),
-			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete()),
-			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(driver, &p.cluster).OnRemote(remote).BackgroundDelete()),
-		),
-		concurrent.New("cluster add-ons wave 2",
-			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(driver, &p.cluster, remote).OnRemote(remote).BackgroundDelete()),
-		),
-	)
-
-	return provisioner, nil
+	return clusteropenstack.NewRemoteCluster(client, &p.cluster), nil
 }
 
 func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (provisioners.Provisioner, error) {
-	remote := vcluster.NewRemoteClusterGenerator(p.client, p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
+	controlPlaneRemote := vcluster.NewRemoteCluster(p.client, p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
 
 	controlPlanePrefix, err := util.GetNATPrefix(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	bootstrapProvisioner, err := p.getBootstrapProvisioner(ctx, driver)
+	clusterRemote, err := p.getRemoteCluster(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	addonsProvisioner, err := p.getAddonsProvisioner(ctx, driver)
-	if err != nil {
-		return nil, err
-	}
+	clusterProvisioner := clusteropenstack.New(ctx, driver, &p.cluster, controlPlanePrefix).InNamespace(p.cluster.Name)
+
+	// These applications are required to get the cluster up and running, they must
+	// tolerate control plane taints, be scheduled onto control plane nodes and allow
+	// scale from zero.
+	bootstrapProvisioner := concurrent.New("cluster bootstrap",
+		cilium.New(driver, &p.cluster),
+		openstackcloudprovider.New(driver, &p.cluster),
+	)
+
+	clusterAutoscalerProvisioner := conditional.New("cluster-autoscaler",
+		p.cluster.AutoscalingEnabled,
+		concurrent.New("cluster-autoscaler",
+			clusterautoscaler.New(driver, &p.cluster).InNamespace(p.cluster.Name),
+			clusterautoscaleropenstack.New(driver, &p.cluster).InNamespace(p.cluster.Name),
+		),
+	)
+
+	certManagerProvisioner := serial.New("cert-manager",
+		certmanager.New(driver, &p.cluster),
+		certmanagerissuers.New(driver, &p.cluster),
+	)
+
+	addonsProvisioner := serial.New("cluster add-ons",
+		concurrent.New("cluster add-ons wave 1",
+			openstackplugincindercsi.New(driver, &p.cluster),
+			metricsserver.New(driver, &p.cluster),
+			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(driver, &p.cluster)),
+			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New(driver, &p.cluster)),
+			conditional.New("cert-manager", p.cluster.CertManagerEnabled, certManagerProvisioner),
+			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(driver, &p.cluster)),
+			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(driver, &p.cluster)),
+		),
+		concurrent.New("cluster add-ons wave 2",
+			// TODO: this hack where it needs the remote is pretty ugly.
+			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(driver, &p.cluster, clusterRemote)),
+		),
+	)
+
+	// Set up the remote clusters for the various groups.
+	clusterProvisioner.OnRemote(controlPlaneRemote)
+	clusterAutoscalerProvisioner.OnRemote(controlPlaneRemote)
+	bootstrapProvisioner.OnRemote(clusterRemote)
+	addonsProvisioner.OnRemote(clusterRemote)
+
+	// Setup any deletion semantics.  These application sets all exist in "ephemeral"
+	// clusters, so we don't care about cleanup, we do care about cleaning up the cluster
+	// resources though.
+	bootstrapProvisioner.BackgroundDeletion()
+	addonsProvisioner.BackgroundDeletion()
 
 	// Create the cluster and the boostrap components in parallel, the cluster will
 	// come up but never reach healthy until the CNI and cloud controller manager
@@ -163,16 +153,13 @@ func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (pro
 	// nodes to schedule onto.
 	provisioner := serial.New("kubernetes cluster",
 		concurrent.New("kubernetes cluster",
-			clusteropenstack.New(ctx, driver, &p.cluster, controlPlanePrefix).OnRemote(remote).InNamespace(p.cluster.Name),
-			bootstrapProvisioner,
-		),
-		conditional.New("cluster-autoscaler",
-			p.cluster.AutoscalingEnabled,
-			concurrent.New("cluster-autoscaler",
-				clusterautoscaler.New(driver, &p.cluster).OnRemote(remote).InNamespace(p.cluster.Name),
-				clusterautoscaleropenstack.New(driver, &p.cluster).OnRemote(remote).InNamespace(p.cluster.Name),
+			clusterProvisioner,
+			serial.New("cluster bootstrap",
+				remotecluster.New(driver, clusterRemote),
+				bootstrapProvisioner,
 			),
 		),
+		clusterAutoscalerProvisioner,
 		addonsProvisioner,
 	)
 

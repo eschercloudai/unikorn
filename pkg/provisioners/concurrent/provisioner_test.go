@@ -65,6 +65,31 @@ func TestConcurrentProvision(t *testing.T) {
 	assert.NoError(t, concurrent.New("test", p1, p2).Provision(ctx))
 }
 
+// TestConcurrentProvisionPropagate expects remote clusters to be propagated.
+func TestConcurrentProvisionPropagate(t *testing.T) {
+	t.Parallel()
+
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	ctx := context.Background()
+
+	r := mock.NewMockRemoteCluster(c)
+
+	p1 := mock.NewMockProvisioner(c)
+	p1.EXPECT().OnRemote(r)
+	p1.EXPECT().Provision(ctx).Return(nil)
+
+	p2 := mock.NewMockProvisioner(c)
+	p2.EXPECT().OnRemote(r)
+	p2.EXPECT().Provision(ctx).Return(nil)
+
+	provisioner := concurrent.New("test", p1, p2)
+	provisioner.OnRemote(r)
+
+	assert.NoError(t, provisioner.Provision(ctx))
+}
+
 // TestConcurrentProvisionYieldFirst ensures all provisioners are
 // called and it returns a yield if the first provisioner yields.
 func TestConcurrentProvisionYieldFirst(t *testing.T) {

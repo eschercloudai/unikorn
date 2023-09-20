@@ -45,6 +45,16 @@ type Provisioner interface {
 	// ProvisionerName returns the provisioner name.
 	ProvisionerName() string
 
+	// OnRemote defines this provisioner should be run on the
+	// provided remote cluster.  All composite provisioners must
+	// propagate this.
+	OnRemote(remote RemoteCluster)
+
+	// BackgroundDeletion means we don't care about whether it's deprovisioned
+	// successfully or not, especially useful for apps living in a
+	// remote cluster that going to get terminated anyway.
+	BackgroundDeletion()
+
 	// Provision deploys the requested package.
 	// Implementations should ensure this receiver is idempotent.
 	Provision(context.Context) error

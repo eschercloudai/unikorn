@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package kubectl
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-// KubectlProvisioner uses "kubectl apply" to provision the resources.
+// Provisioner uses "kubectl apply" to provision the resources.
 // We use raw config flags here as we can pass them directly to the
 // underlying kubectl command.  We could use a higher level abstraction
 // here, like kubectl's cmdutil.Factory, but then we'd just have to create
@@ -35,7 +35,7 @@ import (
 // nightmare!
 // TODO: some manifests may not have a namspace, we may want to allow
 // overriding this.
-type KubectlProvisioner struct {
+type Provisioner struct {
 	provisioners.ProvisionerMeta
 
 	// config allows access to the provided kubeconfig, context etc.
@@ -48,20 +48,20 @@ type KubectlProvisioner struct {
 }
 
 // Ensure the Provisioner interface is implemented.
-var _ provisioners.Provisioner = &KubectlProvisioner{}
+var _ provisioners.Provisioner = &Provisioner{}
 
-// NewKubectlProvisioner returns a new provisioner that is capable of applying
+// New returns a new provisioner that is capable of applying
 // a manifest with kubectl.  The path argument may be a path on the local file
 // system or a URL.
-func NewKubectlProvisioner(config *genericclioptions.ConfigFlags, path string) *KubectlProvisioner {
-	return &KubectlProvisioner{
+func New(config *genericclioptions.ConfigFlags, path string) *Provisioner {
+	return &Provisioner{
 		config: config,
 		path:   path,
 	}
 }
 
 // Provision implements the Provision interface.
-func (p *KubectlProvisioner) Provision(_ context.Context) error {
+func (p *Provisioner) Provision(_ context.Context) error {
 	var args []string
 
 	// If explcitly specified in the top level command, use these
@@ -83,6 +83,6 @@ func (p *KubectlProvisioner) Provision(_ context.Context) error {
 }
 
 // Deprovision implements the Provision interface.
-func (p *KubectlProvisioner) Deprovision(context.Context) error {
+func (p *Provisioner) Deprovision(context.Context) error {
 	return nil
 }
