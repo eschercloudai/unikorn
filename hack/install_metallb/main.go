@@ -28,7 +28,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/eschercloudai/unikorn/pkg/provisioners/kubectl"
 	"github.com/eschercloudai/unikorn/pkg/readiness"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -97,11 +96,30 @@ func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespac
 	}
 }
 
+func provision(config *genericclioptions.ConfigFlags, path string) error {
+	var args []string
+
+	// If explcitly specified in the top level command, use these
+	if config.KubeConfig != nil && len(*config.KubeConfig) > 0 {
+		args = append(args, "--kubeconfig", *config.KubeConfig)
+	}
+
+	if config.Context != nil && len(*config.Context) > 0 {
+		args = append(args, "--context", *config.Context)
+	}
+
+	args = append(args, "apply", "-f", path)
+
+	if err := exec.Command("kubectl", args...).Run(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // applyManifest does exactly that.
 func applyManifest(config *genericclioptions.ConfigFlags, path string) {
-	provisioner := kubectl.New(config, path)
-
-	if err := provisioner.Provision(context.TODO()); err != nil {
+	if err := provision(config, path); err != nil {
 		panic(err)
 	}
 }
