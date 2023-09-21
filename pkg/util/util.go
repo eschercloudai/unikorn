@@ -25,25 +25,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 )
-
-// SplitYAML takes a yaml manifest and splits it into individual objects
-// discarding any empty sections.
-func SplitYAML(s string) []string {
-	sections := strings.Split(s, "\n---\n")
-
-	var yamls []string
-
-	// Discard any empty sections.
-	for _, section := range sections {
-		if strings.TrimSpace(section) != "" {
-			yamls = append(yamls, section)
-		}
-	}
-
-	return yamls
-}
 
 // natPrefix provides a cache/memoization for GetNATPrefix, be nice to our
 // internet brethren.

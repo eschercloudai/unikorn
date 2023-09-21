@@ -27,9 +27,6 @@ type Callback func() error
 
 // Retrier implements retry loop logic.
 type Retrier struct {
-	// timeout is used to terminate the retry after a period of time.
-	timeout time.Duration
-
 	// period defines the default retry period, defaulting to 1 second.
 	period time.Duration
 }
@@ -39,14 +36,6 @@ type Retrier struct {
 func Forever() *Retrier {
 	return &Retrier{
 		period: time.Second,
-	}
-}
-
-// WithTimeout returns a retrier that will execute for a specifc length of time.
-func WithTimeout(timeout time.Duration) *Retrier {
-	return &Retrier{
-		timeout: timeout,
-		period:  time.Second,
 	}
 }
 
@@ -62,13 +51,6 @@ func (r *Retrier) DoWithContext(c context.Context, f Callback) error {
 	rerr := f()
 	if rerr == nil {
 		return nil
-	}
-
-	if r.timeout != 0 {
-		ctx, cancel := context.WithTimeout(c, r.timeout)
-		defer cancel()
-
-		c = ctx
 	}
 
 	t := time.NewTicker(r.period)
