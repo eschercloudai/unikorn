@@ -174,8 +174,6 @@ func convertStatus(in *unikornv1.KubernetesCluster) *generated.KubernetesResourc
 		out.Status = string(condition.Reason)
 	}
 
-	fmt.Println(err)
-
 	return out
 }
 

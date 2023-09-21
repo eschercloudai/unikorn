@@ -48,9 +48,6 @@ type Provisioner struct {
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster *unikornv1.KubernetesCluster
 
-	// remote is the remote cluster to deploy to.
-	remote provisioners.RemoteCluster
-
 	// controlPlanePrefix contains the IP address prefix to add
 	// to the cluster firewall if, required.
 	controlPlanePrefix string
@@ -77,13 +74,6 @@ func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesClu
 var _ provisioners.Provisioner = &Provisioner{}
 var _ application.ReleaseNamer = &Provisioner{}
 var _ application.ValuesGenerator = &Provisioner{}
-
-// OnRemote implements the Provision interface.
-func (p *Provisioner) OnRemote(remote provisioners.RemoteCluster) *Provisioner {
-	p.remote = remote
-
-	return p
-}
 
 // InNamespace implements the Provision interface.
 func (p *Provisioner) InNamespace(namespace string) *Provisioner {
@@ -313,7 +303,13 @@ func (p *Provisioner) ReleaseName() string {
 }
 
 func (p *Provisioner) getProvisioner() provisioners.Provisioner {
-	return application.New(p.driver, applicationName, p.cluster).WithApplicationName(legacyApplicationName).WithGenerator(p).OnRemote(p.remote).InNamespace(p.namespace)
+	provisioner := application.New(p.driver, applicationName, p.cluster).WithApplicationName(legacyApplicationName).WithGenerator(p).InNamespace(p.namespace)
+
+	if p.Remote != nil {
+		provisioner.OnRemote(p.Remote)
+	}
+
+	return provisioner
 }
 
 // Provision implements the Provision interface.
@@ -329,6 +325,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	// TODO: we could have a post reconcile hook?  Make all this evil
+	// go away...
 	if err := p.deleteOrphanedMachineDeployments(ctx); err != nil {
 		return err
 	}

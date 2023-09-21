@@ -47,9 +47,11 @@ var _ provisioners.Provisioner = &Provisioner{}
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning serial group", "group", p.Name)
+	log.Info("provisioning serial group", "group", p.Name, "remote", p.Remote)
 
 	for _, provisioner := range p.provisioners {
+		p.PropagateOptions(provisioner)
+
 		if err := provisioner.Provision(ctx); err != nil {
 			log.Info("serial group member exited with error", "error", err, "group", p.Name, "provisioner", provisioner.ProvisionerName())
 
@@ -73,6 +75,8 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	for i := range p.provisioners {
 		provisioner := p.provisioners[len(p.provisioners)-(i+1)]
+
+		p.PropagateOptions(provisioner)
 
 		if err := provisioner.Deprovision(ctx); err != nil {
 			log.Info("serial group member exited with error", "error", err, "group", p.Name, "provisioner", provisioner.ProvisionerName())

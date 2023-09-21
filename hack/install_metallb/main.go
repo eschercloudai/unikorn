@@ -28,7 +28,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/eschercloudai/unikorn/pkg/provisioners/generic"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/kubectl"
 	"github.com/eschercloudai/unikorn/pkg/readiness"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -99,7 +99,7 @@ func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespac
 
 // applyManifest does exactly that.
 func applyManifest(config *genericclioptions.ConfigFlags, path string) {
-	provisioner := generic.NewKubectlProvisioner(config, path)
+	provisioner := kubectl.New(config, path)
 
 	if err := provisioner.Provision(context.TODO()); err != nil {
 		panic(err)

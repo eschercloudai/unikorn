@@ -22,7 +22,7 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/generic"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/resource"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
@@ -85,7 +85,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 			},
 		}
 
-		if err := generic.NewResourceProvisioner(p.client, namespace).Provision(ctx); err != nil {
+		if err := resource.New(p.client, namespace).Provision(ctx); err != nil {
 			return err
 		}
 	}
@@ -114,7 +114,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	// Deprovision the namespace and await deletion.
-	if err := generic.NewResourceProvisioner(p.client, namespace).Deprovision(ctx); err != nil {
+	if err := resource.New(p.client, namespace).Deprovision(ctx); err != nil {
 		return err
 	}
 

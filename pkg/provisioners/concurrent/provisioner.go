@@ -50,12 +50,14 @@ var _ provisioners.Provisioner = &Provisioner{}
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning concurrency group", "group", p.Name)
+	log.Info("provisioning concurrency group", "group", p.Name, "remote", p.Remote)
 
 	group := &errgroup.Group{}
 
 	for i := range p.provisioners {
 		provisioner := p.provisioners[i]
+
+		p.PropagateOptions(provisioner)
 
 		callback := func() error {
 			// As errgroup only saves the first error, we may lose some
@@ -94,6 +96,8 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	for i := range p.provisioners {
 		provisioner := p.provisioners[i]
+
+		p.PropagateOptions(provisioner)
 
 		callback := func() error {
 			// As errgroup only saves the first error, we may lose some

@@ -27,11 +27,11 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/generic"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanager"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterapi"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/resource"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
@@ -115,7 +115,7 @@ func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace
 		},
 	}
 
-	if err := generic.NewResourceProvisioner(p.client, namespace).Provision(ctx); err != nil {
+	if err := resource.New(p.client, namespace).Provision(ctx); err != nil {
 		return nil, err
 	}
 
@@ -136,7 +136,7 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 	}
 
 	for i := range clusters.Items {
-		if err := generic.NewResourceProvisioner(p.client, &clusters.Items[i]).Deprovision(ctx); err != nil {
+		if err := resource.New(p.client, &clusters.Items[i]).Deprovision(ctx); err != nil {
 			return err
 		}
 	}
@@ -144,26 +144,28 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 	return nil
 }
 
-// getRemoteClusterGenerator returns a generator capable of reading the vcluster
-// kubeconfig from the underlying control cluster.
-func (p *Provisioner) getRemoteClusterGenerator(namespace string) *vcluster.RemoteClusterGenerator {
-	return vcluster.NewRemoteClusterGenerator(p.client, namespace, provisioners.VClusterRemoteLabelsFromControlPlane(&p.controlPlane))
-}
-
 // getControlPlaneProvisioner returns a provisoner that encodes control plane
 // provisioning steps.
 func (p *Provisioner) getControlPlaneProvisioner(driver cd.Driver, namespace string) provisioners.Provisioner {
-	remote := p.getRemoteClusterGenerator(namespace)
+	remote := vcluster.NewRemoteCluster(p.client, namespace, provisioners.VClusterRemoteLabelsFromControlPlane(&p.controlPlane))
+
+	clusterAPIProvisioner := concurrent.New("cluster-api",
+		certmanager.New(driver, &p.controlPlane),
+		clusterapi.New(driver, &p.controlPlane),
+	)
+
+	// Set up any remote targets.
+	clusterAPIProvisioner.OnRemote(remote)
+
+	// Set up deletion semantics.
+	clusterAPIProvisioner.BackgroundDeletion()
 
 	// Provision the vitual cluster, setup the remote cluster then
 	// install cert manager and cluster API into it.
 	return serial.New("control plane",
 		vcluster.New(driver, &p.controlPlane).InNamespace(namespace),
 		remotecluster.New(driver, remote),
-		concurrent.New("cluster-api",
-			certmanager.New(driver, &p.controlPlane).OnRemote(remote).BackgroundDelete(),
-			clusterapi.New(driver, &p.controlPlane).OnRemote(remote).BackgroundDelete(),
-		),
+		clusterAPIProvisioner,
 	)
 }
 
@@ -239,7 +241,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	// Deprovision the namespace and await deletion.
 	// This will clean up all the vcluster gubbins and the CAPI stuff contained within.
-	if err := generic.NewResourceProvisioner(p.client, namespace).Deprovision(ctx); err != nil {
+	if err := resource.New(p.client, namespace).Deprovision(ctx); err != nil {
 		return err
 	}
 

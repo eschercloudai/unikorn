@@ -84,10 +84,7 @@ type Provisioner struct {
 	// driver is the CD driver that implements applications.
 	driver cd.Driver
 
-	// remote is the remote cluster to deploy to.
-	remote provisioners.RemoteCluster
-
-	// remoteNamespace explicitly sets the namespace for the application.
+	// namespace explicitly sets the namespace for the application.
 	namespace string
 
 	// applicationName allows the application name to be overridden.
@@ -99,11 +96,6 @@ type Provisioner struct {
 	// resource is the top level resource an application belongs to, this
 	// is used to derive a unique label set to identify the resource.
 	resource MutuallyExclusiveResource
-
-	// backgroundDelete means we don't care about whether it's deprovisioned
-	// successfully or not, especially useful for flaky apps living in a
-	// remote cluster that going to get terminated anyway.
-	backgroundDelete bool
 }
 
 // New returns a new initialized provisioner object.
@@ -119,13 +111,6 @@ func New(driver cd.Driver, name string, resource MutuallyExclusiveResource) *Pro
 
 // Ensure the Provisioner interface is implemented.
 var _ provisioners.Provisioner = &Provisioner{}
-
-// OnRemote implements the Provision interface.
-func (p *Provisioner) OnRemote(remote provisioners.RemoteCluster) *Provisioner {
-	p.remote = remote
-
-	return p
-}
 
 // InNamespace deploys the application into an explicit namespace.
 func (p *Provisioner) InNamespace(namespace string) *Provisioner {
@@ -146,12 +131,6 @@ func (p *Provisioner) WithApplicationName(name string) *Provisioner {
 // you cannot do it all from the default set of arguments.
 func (p *Provisioner) WithGenerator(generator interface{}) *Provisioner {
 	p.generator = generator
-
-	return p
-}
-
-func (p *Provisioner) BackgroundDelete() *Provisioner {
-	p.backgroundDelete = true
 
 	return p
 }
@@ -268,8 +247,8 @@ func (p *Provisioner) getValues(application *unikornv1.HelmApplication) (interfa
 
 // getClusterID returns the destination cluster name.
 func (p *Provisioner) getClusterID() *cd.ResourceIdentifier {
-	if p.remote != nil {
-		return p.remote.ID()
+	if p.Remote != nil {
+		return p.Remote.ID()
 	}
 
 	return nil
@@ -352,7 +331,7 @@ func (p *Provisioner) generateApplication(ctx context.Context) (*cd.HelmApplicat
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning application", "application", p.Name)
+	log.Info("provisioning application", "application", p.Name, "remote", p.Remote)
 
 	// Convert the generic object type into what's expected by the driver interface.
 	id, err := p.getResourceID()
@@ -385,7 +364,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	if err := p.driver.DeleteHelmApplication(ctx, id, p.backgroundDelete); err != nil {
+	if err := p.driver.DeleteHelmApplication(ctx, id, p.BackgroundDelete); err != nil {
 		return err
 	}
 

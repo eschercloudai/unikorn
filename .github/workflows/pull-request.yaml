@@ -46,6 +46,8 @@ jobs:
       run: make lint
     - name: Build Images
       run: make charts/unikorn/crds images
+    - name: Build Generated Code
+      run: make generate
     - name: Generated Code Checked In
       run: '[[ -z $(git status --porcelain) ]]'
     - name: Unit Test
