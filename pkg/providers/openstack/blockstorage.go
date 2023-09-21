@@ -21,7 +21,7 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/availabilityzones"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -52,28 +52,8 @@ func NewBlockStorageClient(provider Provider) (*BlockStorageClient, error) {
 	return c, nil
 }
 
-type AvailabilityZonePage struct {
-	pagination.SinglePageBase
-}
-
-type AvailabilityZoneInfo struct {
-	Info []AvailabilityZone `json:"availabilityZoneInfo"`
-}
-
-type AvailabilityZone struct {
-	ZoneName  string                `json:"zoneName"`
-	ZoneState AvailabilityZoneState `json:"zoneState"`
-}
-
-type AvailabilityZoneState struct {
-	Available bool `json:"available"`
-}
-
 // AvailabilityZones retrieves block storage availability zones.
-// Obviously this is undocumented by Openstack, and unimplemented by
-// gophercloud, so we have to do it ourselves.
-// TODO: upstream me.
-func (c *BlockStorageClient) AvailabilityZones(ctx context.Context) ([]AvailabilityZone, error) {
+func (c *BlockStorageClient) AvailabilityZones(ctx context.Context) ([]availabilityzones.AvailabilityZone, error) {
 	url := c.client.ServiceURL("os-availability-zone")
 
 	tracer := otel.GetTracerProvider().Tracer(constants.Application)
@@ -81,25 +61,19 @@ func (c *BlockStorageClient) AvailabilityZones(ctx context.Context) ([]Availabil
 	_, span := tracer.Start(ctx, url, trace.WithSpanKind(trace.SpanKindClient))
 	defer span.End()
 
-	pager := pagination.NewPager(c.client, url, func(r pagination.PageResult) pagination.Page {
-		return AvailabilityZonePage{pagination.SinglePageBase(r)}
-	})
-
-	page, err := pager.AllPages()
+	pages, err := availabilityzones.List(c.client).AllPages()
 	if err != nil {
 		return nil, err
 	}
 
-	result := &AvailabilityZoneInfo{}
-
-	//nolint:forcetypeassert
-	if err := (page.(AvailabilityZonePage)).ExtractInto(result); err != nil {
+	result, err := availabilityzones.ExtractAvailabilityZones(pages)
+	if err != nil {
 		return nil, err
 	}
 
-	filtered := []AvailabilityZone{}
+	filtered := []availabilityzones.AvailabilityZone{}
 
-	for _, az := range result.Info {
+	for _, az := range result {
 		if !az.ZoneState.Available {
 			continue
 		}
