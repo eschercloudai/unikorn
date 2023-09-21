@@ -69,6 +69,12 @@ type Customizer interface {
 	Customize(version *string) ([]cd.HelmApplicationField, error)
 }
 
+// PostProvisionHook is an interface that lets an application provisioner run
+// a callback when provisioning has completed successfully.
+type PostProvisionHook interface {
+	PostProvision(ctx context.Context) error
+}
+
 // Provisioner deploys an application that is keyed to a specific resource.
 // For example, ArgoCD dictates that applications be installed in the same
 // namespace, so we use the resource to define a unique set of labels that
@@ -349,6 +355,14 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	log.Info("application provisioned", "application", p.Name)
+
+	if p.generator != nil {
+		if hook, ok := p.generator.(PostProvisionHook); ok {
+			if err := hook.PostProvision(ctx); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }

@@ -103,8 +103,8 @@ func TestApplicationCreateHelm(t *testing.T) {
 	assert.Nil(t, application.Spec.Source.Helm)
 	assert.Equal(t, "in-cluster", application.Spec.Destination.Name)
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
+	assert.True(t, application.Spec.SyncPolicy.Automated.SelfHeal)
+	assert.True(t, application.Spec.SyncPolicy.Automated.Prune)
 	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
 }
 
@@ -183,8 +183,8 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%s: %s\n", valuesKey, valuesValue), application.Spec.Source.Helm.Values)
 	assert.Equal(t, remoteDestination, application.Spec.Destination.Name)
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
+	assert.True(t, application.Spec.SyncPolicy.Automated.SelfHeal)
+	assert.True(t, application.Spec.SyncPolicy.Automated.Prune)
 	assert.Equal(t, 2, len(application.Spec.SyncPolicy.SyncOptions))
 	assert.Equal(t, argoprojv1.CreateNamespace, application.Spec.SyncPolicy.SyncOptions[0])
 	assert.Equal(t, argoprojv1.ServerSideApply, application.Spec.SyncPolicy.SyncOptions[1])
@@ -224,8 +224,8 @@ func TestApplicationCreateGit(t *testing.T) {
 	assert.Nil(t, application.Spec.Source.Helm)
 	assert.Equal(t, "in-cluster", application.Spec.Destination.Name)
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
+	assert.True(t, application.Spec.SyncPolicy.Automated.SelfHeal)
+	assert.True(t, application.Spec.SyncPolicy.Automated.Prune)
 	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
 	assert.Nil(t, application.Spec.IgnoreDifferences)
 }
@@ -268,8 +268,8 @@ func TestApplicationUpdateAndDelete(t *testing.T) {
 	assert.Nil(t, application.Spec.Source.Helm)
 	assert.Equal(t, "in-cluster", application.Spec.Destination.Name)
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.SelfHeal)
-	assert.Equal(t, true, application.Spec.SyncPolicy.Automated.Prune)
+	assert.True(t, application.Spec.SyncPolicy.Automated.SelfHeal)
+	assert.True(t, application.Spec.SyncPolicy.Automated.Prune)
 	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
 
 	assert.ErrorIs(t, tc.driver.DeleteHelmApplication(context.TODO(), id, false), provisioners.ErrYield)

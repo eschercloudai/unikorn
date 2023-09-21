@@ -101,6 +101,11 @@ func applicationLabels(id *cd.ResourceIdentifier) labels.Set {
 	return labels
 }
 
+// Kind returns the driver kind.
+func (d *Driver) Kind() cd.DriverKind {
+	return cd.DriverKindArgoCD
+}
+
 // Client gets the Kubernetes client.
 func (d *Driver) Client() client.Client {
 	return d.kubernetesClient

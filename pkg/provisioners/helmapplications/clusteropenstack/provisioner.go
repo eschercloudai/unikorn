@@ -24,7 +24,6 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 )
 
@@ -40,8 +39,6 @@ const (
 
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
-	provisioners.ProvisionerMeta
-
 	// driver is the CD driver that implments applications.
 	driver cd.Driver
 
@@ -51,36 +48,23 @@ type Provisioner struct {
 	// controlPlanePrefix contains the IP address prefix to add
 	// to the cluster firewall if, required.
 	controlPlanePrefix string
-
-	// namespace defines where to install the application.
-	namespace string
 }
 
 // New returns a new initialized provisioner object.
-func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesCluster, controlPlanePrefix string) *Provisioner {
+func New(ctx context.Context, driver cd.Driver, cluster *unikornv1.KubernetesCluster, controlPlanePrefix string) *application.Provisioner {
 	provisioner := &Provisioner{
-		ProvisionerMeta: provisioners.ProvisionerMeta{
-			Name: cluster.Name,
-		},
 		driver:             driver,
 		cluster:            cluster,
 		controlPlanePrefix: controlPlanePrefix,
 	}
 
-	return provisioner
+	return application.New(driver, applicationName, cluster).WithApplicationName(legacyApplicationName).WithGenerator(provisioner)
 }
 
 // Ensure the Provisioner interface is implemented.
-var _ provisioners.Provisioner = &Provisioner{}
 var _ application.ReleaseNamer = &Provisioner{}
 var _ application.ValuesGenerator = &Provisioner{}
-
-// InNamespace implements the Provision interface.
-func (p *Provisioner) InNamespace(namespace string) *Provisioner {
-	p.namespace = namespace
-
-	return p
-}
+var _ application.PostProvisionHook = &Provisioner{}
 
 // generateMachineHelmValues translates the API's idea of a machine into what's
 // expected by the underlying Helm chart.
@@ -298,47 +282,12 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 	return values, nil
 }
 
+// ReleaseName implements the application.ReleaseNamer interface.
 func (p *Provisioner) ReleaseName() string {
 	return releaseName(p.cluster)
 }
 
-func (p *Provisioner) getProvisioner() provisioners.Provisioner {
-	provisioner := application.New(p.driver, applicationName, p.cluster).WithApplicationName(legacyApplicationName).WithGenerator(p).InNamespace(p.namespace)
-
-	if p.Remote != nil {
-		provisioner.OnRemote(p.Remote)
-	}
-
-	return provisioner
-}
-
-// Provision implements the Provision interface.
-func (p *Provisioner) Provision(ctx context.Context) error {
-	// TODO: this application is special in that everything it creates is a
-	// CRD, so as far as Argo is concerned, everything is healthy and the
-	// check passes instantly, rather than waiting for the CAPI controllers
-	// to do something.  What happens is the task that provisions the Argo
-	// remote cluster will yield, and second time around this will be in
-	// the Progressing state.  If we had a job for the Helm chart that ran
-	// until CAPI did something, that would add in the correct semantics.
-	if err := p.getProvisioner().Provision(ctx); err != nil {
-		return err
-	}
-
-	// TODO: we could have a post reconcile hook?  Make all this evil
-	// go away...
-	if err := p.deleteOrphanedMachineDeployments(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Deprovision implements the Provision interface.
-func (p *Provisioner) Deprovision(ctx context.Context) error {
-	if err := p.getProvisioner().Deprovision(ctx); err != nil {
-		return err
-	}
-
-	return nil
+// PostHook implements the apllication PostProvisionHook interface.
+func (p *Provisioner) PostProvision(ctx context.Context) error {
+	return p.deleteOrphanedMachineDeployments(ctx)
 }

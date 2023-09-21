@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -207,6 +208,10 @@ func deleteForeignResources(ctx context.Context, c client.Client, objects []unst
 //
 //nolint:cyclop
 func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) error {
+	if p.driver.Kind() != cd.DriverKindArgoCD {
+		return nil
+	}
+
 	vc := vcluster.NewControllerRuntimeClient(p.driver.Client())
 
 	vclusterClient, err := vc.Client(ctx, p.cluster.Namespace, false)
