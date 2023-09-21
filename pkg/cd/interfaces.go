@@ -28,6 +28,13 @@ import (
 // or Flux, this is a low level driver interface that configures things
 // like remote clusters and Helm applications.
 type Driver interface {
+	// Kind allows provisioners to make decisions based on the driver
+	// in use e.g. if the CD is broken in some way and needs manual
+	// intervention.  Use of this is discouraged, and pull requests will
+	// be rejected if there's no evidence of an upstream fix to remove
+	// your hack.
+	Kind() DriverKind
+
 	// Client gives you access to the Kubernetes client for when your CD driver
 	// is incapable of working as desired and you need to take manual action.
 	// Think long and hard about whether you need this, it's a hack quite frankly.

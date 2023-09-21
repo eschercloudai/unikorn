@@ -109,3 +109,17 @@ func (mr *MockDriverMockRecorder) DeleteHelmApplication(ctx, id, backgroundDelet
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteHelmApplication", reflect.TypeOf((*MockDriver)(nil).DeleteHelmApplication), ctx, id, backgroundDelete)
 }
+
+// Kind mocks base method.
+func (m *MockDriver) Kind() cd.DriverKind {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Kind")
+	ret0, _ := ret[0].(cd.DriverKind)
+	return ret0
+}
+
+// Kind indicates an expected call of Kind.
+func (mr *MockDriverMockRecorder) Kind() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Kind", reflect.TypeOf((*MockDriver)(nil).Kind))
+}

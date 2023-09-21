@@ -20,6 +20,14 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
+// DriverKind allows the provisioners to make CD specific hacks for when
+// the underlying provider is broken in some way.
+type DriverKind string
+
+const (
+	DriverKindArgoCD DriverKind = "argocd"
+)
+
 // ResourceIdentifierLabel is a single key/value pair that can
 // be used to specify context in a resource identifier.
 type ResourceIdentifierLabel struct {

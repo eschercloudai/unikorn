@@ -317,12 +317,15 @@ var mutatorValues = map[string]string{
 }
 
 // mutator does just that allows modifications of the application.
-type mutator struct{}
+type mutator struct {
+	postProvisionCalled bool
+}
 
 var _ application.ReleaseNamer = &mutator{}
 var _ application.Paramterizer = &mutator{}
 var _ application.ValuesGenerator = &mutator{}
 var _ application.Customizer = &mutator{}
+var _ application.PostProvisionHook = &mutator{}
 
 func (m *mutator) ReleaseName() string {
 	return "sentinel"
@@ -352,6 +355,12 @@ func (m *mutator) Customize(version *string) ([]cd.HelmApplicationField, error) 
 	}
 
 	return differences, nil
+}
+
+func (m *mutator) PostProvision(_ context.Context) error {
+	m.postProvisionCalled = true
+
+	return nil
 }
 
 // TestApplicationCreateMutate tests that given the requested input the provisioner
@@ -408,12 +417,14 @@ func TestApplicationCreateMutate(t *testing.T) {
 
 	driver := mock.NewMockDriver(c)
 	driver.EXPECT().Client().Return(tc.client)
-	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
+	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(nil)
 
 	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(driver, applicationName, owner).WithGenerator(&mutator{}).InNamespace(namespace)
+	mutator := &mutator{}
+	provisioner := application.New(driver, applicationName, owner).WithGenerator(mutator).InNamespace(namespace)
 
-	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
+	assert.NoError(t, provisioner.Provision(ctx))
+	assert.True(t, mutator.postProvisionCalled)
 }
 
 // TestApplicationDeleteNotFound tests the provisioner returns nil when an application
