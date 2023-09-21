@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -28,8 +29,9 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/eschercloudai/unikorn/pkg/readiness"
+	"github.com/eschercloudai/unikorn/pkg/util/retry"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -71,27 +73,91 @@ metadata:
 `
 )
 
+var (
+	// ErrConditionFormat means the formatting of the condition is wrong,
+	// these are loosly defined, but there are some conventions.
+	ErrConditionFormat = errors.New("status condition incorrectly formatted")
+
+	// ErrConditionMissing means the condition isn't present.
+	ErrConditionMissing = errors.New("status condition not found")
+
+	// ErrConditionStatus means the condition has the wrong truthiness.
+	ErrConditionStatus = errors.New("status condition incorrect status")
+
+	ErrDaemonSetUnready = errors.New("daemonset readiness doesn't match desired")
+)
+
 // waitCondition waits for a condtion to be true on a generic resource.
-func waitCondition(c context.Context, client dynamic.Interface, group, version, resource, namespace, name, conditionType string) {
+func waitCondition(ctx context.Context, client dynamic.Interface, group, version, resource, namespace, name, conditionType string) {
 	gvr := schema.GroupVersionResource{
 		Group:    group,
 		Version:  version,
 		Resource: resource,
 	}
 
-	checker := readiness.NewStatusCondition(client, gvr, namespace, name, conditionType)
+	callback := func() error {
+		object, err := client.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 
-	if err := readiness.NewRetry(checker).Check(c); err != nil {
+		conditions, _, err := unstructured.NestedSlice(object.Object, "status", "conditions")
+		if err != nil {
+			return fmt.Errorf("%w: conditions lookup error: %s", ErrConditionFormat, err.Error())
+		}
+
+		for i := range conditions {
+			condition, ok := conditions[i].(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("%w: condition type assertion error", ErrConditionFormat)
+			}
+
+			t, _, err := unstructured.NestedString(condition, "type")
+			if err != nil {
+				return fmt.Errorf("%w: condition type error: %s", ErrConditionFormat, err.Error())
+			}
+
+			if t != conditionType {
+				continue
+			}
+
+			s, _, err := unstructured.NestedString(condition, "status")
+			if err != nil {
+				return fmt.Errorf("%w: condition status error: %s", ErrConditionFormat, err.Error())
+			}
+
+			if s != "True" {
+				return ErrConditionStatus
+			}
+
+			return nil
+		}
+
+		return ErrConditionMissing
+	}
+
+	if err := retry.Forever().DoWithContext(ctx, callback); err != nil {
 		panic(err)
 	}
 }
 
 // waitDaemonSetReady performs a type specific wait function until the desired and actual
 // number of rready processes match.
-func waitDaemonSetReady(c context.Context, client kubernetes.Interface, namespace, name string) {
-	checker := readiness.NewDaemonSet(client, namespace, name)
+func waitDaemonSetReady(ctx context.Context, client kubernetes.Interface, namespace, name string) {
+	callback := func() error {
+		daemonset, err := client.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("daemonset get error: %w", err)
+		}
 
-	if err := readiness.NewRetry(checker).Check(c); err != nil {
+		if daemonset.Status.NumberReady != daemonset.Status.DesiredNumberScheduled {
+			return fmt.Errorf("%w: status mismatch", ErrDaemonSetUnready)
+		}
+
+		return nil
+	}
+
+	if err := retry.Forever().DoWithContext(ctx, callback); err != nil {
 		panic(err)
 	}
 }

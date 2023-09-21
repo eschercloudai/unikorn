@@ -77,13 +77,3 @@ type ManagerProvisioner interface {
 	// the provisioner will have a type specific version.
 	Object() client.Object
 }
-
-// ReadinessCheck is an abstract way of reasoning about the readiness of
-// a component installed by a provisioner.  It's a way of providing a
-// barrier essentially, as one thing may depend on another being deployed
-// in order to function correctly.
-type ReadinessCheck interface {
-	// Check performs a single iteration of a readiness check.
-	// Retries are delegated to the caller.
-	Check(context.Context) error
-}
