@@ -18,6 +18,8 @@ package options
 
 import (
 	"github.com/spf13/pflag"
+
+	"github.com/eschercloudai/unikorn/pkg/cd"
 )
 
 // Options defines common controller options.
@@ -26,8 +28,15 @@ type Options struct {
 	// concurrently.  Be warned, this will inrcrease memory utilization
 	// and may need to update the Helm limits.
 	MaxConcurrentReconciles int
+
+	// CDDriver defines the continuous-delivery backend driver to use
+	// to manage applications.
+	CDDriver cd.DriverKindFlag
 }
 
 func (o *Options) AddFlags(flags *pflag.FlagSet) {
+	o.CDDriver.Kind = cd.DriverKindArgoCD
+
 	flags.IntVar(&o.MaxConcurrentReconciles, "--max-concurrency", 16, "Maximum number of requests to process at the same time")
+	flags.Var(&o.CDDriver, "--cd-driver", "CD backend driver to use from [argocd]")
 }

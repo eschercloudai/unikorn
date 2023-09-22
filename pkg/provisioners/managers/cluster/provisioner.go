@@ -21,7 +21,6 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
-	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/conditional"
@@ -54,14 +53,18 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
+	// driver is the CD driver that provisions and deprovisions applications.
+	driver cd.Driver
+
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster unikornv1.KubernetesCluster
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client) provisioners.ManagerProvisioner {
+func New(client client.Client, driver cd.Driver) provisioners.ManagerProvisioner {
 	return &Provisioner{
 		client: client,
+		driver: driver,
 	}
 }
 
@@ -83,7 +86,7 @@ func (p *Provisioner) getRemoteCluster(ctx context.Context) (*clusteropenstack.R
 	return clusteropenstack.NewRemoteCluster(client, &p.cluster), nil
 }
 
-func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (provisioners.Provisioner, error) {
+func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
 	controlPlaneRemote := vcluster.NewRemoteCluster(p.client, p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
 
 	controlPlanePrefix, err := util.GetNATPrefix(ctx)
@@ -96,42 +99,42 @@ func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (pro
 		return nil, err
 	}
 
-	clusterProvisioner := clusteropenstack.New(ctx, driver, &p.cluster, controlPlanePrefix).InNamespace(p.cluster.Name)
+	clusterProvisioner := clusteropenstack.New(ctx, p.driver, &p.cluster, controlPlanePrefix).InNamespace(p.cluster.Name)
 
 	// These applications are required to get the cluster up and running, they must
 	// tolerate control plane taints, be scheduled onto control plane nodes and allow
 	// scale from zero.
 	bootstrapProvisioner := concurrent.New("cluster bootstrap",
-		cilium.New(driver, &p.cluster),
-		openstackcloudprovider.New(driver, &p.cluster),
+		cilium.New(p.driver, &p.cluster),
+		openstackcloudprovider.New(p.driver, &p.cluster),
 	)
 
 	clusterAutoscalerProvisioner := conditional.New("cluster-autoscaler",
 		p.cluster.AutoscalingEnabled,
 		concurrent.New("cluster-autoscaler",
-			clusterautoscaler.New(driver, &p.cluster).InNamespace(p.cluster.Name),
-			clusterautoscaleropenstack.New(driver, &p.cluster).InNamespace(p.cluster.Name),
+			clusterautoscaler.New(p.driver, &p.cluster).InNamespace(p.cluster.Name),
+			clusterautoscaleropenstack.New(p.driver, &p.cluster).InNamespace(p.cluster.Name),
 		),
 	)
 
 	certManagerProvisioner := serial.New("cert-manager",
-		certmanager.New(driver, &p.cluster),
-		certmanagerissuers.New(driver, &p.cluster),
+		certmanager.New(p.driver, &p.cluster),
+		certmanagerissuers.New(p.driver, &p.cluster),
 	)
 
 	addonsProvisioner := serial.New("cluster add-ons",
 		concurrent.New("cluster add-ons wave 1",
-			openstackplugincindercsi.New(driver, &p.cluster),
-			metricsserver.New(driver, &p.cluster),
-			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(driver, &p.cluster)),
-			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New(driver, &p.cluster)),
+			openstackplugincindercsi.New(p.driver, &p.cluster),
+			metricsserver.New(p.driver, &p.cluster),
+			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(p.driver, &p.cluster)),
+			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New(p.driver, &p.cluster)),
 			conditional.New("cert-manager", p.cluster.CertManagerEnabled, certManagerProvisioner),
-			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(driver, &p.cluster)),
-			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(driver, &p.cluster)),
+			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(p.driver, &p.cluster)),
+			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(p.driver, &p.cluster)),
 		),
 		concurrent.New("cluster add-ons wave 2",
 			// TODO: this hack where it needs the remote is pretty ugly.
-			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(driver, &p.cluster, clusterRemote)),
+			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(p.driver, &p.cluster, clusterRemote)),
 		),
 	)
 
@@ -155,7 +158,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (pro
 		concurrent.New("kubernetes cluster",
 			clusterProvisioner,
 			serial.New("cluster bootstrap",
-				remotecluster.New(driver, clusterRemote),
+				remotecluster.New(p.driver, clusterRemote),
 				bootstrapProvisioner,
 			),
 		),
@@ -168,14 +171,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context, driver cd.Driver) (pro
 
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
-	client, err := argocd.NewInCluster(ctx, p.client)
-	if err != nil {
-		return err
-	}
-
-	driver := argocd.NewDriver(p.client, client)
-
-	provisioner, err := p.getProvisioner(ctx, driver)
+	provisioner, err := p.getProvisioner(ctx)
 	if err != nil {
 		return err
 	}
@@ -189,14 +185,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
-	client, err := argocd.NewInCluster(ctx, p.client)
-	if err != nil {
-		return err
-	}
-
-	driver := argocd.NewDriver(p.client, client)
-
-	provisioner, err := p.getProvisioner(ctx, driver)
+	provisioner, err := p.getProvisioner(ctx)
 	if err != nil {
 		return err
 	}

@@ -18,7 +18,6 @@ package flags
 
 import (
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -27,12 +26,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-)
+	"github.com/eschercloudai/unikorn/pkg/errors"
 
-var (
-	// ErrParseFlag is raised when flag parsing fails.
-	ErrParseFlag = errors.New("flag was unable to be parsed")
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // SemverFlag provides parsing and type checking of semantic versions.
@@ -58,7 +54,7 @@ func (s *SemverFlag) Set(in string) error {
 	}
 
 	if !ok {
-		return fmt.Errorf("%w: flag must match v1.2.3", ErrParseFlag)
+		return fmt.Errorf("%w: flag must match v1.2.3", errors.ErrParseFlag)
 	}
 
 	s.Semver = in

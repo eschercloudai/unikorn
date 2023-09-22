@@ -18,6 +18,7 @@ package controlplane
 
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/managers/common"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/controlplane"
 
@@ -36,8 +37,8 @@ type Factory struct{}
 var _ common.ControllerFactory = &Factory{}
 
 // Reconciler returns a new reconciler instance.
-func (*Factory) Reconciler(manager manager.Manager) reconcile.Reconciler {
-	return common.NewReconciler(manager.GetClient(), controlplane.New)
+func (*Factory) Reconciler(manager manager.Manager, driverRunnable cd.DriverRunnable) reconcile.Reconciler {
+	return common.NewReconciler(manager.GetClient(), driverRunnable, controlplane.New)
 }
 
 // RegisterWatches adds any watches that would trigger a reconcile.

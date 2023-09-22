@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
@@ -41,21 +42,25 @@ var (
 )
 
 // ProvisionerCreateFunc provides a type agnosic method to create a root provisioner.
-type ProvisionerCreateFunc func(client.Client) provisioners.ManagerProvisioner
+type ProvisionerCreateFunc func(client.Client, cd.Driver) provisioners.ManagerProvisioner
 
 // Reconciler is a generic reconciler for all manager types.
 type Reconciler struct {
 	// client is the Kubernetes client.
 	client client.Client
 
+	// driverRunnable gives access the CD driver that provisions and deprovisions applications.
+	driverRunnable cd.DriverRunnable
+
 	// createProvisioner provides a type agnosic method to create a root provisioner.
 	createProvisioner ProvisionerCreateFunc
 }
 
 // NewReconciler creates a new reconciler.
-func NewReconciler(client client.Client, createProvisioner ProvisionerCreateFunc) *Reconciler {
+func NewReconciler(client client.Client, driverRunnable cd.DriverRunnable, createProvisioner ProvisionerCreateFunc) *Reconciler {
 	return &Reconciler{
 		client:            client,
+		driverRunnable:    driverRunnable,
 		createProvisioner: createProvisioner,
 	}
 }
@@ -69,7 +74,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 
-	provisioner := r.createProvisioner(r.client)
+	provisioner := r.createProvisioner(r.client, r.driverRunnable.Driver())
 
 	object := provisioner.Object()
 

@@ -22,6 +22,7 @@ import (
 	"context"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // Driver is an abstraction around CD tools such as ArgoCD
@@ -51,4 +52,20 @@ type Driver interface {
 
 	// DeleteCluster deletes an existing cluster.
 	DeleteCluster(ctx context.Context, id *ResourceIdentifier) error
+}
+
+// DriverRunnable provides access to the driver from the reconcilers.
+// Due to how controller-runtime works we want to register the driver
+// with the reconciler, but that may require the use of a client, and
+// that's not running until after the reconciler has been registered
+// and Start() is called.  But, what we can do is register a Runnable
+// with the manager that will get invoked after cache syncing, and
+// before any reconciler is called.
+type DriverRunnable interface {
+	// Must implment manager.Runnable for late initialisation.
+	manager.Runnable
+	manager.LeaderElectionRunnable
+
+	// Driver allows access to the driver from the reconciler.
+	Driver() Driver
 }
