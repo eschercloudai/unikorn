@@ -24,7 +24,6 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
-	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanager"
@@ -68,14 +67,18 @@ type Provisioner struct {
 	// client provides access to Kubernetes.
 	client client.Client
 
+	// driver is the CD driver that provisions and deprovisions applications.
+	driver cd.Driver
+
 	// controlPlane is the control plane CR this deployment relates to
 	controlPlane unikornv1.ControlPlane
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client) provisioners.ManagerProvisioner {
+func New(client client.Client, driver cd.Driver) provisioners.ManagerProvisioner {
 	provisioner := &Provisioner{
 		client: client,
+		driver: driver,
 	}
 
 	return provisioner
@@ -146,12 +149,12 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 
 // getControlPlaneProvisioner returns a provisoner that encodes control plane
 // provisioning steps.
-func (p *Provisioner) getControlPlaneProvisioner(driver cd.Driver, namespace string) provisioners.Provisioner {
+func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.Provisioner {
 	remote := vcluster.NewRemoteCluster(p.client, namespace, provisioners.VClusterRemoteLabelsFromControlPlane(&p.controlPlane))
 
 	clusterAPIProvisioner := concurrent.New("cluster-api",
-		certmanager.New(driver, &p.controlPlane),
-		clusterapi.New(driver, &p.controlPlane),
+		certmanager.New(p.driver, &p.controlPlane),
+		clusterapi.New(p.driver, &p.controlPlane),
 	)
 
 	// Set up any remote targets.
@@ -163,8 +166,8 @@ func (p *Provisioner) getControlPlaneProvisioner(driver cd.Driver, namespace str
 	// Provision the vitual cluster, setup the remote cluster then
 	// install cert manager and cluster API into it.
 	return serial.New("control plane",
-		vcluster.New(driver, &p.controlPlane).InNamespace(namespace),
-		remotecluster.New(driver, remote),
+		vcluster.New(p.driver, &p.controlPlane).InNamespace(namespace),
+		remotecluster.New(p.driver, remote),
 		clusterAPIProvisioner,
 	)
 }
@@ -183,20 +186,13 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	client, err := argocd.NewInCluster(ctx, p.client)
-	if err != nil {
-		return err
-	}
-
-	driver := argocd.NewDriver(p.client, client)
-
 	// Indicate the namespace is created before provisioning the rest.  This will inevitably
 	// yield as the components take some time to become healthy.  It does however give
 	// clusters an opportunity to be provisioned before the CP is fully up, reducing
 	// latency at the front-end.
 	p.controlPlane.Status.Namespace = namespace.Name
 
-	if err := p.getControlPlaneProvisioner(driver, namespace.Name).Provision(ctx); err != nil {
+	if err := p.getControlPlaneProvisioner(namespace.Name).Provision(ctx); err != nil {
 		return err
 	}
 
@@ -227,15 +223,8 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	client, err := argocd.NewInCluster(ctx, p.client)
-	if err != nil {
-		return err
-	}
-
-	driver := argocd.NewDriver(p.client, client)
-
 	// Remove the control plane.
-	if err := p.getControlPlaneProvisioner(driver, namespace.Name).Deprovision(ctx); err != nil {
+	if err := p.getControlPlaneProvisioner(namespace.Name).Deprovision(ctx); err != nil {
 		return err
 	}
 

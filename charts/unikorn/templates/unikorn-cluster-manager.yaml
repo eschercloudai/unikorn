@@ -55,7 +55,7 @@ rules:
   - watch
   - patch
   - delete
-# V-cluster integration (access to kubeconfig).
+# ArgoCD integration (access to API secret).
 - apiGroups:
   - ""
   resources:

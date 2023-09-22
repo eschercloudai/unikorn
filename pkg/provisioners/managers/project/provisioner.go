@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/resource"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
@@ -47,7 +48,7 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client) provisioners.ManagerProvisioner {
+func New(client client.Client, _ cd.Driver) provisioners.ManagerProvisioner {
 	return &Provisioner{
 		client: client,
 	}

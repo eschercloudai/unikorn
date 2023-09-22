@@ -123,3 +123,68 @@ func (mr *MockDriverMockRecorder) Kind() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Kind", reflect.TypeOf((*MockDriver)(nil).Kind))
 }
+
+// MockDriverRunnable is a mock of DriverRunnable interface.
+type MockDriverRunnable struct {
+	ctrl     *gomock.Controller
+	recorder *MockDriverRunnableMockRecorder
+}
+
+// MockDriverRunnableMockRecorder is the mock recorder for MockDriverRunnable.
+type MockDriverRunnableMockRecorder struct {
+	mock *MockDriverRunnable
+}
+
+// NewMockDriverRunnable creates a new mock instance.
+func NewMockDriverRunnable(ctrl *gomock.Controller) *MockDriverRunnable {
+	mock := &MockDriverRunnable{ctrl: ctrl}
+	mock.recorder = &MockDriverRunnableMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockDriverRunnable) EXPECT() *MockDriverRunnableMockRecorder {
+	return m.recorder
+}
+
+// Driver mocks base method.
+func (m *MockDriverRunnable) Driver() cd.Driver {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Driver")
+	ret0, _ := ret[0].(cd.Driver)
+	return ret0
+}
+
+// Driver indicates an expected call of Driver.
+func (mr *MockDriverRunnableMockRecorder) Driver() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Driver", reflect.TypeOf((*MockDriverRunnable)(nil).Driver))
+}
+
+// NeedLeaderElection mocks base method.
+func (m *MockDriverRunnable) NeedLeaderElection() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NeedLeaderElection")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// NeedLeaderElection indicates an expected call of NeedLeaderElection.
+func (mr *MockDriverRunnableMockRecorder) NeedLeaderElection() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NeedLeaderElection", reflect.TypeOf((*MockDriverRunnable)(nil).NeedLeaderElection))
+}
+
+// Start mocks base method.
+func (m *MockDriverRunnable) Start(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Start", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Start indicates an expected call of Start.
+func (mr *MockDriverRunnableMockRecorder) Start(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockDriverRunnable)(nil).Start), arg0)
+}

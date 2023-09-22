@@ -61,12 +61,10 @@ var _ cd.Driver = &Driver{}
 
 // NewDriver creates a new ArgoCD driver.
 func NewDriver(kubernetesClient client.Client, argoCDClient Client) *Driver {
-	driver := &Driver{
+	return &Driver{
 		argoCDClient:     argoCDClient,
 		kubernetesClient: kubernetesClient,
 	}
-
-	return driver
 }
 
 // clusterName generates a cluster name from a cluster identifier.
