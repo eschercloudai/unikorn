@@ -400,7 +400,6 @@ spec:
                       reply on this behaviour.
                     type: string
                 required:
-                - caCert
                 - cloud
                 - cloudConfig
                 - externalNetworkId

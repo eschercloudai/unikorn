@@ -40,12 +40,6 @@ type Options struct {
 	// Endpoint is the Keystone Endpoint.
 	Endpoint string
 
-	// CACertificate is ONLY used in testing, in production we simply Dial the
-	// endpoint and extract it as this will actually pickup CA rotations.
-	// Having this set will inhibit that behaviour.  This is a PEM encoded
-	// certificate if you were to every use it...
-	CACertificate []byte
-
 	// Domain is the default domain users live under.
 	Domain string
 
@@ -83,10 +77,6 @@ func (a *Authenticator) Endpoint() string {
 // TODO: It stands to reason that the user should supply this in future.
 func (a *Authenticator) Domain() string {
 	return a.options.Domain
-}
-
-func (a *Authenticator) CACertificate() []byte {
-	return a.options.CACertificate
 }
 
 // OIDCTokenExchangeResult is what's returned by Keystone when we give it an OIDC

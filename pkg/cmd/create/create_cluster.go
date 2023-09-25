@@ -32,7 +32,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/completion"
 	"github.com/eschercloudai/unikorn/pkg/cmd/util/flags"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	uutil "github.com/eschercloudai/unikorn/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -244,14 +243,6 @@ func (o *createClusterOptions) completeOpenstackConfig() error {
 	}
 
 	o.clouds = filteredCloudsYaml
-
-	// Work out the correct CA to use.
-	ca, err := uutil.GetURLCACertificate(cloud.AuthInfo.AuthURL)
-	if err != nil {
-		return err
-	}
-
-	o.caCert = ca
 
 	return nil
 }

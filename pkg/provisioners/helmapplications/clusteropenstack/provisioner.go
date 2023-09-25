@@ -199,10 +199,13 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 	openstackValues := map[string]interface{}{
 		"cloud":                *p.cluster.Spec.Openstack.Cloud,
 		"cloudsYAML":           base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CloudConfig),
-		"ca":                   base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert),
 		"computeFailureDomain": *p.cluster.Spec.Openstack.FailureDomain,
 		"volumeFailureDomain":  *volumeFailureDomain,
 		"externalNetworkID":    *p.cluster.Spec.Openstack.ExternalNetworkID,
+	}
+
+	if p.cluster.Spec.Openstack.CACert != nil {
+		openstackValues["ca"] = base64.StdEncoding.EncodeToString(*p.cluster.Spec.Openstack.CACert)
 	}
 
 	if p.cluster.Spec.Openstack.SSHKeyName != nil {

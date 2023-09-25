@@ -31,7 +31,6 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/providers/openstack"
-	"github.com/eschercloudai/unikorn/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -255,17 +254,6 @@ func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlP
 		return err
 	}
 
-	// NOTE: this is a testing hack, we expect the inner code to be executed all the time.
-	ca := c.authenticator.Keystone.CACertificate()
-	if ca == nil {
-		dynamicCA, err := util.GetURLCACertificate(c.authenticator.Keystone.Endpoint())
-		if err != nil {
-			return errors.OAuth2ServerError("unable to get endpoint CA certificate").WithError(err)
-		}
-
-		ca = dynamicCA
-	}
-
 	clientConfig, cloud, err := c.createClientConfig(controlPlane, options.Name)
 	if err != nil {
 		return err
@@ -276,7 +264,8 @@ func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlP
 		return err
 	}
 
-	cluster.Spec.Openstack.CACert = &ca
+	// TODO: should allow a private/self-signed CA via the API, or perhaps provide a
+	// default.
 	cluster.Spec.Openstack.Cloud = &cloud
 	cluster.Spec.Openstack.CloudConfig = &clientConfig
 
