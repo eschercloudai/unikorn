@@ -8,7 +8,7 @@ on:
 env:
   GO_VERSION: 1.21.1
 jobs:
-  Static:
+  License:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -18,15 +18,9 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Touch
-      run: make touch
     - name: License Checker
-      run: make license
-    - name: Validate OpenAPI Schema
-      run: make validate
-    - name: Validate documentation
-      run: sudo apt -y install wbritish && make validate-docs
-  Runtime:
+      run: make touch license
+  OpenAPI-Schema:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -36,20 +30,69 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Install Helm
-      uses: azure/setup-helm@v3
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Touch
-      run: make touch
+    - name: Validate OpenAPI Schema
+      run: make touch validate
+  Documentation:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Validate documentation
+      run: sudo apt -y install wbritish && make touch validate-docs
+  Modules:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Install Modules
+      run: go mod download
+  Lint:
+    runs-on: ubuntu-latest
+    needs: Modules
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
     - name: Golang CI/Helm Lint
-      run: make lint
+      run: make touch lint
+  Build:
+    runs-on: ubuntu-latest
+    needs: Modules
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
     - name: Build Images
-      run: make charts/unikorn/crds images
-    - name: Build Generated Code
-      run: make generate
-    - name: Generated Code Checked In
-      run: '[[ -z $(git status --porcelain) ]]'
+      run: make touch images
+  Unit-Test:
+    runs-on: ubuntu-latest
+    needs: Modules
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
     - name: Unit Test
       run: make test-unit
     - name: Archive code coverage results
@@ -57,3 +100,18 @@ jobs:
       with:
         name: code-coverage
         path: cover.html
+  Generated-Code:
+    runs-on: ubuntu-latest
+    needs: Modules
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    - name: Build Generated Code
+      run: make generate charts/unikorn/crds generated pkg/server/generated
+    - name: Generated Code Checked In
+      run: '[[ -z $(git status --porcelain) ]]'

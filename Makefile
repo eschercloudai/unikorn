@@ -193,7 +193,7 @@ $(SRVGENDIR): $(SRVSCHEMA)
 # spurious rebuilds of generated content.  Call this to prevent that.
 .PHONY: touch
 touch:
-	touch $(CRDDIR) $(GENDIR) pkg/apis/unikorn/v1alpha1/zz_generated.deepcopy.go
+	touch $(CRDDIR) $(GENDIR) $(SRVGENDIR) pkg/apis/unikorn/v1alpha1/zz_generated.deepcopy.go
 
 # Perform linting.
 # This must pass or you will be denied by CI.
