@@ -47,6 +47,10 @@ type PublicKeyVar struct {
 
 // Set accepts a base64 encoded PEM public key and tries to decode it.
 func (v *PublicKeyVar) Set(s string) error {
+	if s == "" {
+		return nil
+	}
+
 	pemString, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return err
@@ -85,9 +89,10 @@ func (v *PublicKeyVar) Type() string {
 }
 
 type Options struct {
-	ComputeOptions    openstack.ComputeOptions
-	Key               PublicKeyVar
-	ServerGroupPolicy string
+	ComputeOptions     openstack.ComputeOptions
+	Key                PublicKeyVar
+	ServerGroupPolicy  string
+	ValidateProperties bool
 	// applicationCredentialRoles sets the roles an application credential
 	// is granted on creation.
 	ApplicationCredentialRoles []string
@@ -96,6 +101,7 @@ type Options struct {
 func (o *Options) AddFlags(f *pflag.FlagSet) {
 	o.ComputeOptions.AddFlags(f)
 	f.Var(&o.Key, "image-signing-key", "Key used to verify valid images for use with the platform")
+	f.BoolVar(&o.ValidateProperties, "validate-image-properties", true, "Whether to validate image properties for a preloaded K8s and GPU driver version")
 	f.StringVar(&o.ServerGroupPolicy, "server-group-policy", "soft-anti-affinity", "Scheduling policy to use for server groups")
 	f.StringSliceVar(&o.ApplicationCredentialRoles, "application-credential-roles", nil, "A role to be added to application credentials on creation.  May be specified more than once.")
 }

@@ -55,36 +55,44 @@ func NewImageClient(provider Provider) (*ImageClient, error) {
 	return c, nil
 }
 
+func validateProperties(image *images.Image) bool {
+	return image.Properties["k8s"] != nil
+}
+
 // verifyImage asserts the image is trustworthy for use with our goodselves.
 func verifyImage(image *images.Image, key *ecdsa.PublicKey) bool {
 	if image.Properties == nil {
 		return false
 	}
 
-	// These will be digitally signed by Baski when created, so we only trust
-	// those images.
-	signatureRaw, ok := image.Properties["digest"]
-	if !ok {
-		return false
+	if key != nil {
+		// These will be digitally signed by Baski when created, so we only trust
+		// those images.
+		signatureRaw, ok := image.Properties["digest"]
+		if !ok {
+			return false
+		}
+
+		signatureB64, ok := signatureRaw.(string)
+		if !ok {
+			return false
+		}
+
+		signature, err := base64.StdEncoding.DecodeString(signatureB64)
+		if err != nil {
+			return false
+		}
+
+		hash := sha256.Sum256([]byte(image.ID))
+
+		return ecdsa.VerifyASN1(key, hash[:], signature)
 	}
 
-	signatureB64, ok := signatureRaw.(string)
-	if !ok {
-		return false
-	}
-
-	signature, err := base64.StdEncoding.DecodeString(signatureB64)
-	if err != nil {
-		return false
-	}
-
-	hash := sha256.Sum256([]byte(image.ID))
-
-	return ecdsa.VerifyASN1(key, hash[:], signature)
+	return true
 }
 
 // Images returns a list of images.
-func (c *ImageClient) Images(ctx context.Context, key *ecdsa.PublicKey) ([]images.Image, error) {
+func (c *ImageClient) Images(ctx context.Context, key *ecdsa.PublicKey, validate bool) ([]images.Image, error) {
 	tracer := otel.GetTracerProvider().Tracer(constants.Application)
 
 	_, span := tracer.Start(ctx, "/imageservice/v2/images", trace.WithSpanKind(trace.SpanKindClient))
@@ -107,6 +115,10 @@ func (c *ImageClient) Images(ctx context.Context, key *ecdsa.PublicKey) ([]image
 		image := result[i]
 
 		if image.Status != "active" {
+			continue
+		}
+
+		if validate && !validateProperties(&image) {
 			continue
 		}
 
