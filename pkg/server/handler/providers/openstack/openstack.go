@@ -436,10 +436,10 @@ func (w imageSortWrapper) Swap(i, j int) {
 func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, error) {
 	client, err := o.ImageClient(r)
 	if err != nil {
-		return nil, errors.OAuth2ServerError("failed get compute client").WithError(err)
+		return nil, errors.OAuth2ServerError("failed get image client").WithError(err)
 	}
 
-	result, err := client.Images(r.Context(), o.options.Key.key)
+	result, err := client.Images(r.Context(), o.options.Key.key, o.options.Properties)
 	if err != nil {
 		return nil, covertError(err)
 	}
@@ -447,16 +447,8 @@ func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, erro
 	images := make(generated.OpenstackImages, len(result))
 
 	for i, image := range result {
-		// images are pre-filtered by the provider library, so these keys exist.
-		kubernetesVersion, ok := image.Properties["k8s"].(string)
-		if !ok {
-			return nil, errors.OAuth2ServerError("failed parse image kubernetes version")
-		}
-
-		nvidiaDriverVersion, ok := image.Properties["gpu"].(string)
-		if !ok {
-			return nil, errors.OAuth2ServerError("failed parse image gpu driver version")
-		}
+		kubernetesVersion, _ := image.Properties["k8s"].(string)
+		nvidiaDriverVersion, _ := image.Properties["gpu"].(string)
 
 		images[i].Id = image.ID
 		images[i].Name = image.Name

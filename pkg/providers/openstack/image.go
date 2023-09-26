@@ -27,8 +27,10 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/exp/slices"
 
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/util"
 )
 
 // ImageClient wraps the generic client because gophercloud is unsafe.
@@ -55,36 +57,50 @@ func NewImageClient(provider Provider) (*ImageClient, error) {
 	return c, nil
 }
 
+func validateProperties(image *images.Image, required []string) bool {
+	for _, r := range required {
+		if !slices.Contains(util.Keys(image.Properties), r) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // verifyImage asserts the image is trustworthy for use with our goodselves.
 func verifyImage(image *images.Image, key *ecdsa.PublicKey) bool {
 	if image.Properties == nil {
 		return false
 	}
 
-	// These will be digitally signed by Baski when created, so we only trust
-	// those images.
-	signatureRaw, ok := image.Properties["digest"]
-	if !ok {
-		return false
+	if key != nil {
+		// These will be digitally signed by Baski when created, so we only trust
+		// those images.
+		signatureRaw, ok := image.Properties["digest"]
+		if !ok {
+			return false
+		}
+
+		signatureB64, ok := signatureRaw.(string)
+		if !ok {
+			return false
+		}
+
+		signature, err := base64.StdEncoding.DecodeString(signatureB64)
+		if err != nil {
+			return false
+		}
+
+		hash := sha256.Sum256([]byte(image.ID))
+
+		return ecdsa.VerifyASN1(key, hash[:], signature)
 	}
 
-	signatureB64, ok := signatureRaw.(string)
-	if !ok {
-		return false
-	}
-
-	signature, err := base64.StdEncoding.DecodeString(signatureB64)
-	if err != nil {
-		return false
-	}
-
-	hash := sha256.Sum256([]byte(image.ID))
-
-	return ecdsa.VerifyASN1(key, hash[:], signature)
+	return true
 }
 
 // Images returns a list of images.
-func (c *ImageClient) Images(ctx context.Context, key *ecdsa.PublicKey) ([]images.Image, error) {
+func (c *ImageClient) Images(ctx context.Context, key *ecdsa.PublicKey, properties []string) ([]images.Image, error) {
 	tracer := otel.GetTracerProvider().Tracer(constants.Application)
 
 	_, span := tracer.Start(ctx, "/imageservice/v2/images", trace.WithSpanKind(trace.SpanKindClient))
@@ -108,6 +124,12 @@ func (c *ImageClient) Images(ctx context.Context, key *ecdsa.PublicKey) ([]image
 
 		if image.Status != "active" {
 			continue
+		}
+
+		if properties != nil {
+			if !validateProperties(&image, properties) {
+				continue
+			}
 		}
 
 		if !verifyImage(&image, key) {
