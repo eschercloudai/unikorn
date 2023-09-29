@@ -111,3 +111,18 @@ const (
 	// a go.
 	DefaultYieldTimeout = 10 * time.Second
 )
+
+// LabelPriorities assigns a priority to the labels for sorting.  Most things
+// use the labels to uniquely identify a resource.  For example, when we create
+// a remote cluster in ArgoCD we use a tuple of project, control plane and optionally
+// the cluster.  This gives a unique identifier given projects and control planes
+// provide a namespace abstraction, and a deterministic one as the order is defined.
+// This function is required because labels are given as a map, and thus are
+// no-deterministically ordered when iterating in go.
+func LabelPriorities() []string {
+	return []string{
+		KubernetesClusterLabel,
+		ControlPlaneLabel,
+		ProjectLabel,
+	}
+}

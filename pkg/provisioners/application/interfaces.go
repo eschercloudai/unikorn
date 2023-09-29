@@ -19,24 +19,18 @@ package application
 import (
 	"context"
 
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
-
-	"k8s.io/apimachinery/pkg/labels"
 )
 
-// MutuallyExclusiveResource is a generic interface over all resource types,
-// where the resource can be uniquely identified.  As these typically map to
-// custom resource types, be extra careful you don't overload anything in
-// metav1.Object or runtime.Object.
-type MutuallyExclusiveResource interface {
+// OwningResource defines the interfaces an owning resource has to implement
+// to support application deployment.
+type OwningResource interface {
 	// The resource must contain an getter to access it's catalog of applications.
-	util.ApplicationBundleGetter
+	unikornv1.ApplicationBundleGetter
 
-	// ResourceLabels returns a set of labels from the resource that uniquely
-	// identify it, if they all were to reside in the same namespace.
-	// In database terms this would be a composite key.
-	ResourceLabels() (labels.Set, error)
+	// The resource must be able to uniquely identify an application.
+	unikornv1.MutuallyExclusiveResource
 }
 
 // ReleaseNamer is an interface that allows generators to supply an implicit release

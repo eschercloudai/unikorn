@@ -137,7 +137,7 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 // getControlPlaneProvisioner returns a provisoner that encodes control plane
 // provisioning steps.
 func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.Provisioner {
-	remote := vcluster.NewRemoteCluster(namespace, provisioners.VClusterRemoteLabelsFromControlPlane(&p.controlPlane))
+	remote := vcluster.NewRemoteCluster(namespace, &p.controlPlane)
 
 	clusterAPIProvisioner := concurrent.New("cluster-api",
 		certmanager.New(),

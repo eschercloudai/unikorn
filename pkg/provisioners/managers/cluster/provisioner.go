@@ -20,6 +20,8 @@ import (
 	"context"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/conditional"
@@ -40,7 +42,10 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
+	provisionersutil "github.com/eschercloudai/unikorn/pkg/provisioners/util"
 	"github.com/eschercloudai/unikorn/pkg/util"
+
+	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -76,8 +81,40 @@ func (p *Provisioner) getRemoteCluster(ctx context.Context) (*clusteropenstack.R
 	return clusteropenstack.NewRemoteCluster(client, &p.cluster), nil
 }
 
+// getControlPlane gets the control plane object that owns this cluster.
+func (p *Provisioner) getControlPlane(ctx context.Context) (*unikornv1.ControlPlane, error) {
+	// TODO: error checking.
+	projectLabels := labels.Set{
+		constants.KindLabel:    constants.KindLabelValueProject,
+		constants.ProjectLabel: p.cluster.Labels[constants.ProjectLabel],
+	}
+
+	projectNamespace, err := provisionersutil.GetResourceNamespace(ctx, projectLabels)
+	if err != nil {
+		return nil, err
+	}
+
+	var controlPlane unikornv1.ControlPlane
+
+	key := client.ObjectKey{
+		Namespace: projectNamespace.Name,
+		Name:      p.cluster.Labels[constants.ControlPlaneLabel],
+	}
+
+	if err := clientlib.FromContext(ctx).Get(ctx, key, &controlPlane); err != nil {
+		return nil, err
+	}
+
+	return &controlPlane, nil
+}
+
 func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
-	controlPlaneRemote := vcluster.NewRemoteCluster(p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
+	controlPlane, err := p.getControlPlane(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	controlPlaneRemote := vcluster.NewRemoteCluster(p.cluster.Namespace, controlPlane)
 
 	controlPlanePrefix, err := util.GetNATPrefix(ctx)
 	if err != nil {

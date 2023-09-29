@@ -21,7 +21,6 @@ rules:
   - unikorn.eschercloud.ai
   resources:
   - kubernetesclusters
-  - kubernetesworkloadpools
   verbs:
   - list
   - get
@@ -34,6 +33,21 @@ rules:
   - kubernetesclusters/status
   verbs:
   - update
+# Get my owning control plane.
+- apiGroups:
+  - unikorn.eschercloud.ai
+  resources:
+  - controlplanes
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - list
+  - watch
 # Get application bundles
 - apiGroups:
   - unikorn.eschercloud.ai

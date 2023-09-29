@@ -82,23 +82,25 @@ func NewRemoteCluster(client client.Client, cluster *unikornv1.KubernetesCluster
 
 // ID implements the remotecluster.Generator interface.
 func (g *RemoteCluster) ID() *cd.ResourceIdentifier {
-	// TODO: the labels handling is a bit smelly,
+	// You must call ResourceLabels() rather than access them directly
+	// as this will add in the cluster name label from the resource name.
+	// TODO: error checking.
+	resourceLabels, _ := g.cluster.ResourceLabels()
+
+	var labels []cd.ResourceIdentifierLabel
+
+	for _, label := range constants.LabelPriorities() {
+		if value, ok := resourceLabels[label]; ok {
+			labels = append(labels, cd.ResourceIdentifierLabel{
+				Name:  label,
+				Value: value,
+			})
+		}
+	}
+
 	return &cd.ResourceIdentifier{
-		Name: "kubernetes",
-		Labels: []cd.ResourceIdentifierLabel{
-			{
-				Name:  constants.KubernetesClusterLabel,
-				Value: g.cluster.Name,
-			},
-			{
-				Name:  constants.ControlPlaneLabel,
-				Value: g.cluster.Labels[constants.ControlPlaneLabel],
-			},
-			{
-				Name:  constants.ProjectLabel,
-				Value: g.cluster.Labels[constants.ProjectLabel],
-			},
-		},
+		Name:   "kubernetes",
+		Labels: labels,
 	}
 }
 
