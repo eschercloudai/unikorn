@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,9 +35,6 @@ import (
 type Provisioner struct {
 	provisioners.ProvisionerMeta
 
-	// client is a client to allow Kubernetes access.
-	client client.Client
-
 	// resource is the resource to provision.
 	resource client.Object
 }
@@ -47,9 +45,8 @@ var _ provisioners.Provisioner = &Provisioner{}
 // New returns a new provisioner that is capable of applying
 // a manifest with kubectl.  The path argument may be a path on the local file
 // system or a URL.
-func New(client client.Client, resource client.Object) *Provisioner {
+func New(resource client.Object) *Provisioner {
 	return &Provisioner{
-		client:   client,
 		resource: resource,
 	}
 }
@@ -61,12 +58,13 @@ func mutate() error {
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
+	c := clientlib.FromContext(ctx)
 
 	objectKey := client.ObjectKeyFromObject(p.resource)
 
 	log.Info("creating object", "key", objectKey)
 
-	result, err := controllerutil.CreateOrUpdate(ctx, p.client, p.resource, mutate)
+	result, err := controllerutil.CreateOrUpdate(ctx, c, p.resource, mutate)
 	if err != nil {
 		return err
 	}
@@ -79,12 +77,13 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
+	c := clientlib.FromContext(ctx)
 
 	objectKey := client.ObjectKeyFromObject(p.resource)
 
 	log.Info("deleting object", "key", objectKey)
 
-	if err := p.client.Delete(ctx, p.resource); err != nil {
+	if err := c.Delete(ctx, p.resource); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("object deleted", "key", objectKey)
 

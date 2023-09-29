@@ -14,18 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package longhorn
+package application
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"context"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "longhorn"
-)
+type key int
 
-// New returns a new initialized provisioner object.
-func New() *application.Provisioner {
-	return application.New(applicationName).InNamespace("longhorn-system")
+//nolint:gochecknoglobals
+var resourceKey key
+
+func NewContext(ctx context.Context, resource MutuallyExclusiveResource) context.Context {
+	return context.WithValue(ctx, resourceKey, resource)
+}
+
+func FromContext(ctx context.Context) MutuallyExclusiveResource {
+	//nolint:forcetypeassert
+	return ctx.Value(resourceKey).(MutuallyExclusiveResource)
 }

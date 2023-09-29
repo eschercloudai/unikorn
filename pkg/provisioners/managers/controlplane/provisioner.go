@@ -23,7 +23,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanager"
@@ -64,24 +64,13 @@ func init() {
 type Provisioner struct {
 	provisioners.ProvisionerMeta
 
-	// client provides access to Kubernetes.
-	client client.Client
-
-	// driver is the CD driver that provisions and deprovisions applications.
-	driver cd.Driver
-
 	// controlPlane is the control plane CR this deployment relates to
 	controlPlane unikornv1.ControlPlane
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, driver cd.Driver) provisioners.ManagerProvisioner {
-	provisioner := &Provisioner{
-		client: client,
-		driver: driver,
-	}
-
-	return provisioner
+func New() provisioners.ManagerProvisioner {
+	return &Provisioner{}
 }
 
 // Ensure the ManagerProvisioner interface is implemented.
@@ -100,7 +89,7 @@ func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace
 		return nil, err
 	}
 
-	namespace, err := util.GetResourceNamespace(ctx, p.client, labels)
+	namespace, err := util.GetResourceNamespace(ctx, labels)
 	if err == nil {
 		return namespace, nil
 	}
@@ -118,28 +107,26 @@ func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace
 		},
 	}
 
-	if err := resource.New(p.client, namespace).Provision(ctx); err != nil {
+	if err := resource.New(namespace).Provision(ctx); err != nil {
 		return nil, err
 	}
 
 	p.controlPlane.Status.Namespace = namespace.Name
-
-	if err := p.client.Status().Update(ctx, &p.controlPlane); err != nil {
-		return nil, err
-	}
 
 	return namespace, nil
 }
 
 // deprovisionClusters removes any kubernetes clusters, and frees up OpenStack resources.
 func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string) error {
+	c := clientlib.FromContext(ctx)
+
 	clusters := &unikornv1.KubernetesClusterList{}
-	if err := p.client.List(ctx, clusters, &client.ListOptions{Namespace: namespace}); err != nil {
+	if err := c.List(ctx, clusters, &client.ListOptions{Namespace: namespace}); err != nil {
 		return err
 	}
 
 	for i := range clusters.Items {
-		if err := resource.New(p.client, &clusters.Items[i]).Deprovision(ctx); err != nil {
+		if err := resource.New(&clusters.Items[i]).Deprovision(ctx); err != nil {
 			return err
 		}
 	}
@@ -150,11 +137,11 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 // getControlPlaneProvisioner returns a provisoner that encodes control plane
 // provisioning steps.
 func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.Provisioner {
-	remote := vcluster.NewRemoteCluster(p.client, namespace, provisioners.VClusterRemoteLabelsFromControlPlane(&p.controlPlane))
+	remote := vcluster.NewRemoteCluster(namespace, provisioners.VClusterRemoteLabelsFromControlPlane(&p.controlPlane))
 
 	clusterAPIProvisioner := concurrent.New("cluster-api",
-		certmanager.New(p.driver, &p.controlPlane),
-		clusterapi.New(p.driver, &p.controlPlane),
+		certmanager.New(),
+		clusterapi.New(),
 	)
 
 	// Set up any remote targets.
@@ -166,8 +153,8 @@ func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.
 	// Provision the vitual cluster, setup the remote cluster then
 	// install cert manager and cluster API into it.
 	return serial.New("control plane",
-		vcluster.New(p.driver, &p.controlPlane).InNamespace(namespace),
-		remotecluster.New(p.driver, remote),
+		vcluster.New().InNamespace(namespace),
+		remotecluster.New(remote),
 		clusterAPIProvisioner,
 	)
 }
@@ -208,7 +195,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 		return err
 	}
 
-	namespace, err := util.GetResourceNamespace(ctx, p.client, labels)
+	namespace, err := util.GetResourceNamespace(ctx, labels)
 	if err != nil {
 		// Already dead.
 		if errors.Is(err, util.ErrNamespaceLookup) {
@@ -230,7 +217,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	// Deprovision the namespace and await deletion.
 	// This will clean up all the vcluster gubbins and the CAPI stuff contained within.
-	if err := resource.New(p.client, namespace).Deprovision(ctx); err != nil {
+	if err := resource.New(namespace).Deprovision(ctx); err != nil {
 		return err
 	}
 

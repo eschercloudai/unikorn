@@ -17,8 +17,9 @@ limitations under the License.
 package cilium
 
 import (
+	"context"
+
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 )
@@ -29,22 +30,21 @@ const (
 )
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, cluster *unikornv1.KubernetesCluster) *application.Provisioner {
-	provisioner := &Provisioner{
-		cluster: cluster,
-	}
+func New() *application.Provisioner {
+	provisioner := &Provisioner{}
 
-	return application.New(driver, applicationName, cluster).WithGenerator(provisioner).InNamespace("kube-system")
+	return application.New(applicationName).WithGenerator(provisioner).InNamespace("kube-system")
 }
 
-type Provisioner struct {
-	cluster *unikornv1.KubernetesCluster
-}
+type Provisioner struct{}
 
 // Ensure the Provisioner interface is implemented.
 var _ application.ValuesGenerator = &Provisioner{}
 
-func (p *Provisioner) Values(_ *string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, _ *string) (interface{}, error) {
+	//nolint:forcetypeassert
+	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
+
 	// Scale to zero support.
 	operatorValues := map[string]interface{}{
 		"nodeSelector": util.ControlPlaneNodeSelector(),
@@ -52,8 +52,8 @@ func (p *Provisioner) Values(_ *string) (interface{}, error) {
 
 	// If the cluster CP has one node, then this will fail to deploy
 	// as cilium has 2 as the default, we need to work some magic here.
-	if *p.cluster.Spec.ControlPlane.Replicas == 1 {
-		operatorValues["replicas"] = p.cluster.Spec.ControlPlane.Replicas
+	if *cluster.Spec.ControlPlane.Replicas == 1 {
+		operatorValues["replicas"] = cluster.Spec.ControlPlane.Replicas
 	}
 
 	values := map[string]interface{}{

@@ -17,10 +17,11 @@ limitations under the License.
 package openstackplugincindercsi
 
 import (
+	"context"
 	"strings"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
+	"github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackcloudprovider"
@@ -40,35 +41,26 @@ const (
 )
 
 // Provisioner provides helm configuration interfaces.
-type Provisioner struct {
-	// driver is the CD driver that implments applications.
-	driver cd.Driver
-
-	// cluster is the Kubernetes cluster we're provisioning.
-	cluster *unikornv1.KubernetesCluster
-}
+type Provisioner struct{}
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, cluster *unikornv1.KubernetesCluster) *application.Provisioner {
-	provisioner := &Provisioner{
-		driver:  driver,
-		cluster: cluster,
-	}
+func New() *application.Provisioner {
+	provisioner := &Provisioner{}
 
-	return application.New(driver, applicationName, cluster).WithGenerator(provisioner).InNamespace("ocp-system")
+	return application.New(applicationName).WithGenerator(provisioner).InNamespace("ocp-system")
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ application.ValuesGenerator = &Provisioner{}
 
-func (p *Provisioner) generateStorageClass(name string, reclaimPolicy corev1.PersistentVolumeReclaimPolicy, volumeBindingMode storagev1.VolumeBindingMode, isDefault, volumeExpansion bool) *storagev1.StorageClass {
+func (p *Provisioner) generateStorageClass(cluster *unikornv1.KubernetesCluster, name string, reclaimPolicy corev1.PersistentVolumeReclaimPolicy, volumeBindingMode storagev1.VolumeBindingMode, isDefault, volumeExpansion bool) *storagev1.StorageClass {
 	class := &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Provisioner: "cinder.csi.openstack.org",
 		Parameters: map[string]string{
-			"availability": *p.cluster.Spec.Openstack.VolumeFailureDomain,
+			"availability": *cluster.Spec.Openstack.VolumeFailureDomain,
 		},
 		ReclaimPolicy:        &reclaimPolicy,
 		AllowVolumeExpansion: &volumeExpansion,
@@ -84,15 +76,20 @@ func (p *Provisioner) generateStorageClass(name string, reclaimPolicy corev1.Per
 	return class
 }
 
-func (p *Provisioner) generateStorageClasses() []*storagev1.StorageClass {
+func (p *Provisioner) generateStorageClasses(cluster *unikornv1.KubernetesCluster) []*storagev1.StorageClass {
 	return []*storagev1.StorageClass{
-		p.generateStorageClass("cinder", corev1.PersistentVolumeReclaimDelete, storagev1.VolumeBindingWaitForFirstConsumer, true, true),
+		p.generateStorageClass(cluster, "cinder", corev1.PersistentVolumeReclaimDelete, storagev1.VolumeBindingWaitForFirstConsumer, true, true),
 	}
 }
 
 // Generate implements the application.ValuesGenerator interface.
-func (p *Provisioner) Values(version *string) (interface{}, error) {
-	storageClasses := p.generateStorageClasses()
+func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
+	//nolint:forcetypeassert
+	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
+
+	client := client.FromContext(ctx)
+
+	storageClasses := p.generateStorageClasses(cluster)
 
 	yamls := make([]string, len(storageClasses))
 
@@ -101,7 +98,7 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 
 		// While we could hard code the TypeMeta, it's better practice and safer
 		// to use the provided mechanisms.
-		if err := p.driver.Client().Scheme().Convert(class, &u, nil); err != nil {
+		if err := client.Scheme().Convert(class, &u, nil); err != nil {
 			return nil, err
 		}
 
@@ -113,7 +110,7 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 		yamls[i] = string(y)
 	}
 
-	cloudConfig, err := openstackcloudprovider.GenerateCloudConfig(p.cluster)
+	cloudConfig, err := openstackcloudprovider.GenerateCloudConfig(cluster)
 	if err != nil {
 		return nil, err
 	}

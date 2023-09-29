@@ -17,7 +17,8 @@ limitations under the License.
 package metricsserver
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/cd"
+	"context"
+
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 )
@@ -33,16 +34,16 @@ type Provisioner struct{}
 var _ application.ValuesGenerator = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource) *application.Provisioner {
+func New() *application.Provisioner {
 	p := &Provisioner{}
 
-	return application.New(driver, applicationName, resource).WithGenerator(p).InNamespace("kube-system")
+	return application.New(applicationName).WithGenerator(p).InNamespace("kube-system")
 }
 
 // Generate implements the application.Generator interface.
 // This forces the server onto the control plane rather than take up a
 // worker node (and thus incur the ire of users).
-func (p *Provisioner) Values(version *string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
 	values := map[string]interface{}{
 		"tolerations":  util.ControlPlaneTolerations(),
 		"nodeSelector": util.ControlPlaneNodeSelector(),

@@ -18,6 +18,7 @@ package openstackcloudprovider
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 
@@ -25,7 +26,6 @@ import (
 	ini "gopkg.in/ini.v1"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
@@ -45,18 +45,13 @@ var (
 )
 
 // Provisioner encapsulates control plane provisioning.
-type Provisioner struct {
-	// cluster is the Kubernetes cluster we're provisioning.
-	cluster *unikornv1.KubernetesCluster
-}
+type Provisioner struct{}
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, cluster *unikornv1.KubernetesCluster) *application.Provisioner {
-	provisioner := &Provisioner{
-		cluster: cluster,
-	}
+func New() *application.Provisioner {
+	provisioner := &Provisioner{}
 
-	return application.New(driver, applicationName, cluster).WithGenerator(provisioner).InNamespace("ocp-system")
+	return application.New(applicationName).WithGenerator(provisioner).InNamespace("ocp-system")
 }
 
 // Ensure the Provisioner interface is implemented.
@@ -132,8 +127,11 @@ func GenerateCloudConfig(cluster *unikornv1.KubernetesCluster) (string, error) {
 // Generate implements the application.Generator interface.
 // Note there is an option, to just pass through the clouds.yaml file, however
 // the chart doesn't allow it to be exposed so we need to translate between formats.
-func (p *Provisioner) Values(_ *string) (interface{}, error) {
-	cloudConfig, err := GenerateCloudConfig(p.cluster)
+func (p *Provisioner) Values(ctx context.Context, _ *string) (interface{}, error) {
+	//nolint:forcetypeassert
+	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
+
+	cloudConfig, err := GenerateCloudConfig(cluster)
 	if err != nil {
 		return nil, err
 	}

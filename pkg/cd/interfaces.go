@@ -21,7 +21,6 @@ package cd
 import (
 	"context"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -35,11 +34,6 @@ type Driver interface {
 	// be rejected if there's no evidence of an upstream fix to remove
 	// your hack.
 	Kind() DriverKind
-
-	// Client gives you access to the Kubernetes client for when your CD driver
-	// is incapable of working as desired and you need to take manual action.
-	// Think long and hard about whether you need this, it's a hack quite frankly.
-	Client() client.Client
 
 	// CreateOrUpdateHelmApplication creates or updates a helm application idempotently.
 	CreateOrUpdateHelmApplication(ctx context.Context, id *ResourceIdentifier, app *HelmApplication) error

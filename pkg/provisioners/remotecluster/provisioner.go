@@ -48,20 +48,16 @@ func GetClient(ctx context.Context, generator provisioners.RemoteCluster) (clien
 type Provisioner struct {
 	provisioners.ProvisionerMeta
 
-	// driver is the CD driver that implements applications.
-	driver cd.Driver
-
 	// generator provides a method to derive cluster names and configuration.
 	generator provisioners.RemoteCluster
 }
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, generator provisioners.RemoteCluster) *Provisioner {
+func New(generator provisioners.RemoteCluster) *Provisioner {
 	return &Provisioner{
 		ProvisionerMeta: provisioners.ProvisionerMeta{
 			Name: "remote-cluster",
 		},
-		driver:    driver,
 		generator: generator,
 	}
 }
@@ -88,7 +84,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		Config: config,
 	}
 
-	if err := p.driver.CreateOrUpdateCluster(ctx, p.generator.ID(), cluster); err != nil {
+	if err := cd.FromContext(ctx).CreateOrUpdateCluster(ctx, p.generator.ID(), cluster); err != nil {
 		log.Info("remote cluster not ready, yielding", "remotecluster", p.Name)
 
 		return provisioners.ErrYield
@@ -105,7 +101,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning remote cluster", "remotecluster", p.Name)
 
-	if err := p.driver.DeleteCluster(ctx, p.generator.ID()); err != nil {
+	if err := cd.FromContext(ctx).DeleteCluster(ctx, p.generator.ID()); err != nil {
 		return err
 	}
 

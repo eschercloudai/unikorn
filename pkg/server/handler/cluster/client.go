@@ -24,6 +24,7 @@ import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
@@ -129,7 +130,11 @@ func (c *Client) GetKubeconfig(ctx context.Context, controlPlaneName generated.C
 		return nil, err
 	}
 
-	vc := vcluster.NewControllerRuntimeClient(c.client)
+	// TODO: propagate the client like we do in the controllers, then code sharing
+	// becomes a lot easier!
+	ctx = clientlib.NewContext(ctx, c.client)
+
+	vc := vcluster.NewControllerRuntimeClient()
 
 	vclusterConfig, err := vc.RESTConfig(ctx, controlPlane.Namespace, false)
 	if err != nil {
