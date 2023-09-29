@@ -104,11 +104,6 @@ func (d *Driver) Kind() cd.DriverKind {
 	return cd.DriverKindArgoCD
 }
 
-// Client gets the Kubernetes client.
-func (d *Driver) Client() client.Client {
-	return d.kubernetesClient
-}
-
 // GetHelmApplication retrieves an abstract helm application.
 func (d *Driver) GetHelmApplication(ctx context.Context, id *cd.ResourceIdentifier) (*argoprojv1.Application, error) {
 	options := &client.ListOptions{

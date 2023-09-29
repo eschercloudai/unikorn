@@ -26,6 +26,7 @@ import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/cd/mock"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	mockprovisioners "github.com/eschercloudai/unikorn/pkg/provisioners/mock"
@@ -134,7 +135,6 @@ func TestApplicationCreateHelm(t *testing.T) {
 	}
 
 	tc := mustNewTestContext(t, app, newBundle(app))
-	ctx := context.Background()
 
 	c := gomock.NewController(t)
 	defer c.Finish()
@@ -150,11 +150,16 @@ func TestApplicationCreateHelm(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	driver.EXPECT().Client().Return(tc.client)
+	owner := &mutuallyExclusiveResource{}
+
+	ctx := context.Background()
+	ctx = clientlib.NewContext(ctx, tc.client)
+	ctx = cd.NewContext(ctx, driver)
+	ctx = application.NewContext(ctx, owner)
+
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
-	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(driver, applicationName, owner)
+	provisioner := application.New(applicationName)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
@@ -196,7 +201,6 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	}
 
 	tc := mustNewTestContext(t, app, newBundle(app))
-	ctx := context.Background()
 
 	c := gomock.NewController(t)
 	defer c.Finish()
@@ -245,14 +249,18 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	driver.EXPECT().Client().Return(tc.client)
-	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
-
 	owner := &mutuallyExclusiveResource{
 		idLabel1: idLabel1Value,
 	}
 
-	provisioner := application.New(driver, applicationName, owner).WithApplicationName(overrideApplicationName)
+	ctx := context.Background()
+	ctx = clientlib.NewContext(ctx, tc.client)
+	ctx = cd.NewContext(ctx, driver)
+	ctx = application.NewContext(ctx, owner)
+
+	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
+
+	provisioner := application.New(applicationName).WithApplicationName(overrideApplicationName)
 	provisioner.OnRemote(r)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
@@ -277,7 +285,6 @@ func TestApplicationCreateGit(t *testing.T) {
 	}
 
 	tc := mustNewTestContext(t, app, newBundle(app))
-	ctx := context.Background()
 
 	c := gomock.NewController(t)
 	defer c.Finish()
@@ -293,11 +300,16 @@ func TestApplicationCreateGit(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	driver.EXPECT().Client().Return(tc.client)
+	owner := &mutuallyExclusiveResource{}
+
+	ctx := context.Background()
+	ctx = clientlib.NewContext(ctx, tc.client)
+	ctx = cd.NewContext(ctx, driver)
+	ctx = application.NewContext(ctx, owner)
+
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
-	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(driver, applicationName, owner)
+	provisioner := application.New(applicationName)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
@@ -327,11 +339,11 @@ var _ application.ValuesGenerator = &mutator{}
 var _ application.Customizer = &mutator{}
 var _ application.PostProvisionHook = &mutator{}
 
-func (m *mutator) ReleaseName() string {
+func (m *mutator) ReleaseName(ctx context.Context) string {
 	return "sentinel"
 }
 
-func (m *mutator) Parameters(version *string) (map[string]string, error) {
+func (m *mutator) Parameters(ctx context.Context, version *string) (map[string]string, error) {
 	p := map[string]string{
 		mutatorParameter: mutatorValue,
 	}
@@ -339,7 +351,7 @@ func (m *mutator) Parameters(version *string) (map[string]string, error) {
 	return p, nil
 }
 
-func (m *mutator) Values(version *string) (interface{}, error) {
+func (m *mutator) Values(ctx context.Context, version *string) (interface{}, error) {
 	return mutatorValues, nil
 }
 
@@ -382,7 +394,6 @@ func TestApplicationCreateMutate(t *testing.T) {
 	}
 
 	tc := mustNewTestContext(t, app, newBundle(app))
-	ctx := context.Background()
 
 	c := gomock.NewController(t)
 	defer c.Finish()
@@ -416,12 +427,17 @@ func TestApplicationCreateMutate(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	driver.EXPECT().Client().Return(tc.client)
+	owner := &mutuallyExclusiveResource{}
+
+	ctx := context.Background()
+	ctx = clientlib.NewContext(ctx, tc.client)
+	ctx = cd.NewContext(ctx, driver)
+	ctx = application.NewContext(ctx, owner)
+
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(nil)
 
-	owner := &mutuallyExclusiveResource{}
 	mutator := &mutator{}
-	provisioner := application.New(driver, applicationName, owner).WithGenerator(mutator).InNamespace(namespace)
+	provisioner := application.New(applicationName).WithGenerator(mutator).InNamespace(namespace)
 
 	assert.NoError(t, provisioner.Provision(ctx))
 	assert.True(t, mutator.postProvisionCalled)
@@ -432,8 +448,6 @@ func TestApplicationCreateMutate(t *testing.T) {
 func TestApplicationDeleteNotFound(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-
 	c := gomock.NewController(t)
 	defer c.Finish()
 
@@ -442,10 +456,15 @@ func TestApplicationDeleteNotFound(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
+	owner := &mutuallyExclusiveResource{}
+
+	ctx := context.Background()
+	ctx = cd.NewContext(ctx, driver)
+	ctx = application.NewContext(ctx, owner)
+
 	driver.EXPECT().DeleteHelmApplication(ctx, driverAppID, false).Return(provisioners.ErrYield)
 
-	owner := &mutuallyExclusiveResource{}
-	provisioner := application.New(driver, applicationName, owner)
+	provisioner := application.New(applicationName)
 
 	assert.ErrorIs(t, provisioner.Deprovision(ctx), provisioners.ErrYield)
 }

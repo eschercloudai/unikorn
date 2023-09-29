@@ -20,7 +20,6 @@ import (
 	"context"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/conditional"
@@ -50,22 +49,13 @@ import (
 type Provisioner struct {
 	provisioners.ProvisionerMeta
 
-	// client provides access to Kubernetes.
-	client client.Client
-
-	// driver is the CD driver that provisions and deprovisions applications.
-	driver cd.Driver
-
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster unikornv1.KubernetesCluster
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, driver cd.Driver) provisioners.ManagerProvisioner {
-	return &Provisioner{
-		client: client,
-		driver: driver,
-	}
+func New() provisioners.ManagerProvisioner {
+	return &Provisioner{}
 }
 
 // Ensure the ManagerProvisioner interface is implemented.
@@ -78,7 +68,7 @@ func (p *Provisioner) Object() client.Object {
 // getRemoteCluster returns a generator capable of reading the cluster
 // kubeconfig from the underlying control plane.
 func (p *Provisioner) getRemoteCluster(ctx context.Context) (*clusteropenstack.RemoteCluster, error) {
-	client, err := vcluster.NewControllerRuntimeClient(p.client).Client(ctx, p.cluster.Namespace, false)
+	client, err := vcluster.NewControllerRuntimeClient().Client(ctx, p.cluster.Namespace, false)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +77,7 @@ func (p *Provisioner) getRemoteCluster(ctx context.Context) (*clusteropenstack.R
 }
 
 func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
-	controlPlaneRemote := vcluster.NewRemoteCluster(p.client, p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
+	controlPlaneRemote := vcluster.NewRemoteCluster(p.cluster.Namespace, provisioners.VclusterRemoteLabelsFromCluster(&p.cluster))
 
 	controlPlanePrefix, err := util.GetNATPrefix(ctx)
 	if err != nil {
@@ -99,42 +89,42 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 		return nil, err
 	}
 
-	clusterProvisioner := clusteropenstack.New(ctx, p.driver, &p.cluster, controlPlanePrefix).InNamespace(p.cluster.Name)
+	clusterProvisioner := clusteropenstack.New(controlPlanePrefix).InNamespace(p.cluster.Name)
 
 	// These applications are required to get the cluster up and running, they must
 	// tolerate control plane taints, be scheduled onto control plane nodes and allow
 	// scale from zero.
 	bootstrapProvisioner := concurrent.New("cluster bootstrap",
-		cilium.New(p.driver, &p.cluster),
-		openstackcloudprovider.New(p.driver, &p.cluster),
+		cilium.New(),
+		openstackcloudprovider.New(),
 	)
 
 	clusterAutoscalerProvisioner := conditional.New("cluster-autoscaler",
 		p.cluster.AutoscalingEnabled,
 		concurrent.New("cluster-autoscaler",
-			clusterautoscaler.New(p.driver, &p.cluster).InNamespace(p.cluster.Name),
-			clusterautoscaleropenstack.New(p.driver, &p.cluster).InNamespace(p.cluster.Name),
+			clusterautoscaler.New().InNamespace(p.cluster.Name),
+			clusterautoscaleropenstack.New().InNamespace(p.cluster.Name),
 		),
 	)
 
 	certManagerProvisioner := serial.New("cert-manager",
-		certmanager.New(p.driver, &p.cluster),
-		certmanagerissuers.New(p.driver, &p.cluster),
+		certmanager.New(),
+		certmanagerissuers.New(),
 	)
 
 	addonsProvisioner := serial.New("cluster add-ons",
 		concurrent.New("cluster add-ons wave 1",
-			openstackplugincindercsi.New(p.driver, &p.cluster),
-			metricsserver.New(p.driver, &p.cluster),
-			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(p.driver, &p.cluster)),
-			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New(p.driver, &p.cluster)),
+			openstackplugincindercsi.New(),
+			metricsserver.New(),
+			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New()),
+			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New()),
 			conditional.New("cert-manager", p.cluster.CertManagerEnabled, certManagerProvisioner),
-			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(p.driver, &p.cluster)),
-			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(p.driver, &p.cluster)),
+			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New()),
+			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New()),
 		),
 		concurrent.New("cluster add-ons wave 2",
 			// TODO: this hack where it needs the remote is pretty ugly.
-			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(p.driver, &p.cluster, clusterRemote)),
+			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(clusterRemote)),
 		),
 	)
 
@@ -158,7 +148,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 		concurrent.New("kubernetes cluster",
 			clusterProvisioner,
 			serial.New("cluster bootstrap",
-				remotecluster.New(p.driver, clusterRemote),
+				remotecluster.New(clusterRemote),
 				bootstrapProvisioner,
 			),
 		),

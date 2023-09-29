@@ -19,7 +19,6 @@ package vcluster
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -53,6 +52,6 @@ func init() {
 }
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource) *application.Provisioner {
-	return application.New(driver, applicationName, resource)
+func New() *application.Provisioner {
+	return application.New(applicationName)
 }

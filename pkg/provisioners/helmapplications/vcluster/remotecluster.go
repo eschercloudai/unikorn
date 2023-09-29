@@ -24,15 +24,9 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type RemoteCluster struct {
-	// client provides access to the Kubernetes instance where
-	// the vcluster resources live.
-	client client.Client
-
 	// namespace tells us where the vcluster lives.
 	namespace string
 
@@ -45,9 +39,8 @@ type RemoteCluster struct {
 var _ provisioners.RemoteCluster = &RemoteCluster{}
 
 // NewRemoteCluster return a new instance of a remote cluster generator.
-func NewRemoteCluster(client client.Client, namespace string, labels []string) *RemoteCluster {
+func NewRemoteCluster(namespace string, labels []string) *RemoteCluster {
 	return &RemoteCluster{
-		client:    client,
 		namespace: namespace,
 		labels:    labels,
 	}
@@ -73,5 +66,5 @@ func (g *RemoteCluster) ID() *cd.ResourceIdentifier {
 
 // Config implements the remotecluster.Generator interface.
 func (g *RemoteCluster) Config(ctx context.Context) (*clientcmdapi.Config, error) {
-	return NewControllerRuntimeClient(g.client).ClientConfig(ctx, g.namespace, false)
+	return NewControllerRuntimeClient().ClientConfig(ctx, g.namespace, false)
 }

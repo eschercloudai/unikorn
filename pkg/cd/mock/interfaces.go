@@ -14,7 +14,6 @@ import (
 
 	cd "github.com/eschercloudai/unikorn/pkg/cd"
 	gomock "go.uber.org/mock/gomock"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MockDriver is a mock of Driver interface.
@@ -38,20 +37,6 @@ func NewMockDriver(ctrl *gomock.Controller) *MockDriver {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockDriver) EXPECT() *MockDriverMockRecorder {
 	return m.recorder
-}
-
-// Client mocks base method.
-func (m *MockDriver) Client() client.Client {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Client")
-	ret0, _ := ret[0].(client.Client)
-	return ret0
-}
-
-// Client indicates an expected call of Client.
-func (mr *MockDriverMockRecorder) Client() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Client", reflect.TypeOf((*MockDriver)(nil).Client))
 }
 
 // CreateOrUpdateCluster mocks base method.

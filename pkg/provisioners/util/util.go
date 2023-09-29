@@ -23,6 +23,8 @@ import (
 	"errors"
 	"fmt"
 
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -33,9 +35,11 @@ var (
 	ErrNamespaceLookup = errors.New("unable to lookup namespace")
 )
 
-func GetResourceNamespace(ctx context.Context, cli client.Client, l labels.Set) (*corev1.Namespace, error) {
+func GetResourceNamespace(ctx context.Context, l labels.Set) (*corev1.Namespace, error) {
+	c := clientlib.FromContext(ctx)
+
 	namespaces := &corev1.NamespaceList{}
-	if err := cli.List(ctx, namespaces, &client.ListOptions{LabelSelector: l.AsSelector()}); err != nil {
+	if err := c.List(ctx, namespaces, &client.ListOptions{LabelSelector: l.AsSelector()}); err != nil {
 		return nil, err
 	}
 

@@ -17,7 +17,8 @@ limitations under the License.
 package nvidiagpuoperator
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/cd"
+	"context"
+
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 )
@@ -32,10 +33,10 @@ const (
 )
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource) *application.Provisioner {
+func New() *application.Provisioner {
 	p := &Provisioner{}
 
-	return application.New(driver, applicationName, resource).WithGenerator(p).InNamespace(defaultNamespace)
+	return application.New(applicationName).WithGenerator(p).InNamespace(defaultNamespace)
 }
 
 type Provisioner struct{}
@@ -44,7 +45,7 @@ type Provisioner struct{}
 var _ application.ValuesGenerator = &Provisioner{}
 
 // Generate implements the application.Generator interface.
-func (p *Provisioner) Values(version *string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
 	// We limit images to those with the driver pre-installed as it's far quicker for UX.
 	// Also the default affinity is broken and prevents scale to zero, also tolerations
 	// don't allow execution using our default taints.

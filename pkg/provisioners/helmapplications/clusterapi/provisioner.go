@@ -32,8 +32,8 @@ type Provisioner struct{}
 var _ application.Customizer = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource) *application.Provisioner {
-	return application.New(driver, applicationName, resource).WithGenerator(&Provisioner{})
+func New() *application.Provisioner {
+	return application.New(applicationName).WithGenerator(&Provisioner{})
 }
 
 // Customize implments the application.Customizer interface.

@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -86,7 +87,9 @@ func (u *Unbundler) AddApplication(r **unikornv1.HelmApplication, name string, o
 	u.items = append(u.items, item)
 }
 
-func (u *Unbundler) Unbundle(ctx context.Context, c client.Client) error {
+func (u *Unbundler) Unbundle(ctx context.Context) error {
+	c := clientlib.FromContext(ctx)
+
 	key := client.ObjectKey{
 		Name: u.name,
 	}

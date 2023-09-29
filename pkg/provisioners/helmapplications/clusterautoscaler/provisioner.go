@@ -17,8 +17,9 @@ limitations under the License.
 package clusterautoscaler
 
 import (
+	"context"
+
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 )
@@ -28,33 +29,26 @@ const (
 	applicationName = "cluster-autoscaler"
 )
 
-// Provisioner encapsulates control plane provisioning.
-type Provisioner struct {
-	// clusterName defines the CAPI cluster name.
-	clusterName string
-
-	// clusterKubeconfigSecretName defines the secret that contains the
-	// kubeconfig for the cluster.
-	clusterKubeconfigSecretName string
-}
+// Provisioner encapsulates provisioning.
+type Provisioner struct{}
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource *unikornv1.KubernetesCluster) *application.Provisioner {
-	provisoner := &Provisioner{
-		clusterName:                 clusteropenstack.CAPIClusterName(resource),
-		clusterKubeconfigSecretName: clusteropenstack.KubeconfigSecretName(resource),
-	}
+func New() *application.Provisioner {
+	provisoner := &Provisioner{}
 
-	return application.New(driver, applicationName, resource).WithGenerator(provisoner)
+	return application.New(applicationName).WithGenerator(provisoner)
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ application.Paramterizer = &Provisioner{}
 
-func (p *Provisioner) Parameters(version *string) (map[string]string, error) {
+func (p *Provisioner) Parameters(ctx context.Context, version *string) (map[string]string, error) {
+	//nolint:forcetypeassert
+	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
+
 	parameters := map[string]string{
-		"autoDiscovery.clusterName":  p.clusterName,
-		"clusterAPIKubeconfigSecret": p.clusterKubeconfigSecretName,
+		"autoDiscovery.clusterName":  clusteropenstack.CAPIClusterName(cluster),
+		"clusterAPIKubeconfigSecret": clusteropenstack.KubeconfigSecretName(cluster),
 	}
 
 	return parameters, nil

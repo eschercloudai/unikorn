@@ -23,7 +23,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
@@ -51,12 +50,12 @@ type Provisioner struct {
 var _ application.ValuesGenerator = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource, remote provisioners.RemoteCluster) *application.Provisioner {
+func New(remote provisioners.RemoteCluster) *application.Provisioner {
 	p := &Provisioner{
 		remote: remote,
 	}
 
-	return application.New(driver, applicationName, resource).WithGenerator(p).InNamespace("kube-system")
+	return application.New(applicationName).WithGenerator(p).InNamespace("kube-system")
 }
 
 func (p *Provisioner) remoteIngressIP(ctx context.Context) (net.IP, error) {
@@ -99,7 +98,7 @@ func (p *Provisioner) remoteIngressIP(ctx context.Context) (net.IP, error) {
 }
 
 // Generate implements the application.Generator interface.
-func (p *Provisioner) Values(version *string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
 	// Now, we _should_ combine cert-manager's HTTP-01 acme challenge with external-dns
 	// however, in lieu of a DDNS server, we are using IP wildcard DNS via nip.io.  Now
 	// sadly to use _that_, you need to know the IP address of the ingress.  So two
@@ -109,7 +108,7 @@ func (p *Provisioner) Values(version *string) (interface{}, error) {
 	// At present, we just look for a LoadBalancer Service.  In furture we may need to label
 	// it to discriminate.
 	// TODO: read above!
-	ip, err := p.remoteIngressIP(context.TODO())
+	ip, err := p.remoteIngressIP(ctx)
 	if err != nil {
 		return nil, err
 	}

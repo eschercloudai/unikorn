@@ -14,18 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package longhorn
+package cd
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"context"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "longhorn"
-)
+type key int
 
-// New returns a new initialized provisioner object.
-func New() *application.Provisioner {
-	return application.New(applicationName).InNamespace("longhorn-system")
+//nolint:gochecknoglobals
+var driverKey key
+
+func NewContext(ctx context.Context, driver Driver) context.Context {
+	return context.WithValue(ctx, driverKey, driver)
+}
+
+func FromContext(ctx context.Context) Driver {
+	//nolint:forcetypeassert
+	return ctx.Value(driverKey).(Driver)
 }

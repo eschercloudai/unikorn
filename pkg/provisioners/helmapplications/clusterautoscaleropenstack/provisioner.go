@@ -17,7 +17,6 @@ limitations under the License.
 package clusterautoscaleropenstack
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 )
 
@@ -27,6 +26,6 @@ const (
 )
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, resource application.MutuallyExclusiveResource) *application.Provisioner {
-	return application.New(driver, applicationName, resource)
+func New() *application.Provisioner {
+	return application.New(applicationName)
 }

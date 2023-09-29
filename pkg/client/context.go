@@ -14,18 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package longhorn
+package client
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"context"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "longhorn"
-)
+type key int
 
-// New returns a new initialized provisioner object.
-func New() *application.Provisioner {
-	return application.New(applicationName).InNamespace("longhorn-system")
+//nolint:gochecknoglobals
+var clientKey key
+
+func NewContext(ctx context.Context, client client.Client) context.Context {
+	return context.WithValue(ctx, clientKey, client)
+}
+
+func FromContext(ctx context.Context) client.Client {
+	//nolint:forcetypeassert
+	return ctx.Value(clientKey).(client.Client)
 }

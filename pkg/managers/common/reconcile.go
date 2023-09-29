@@ -23,8 +23,10 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +44,7 @@ var (
 )
 
 // ProvisionerCreateFunc provides a type agnosic method to create a root provisioner.
-type ProvisionerCreateFunc func(client.Client, cd.Driver) provisioners.ManagerProvisioner
+type ProvisionerCreateFunc func() provisioners.ManagerProvisioner
 
 // Reconciler is a generic reconciler for all manager types.
 type Reconciler struct {
@@ -74,9 +76,15 @@ var _ reconcile.Reconciler = &Reconciler{}
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 
-	provisioner := r.createProvisioner(r.client, r.driverRunnable.Driver())
+	provisioner := r.createProvisioner()
 
 	object := provisioner.Object()
+
+	resource, _ := object.(application.MutuallyExclusiveResource)
+
+	ctx = clientlib.NewContext(ctx, r.client)
+	ctx = cd.NewContext(ctx, r.driverRunnable.Driver())
+	ctx = application.NewContext(ctx, resource)
 
 	// See if the object exists or not, if not it's been deleted.
 	if err := r.client.Get(ctx, request.NamespacedName, object); err != nil {

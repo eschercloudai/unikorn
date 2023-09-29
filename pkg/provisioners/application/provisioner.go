@@ -24,56 +24,8 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
-	"k8s.io/apimachinery/pkg/labels"
-
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-// MutuallyExclusiveResource is a generic interface over all resource types,
-// where the resource can be uniquely identified.  As these typically map to
-// custom resource types, be extra careful you don't overload anything in
-// metav1.Object or runtime.Object.
-type MutuallyExclusiveResource interface {
-	// The resource must contain an getter to access it's catalog of applications.
-	util.ApplicationBundleGetter
-
-	// ResourceLabels returns a set of labels from the resource that uniquely
-	// identify it, if they all were to reside in the same namespace.
-	// In database terms this would be a composite key.
-	ResourceLabels() (labels.Set, error)
-}
-
-// ReleaseNamer is an interface that allows generators to supply an implicit release
-// name to Helm.
-type ReleaseNamer interface {
-	ReleaseName() string
-}
-
-// Paramterizer is an interface that allows generators to supply a list of parameters
-// to Helm.  These are in addition to those defined by the application template.  At
-// present, there is nothing special about overriding, it just appends, so ensure the
-// explicit and implicit sets don't overlap.
-type Paramterizer interface {
-	Parameters(version *string) (map[string]string, error)
-}
-
-// ValuesGenerator is an interface that allows generators to supply a raw values.yaml
-// file to Helm.  This accepts an object that can be marshaled to YAML.
-type ValuesGenerator interface {
-	Values(version *string) (interface{}, error)
-}
-
-// Customizer is a generic generator interface that implemnets raw customizations to
-// the application template.  Try to avoid using this.
-type Customizer interface {
-	Customize(version *string) ([]cd.HelmApplicationField, error)
-}
-
-// PostProvisionHook is an interface that lets an application provisioner run
-// a callback when provisioning has completed successfully.
-type PostProvisionHook interface {
-	PostProvision(ctx context.Context) error
-}
 
 // Provisioner deploys an application that is keyed to a specific resource.
 // For example, ArgoCD dictates that applications be installed in the same
@@ -87,9 +39,6 @@ type Provisioner struct {
 	// name, unless overridden by applicationName.
 	provisioners.ProvisionerMeta
 
-	// driver is the CD driver that implements applications.
-	driver cd.Driver
-
 	// namespace explicitly sets the namespace for the application.
 	namespace string
 
@@ -98,20 +47,14 @@ type Provisioner struct {
 
 	// generator provides application generation functionality.
 	generator interface{}
-
-	// resource is the top level resource an application belongs to, this
-	// is used to derive a unique label set to identify the resource.
-	resource MutuallyExclusiveResource
 }
 
 // New returns a new initialized provisioner object.
-func New(driver cd.Driver, name string, resource MutuallyExclusiveResource) *Provisioner {
+func New(name string) *Provisioner {
 	return &Provisioner{
 		ProvisionerMeta: provisioners.ProvisionerMeta{
 			Name: name,
 		},
-		driver:   driver,
-		resource: resource,
 	}
 }
 
@@ -141,7 +84,7 @@ func (p *Provisioner) WithGenerator(generator interface{}) *Provisioner {
 	return p
 }
 
-func (p *Provisioner) getResourceID() (*cd.ResourceIdentifier, error) {
+func (p *Provisioner) getResourceID(ctx context.Context) (*cd.ResourceIdentifier, error) {
 	name := p.Name
 
 	if p.applicationName != "" {
@@ -152,7 +95,7 @@ func (p *Provisioner) getResourceID() (*cd.ResourceIdentifier, error) {
 		Name: name,
 	}
 
-	l, err := p.resource.ResourceLabels()
+	l, err := FromContext(ctx).ResourceLabels()
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +116,7 @@ func (p *Provisioner) getResourceID() (*cd.ResourceIdentifier, error) {
 
 // getReleaseName uses the release name in the application spec by default
 // but allows the generator to override it.
-func (p *Provisioner) getReleaseName(application *unikornv1.HelmApplication) string {
+func (p *Provisioner) getReleaseName(ctx context.Context, application *unikornv1.HelmApplication) string {
 	var name string
 
 	if application.Spec.Release != nil {
@@ -182,7 +125,7 @@ func (p *Provisioner) getReleaseName(application *unikornv1.HelmApplication) str
 
 	if p.generator != nil {
 		if releaseNamer, ok := p.generator.(ReleaseNamer); ok {
-			override := releaseNamer.ReleaseName()
+			override := releaseNamer.ReleaseName(ctx)
 
 			if override != "" {
 				name = override
@@ -195,7 +138,7 @@ func (p *Provisioner) getReleaseName(application *unikornv1.HelmApplication) str
 
 // getParameters constructs a full list of Helm parameters by taking those provided
 // in the application spec, and appending any that the generator yields.
-func (p *Provisioner) getParameters(application *unikornv1.HelmApplication) ([]cd.HelmApplicationParameter, error) {
+func (p *Provisioner) getParameters(ctx context.Context, application *unikornv1.HelmApplication) ([]cd.HelmApplicationParameter, error) {
 	parameters := make([]cd.HelmApplicationParameter, 0, len(application.Spec.Parameters))
 
 	for _, parameter := range application.Spec.Parameters {
@@ -207,7 +150,7 @@ func (p *Provisioner) getParameters(application *unikornv1.HelmApplication) ([]c
 
 	if p.generator != nil {
 		if parameterizer, ok := p.generator.(Paramterizer); ok {
-			p, err := parameterizer.Parameters(application.Spec.Interface)
+			p, err := parameterizer.Parameters(ctx, application.Spec.Interface)
 			if err != nil {
 				return nil, err
 			}
@@ -231,7 +174,7 @@ func (p *Provisioner) getParameters(application *unikornv1.HelmApplication) ([]c
 
 // getValues delegates to the generator to get an option values.yaml file to
 // pass to Helm.
-func (p *Provisioner) getValues(application *unikornv1.HelmApplication) (interface{}, error) {
+func (p *Provisioner) getValues(ctx context.Context, application *unikornv1.HelmApplication) (interface{}, error) {
 	if p.generator == nil {
 		//nolint:nilnil
 		return nil, nil
@@ -243,7 +186,7 @@ func (p *Provisioner) getValues(application *unikornv1.HelmApplication) (interfa
 		return nil, nil
 	}
 
-	values, err := valuesGenerator.Values(application.Spec.Interface)
+	values, err := valuesGenerator.Values(ctx, application.Spec.Interface)
 	if err != nil {
 		return nil, err
 	}
@@ -264,10 +207,10 @@ func (p *Provisioner) getClusterID() *cd.ResourceIdentifier {
 func (p *Provisioner) getApplication(ctx context.Context) (*unikornv1.HelmApplication, error) {
 	var application *unikornv1.HelmApplication
 
-	unbundler := util.NewUnbundler(p.resource)
+	unbundler := util.NewUnbundler(FromContext(ctx))
 	unbundler.AddApplication(&application, p.Name)
 
-	if err := unbundler.Unbundle(ctx, p.driver.Client()); err != nil {
+	if err := unbundler.Unbundle(ctx); err != nil {
 		return nil, err
 	}
 
@@ -283,12 +226,12 @@ func (p *Provisioner) generateApplication(ctx context.Context) (*cd.HelmApplicat
 		return nil, err
 	}
 
-	parameters, err := p.getParameters(application)
+	parameters, err := p.getParameters(ctx, application)
 	if err != nil {
 		return nil, err
 	}
 
-	values, err := p.getValues(application)
+	values, err := p.getValues(ctx, application)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +239,7 @@ func (p *Provisioner) generateApplication(ctx context.Context) (*cd.HelmApplicat
 	cdApplication := &cd.HelmApplication{
 		Repo:       *application.Spec.Repo,
 		Version:    *application.Spec.Version,
-		Release:    p.getReleaseName(application),
+		Release:    p.getReleaseName(ctx, application),
 		Parameters: parameters,
 		Values:     values,
 		Cluster:    p.getClusterID(),
@@ -340,7 +283,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	log.Info("provisioning application", "application", p.Name, "remote", p.Remote)
 
 	// Convert the generic object type into what's expected by the driver interface.
-	id, err := p.getResourceID()
+	id, err := p.getResourceID(ctx)
 	if err != nil {
 		return err
 	}
@@ -350,7 +293,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
-	if err := p.driver.CreateOrUpdateHelmApplication(ctx, id, application); err != nil {
+	if err := cd.FromContext(ctx).CreateOrUpdateHelmApplication(ctx, id, application); err != nil {
 		return err
 	}
 
@@ -373,12 +316,12 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 
 	log.Info("deprovisioning application", "application", p.Name)
 
-	id, err := p.getResourceID()
+	id, err := p.getResourceID(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := p.driver.DeleteHelmApplication(ctx, id, p.BackgroundDelete); err != nil {
+	if err := cd.FromContext(ctx).DeleteHelmApplication(ctx, id, p.BackgroundDelete); err != nil {
 		return err
 	}
 

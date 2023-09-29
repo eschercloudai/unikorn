@@ -21,7 +21,6 @@ import (
 	"errors"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/resource"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
@@ -40,18 +39,13 @@ var (
 type Provisioner struct {
 	provisioners.ProvisionerMeta
 
-	// client provides access to Kubernetes.
-	client client.Client
-
 	// project is the Kubernetes project we're provisioning.
 	project unikornv1.Project
 }
 
 // New returns a new initialized provisioner object.
-func New(client client.Client, _ cd.Driver) provisioners.ManagerProvisioner {
-	return &Provisioner{
-		client: client,
-	}
+func New() provisioners.ManagerProvisioner {
+	return &Provisioner{}
 }
 
 // Ensure the ManagerProvisioner interface is implemented.
@@ -69,7 +63,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	// Namespace exists, leave it alone.
-	namespace, err := util.GetResourceNamespace(ctx, p.client, labels)
+	namespace, err := util.GetResourceNamespace(ctx, labels)
 	if err != nil {
 		// Some other error, propagate it back up the stack.
 		if !errors.Is(err, util.ErrNamespaceLookup) {
@@ -86,7 +80,7 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 			},
 		}
 
-		if err := resource.New(p.client, namespace).Provision(ctx); err != nil {
+		if err := resource.New(namespace).Provision(ctx); err != nil {
 			return err
 		}
 	}
@@ -104,7 +98,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	// Get the project's namespace.
-	namespace, err := util.GetResourceNamespace(ctx, p.client, labels)
+	namespace, err := util.GetResourceNamespace(ctx, labels)
 	if err != nil {
 		// Already dead.
 		if errors.Is(err, util.ErrNamespaceLookup) {
@@ -115,7 +109,7 @@ func (p *Provisioner) Deprovision(ctx context.Context) error {
 	}
 
 	// Deprovision the namespace and await deletion.
-	if err := resource.New(p.client, namespace).Deprovision(ctx); err != nil {
+	if err := resource.New(namespace).Deprovision(ctx); err != nil {
 		return err
 	}
 

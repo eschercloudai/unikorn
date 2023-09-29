@@ -21,7 +21,9 @@ import (
 	"errors"
 	"fmt"
 
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -39,14 +41,14 @@ var (
 )
 
 // filterOwnedResources removes any resources that aren't owned by the cluster.
-func (p *Provisioner) filterOwnedResources(resources []unstructured.Unstructured) []unstructured.Unstructured {
+func (p *Provisioner) filterOwnedResources(cluster *unikornv1.KubernetesCluster, resources []unstructured.Unstructured) []unstructured.Unstructured {
 	var filtered []unstructured.Unstructured
 
 	for _, resource := range resources {
 		ownerReferences := resource.GetOwnerReferences()
 
 		for _, ownerReference := range ownerReferences {
-			if ownerReference.Kind != "Cluster" || ownerReference.Name != releaseName(p.cluster) {
+			if ownerReference.Kind != "Cluster" || ownerReference.Name != releaseName(cluster) {
 				continue
 			}
 
@@ -60,6 +62,9 @@ func (p *Provisioner) filterOwnedResources(resources []unstructured.Unstructured
 // getOwnedResource returns resources of the specified API version/kind that belong
 // to the cluster.
 func (p *Provisioner) getOwnedResource(ctx context.Context, c client.Client, apiVersion, kind string) ([]unstructured.Unstructured, error) {
+	//nolint:forcetypeassert
+	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
+
 	objects := &unstructured.UnstructuredList{
 		Object: map[string]interface{}{
 			"apiVersion": apiVersion,
@@ -68,14 +73,14 @@ func (p *Provisioner) getOwnedResource(ctx context.Context, c client.Client, api
 	}
 
 	options := &client.ListOptions{
-		Namespace: p.cluster.Name,
+		Namespace: cluster.Name,
 	}
 
 	if err := c.List(ctx, objects, options); err != nil {
 		return nil, err
 	}
 
-	return p.filterOwnedResources(objects.Items), nil
+	return p.filterOwnedResources(cluster, objects.Items), nil
 }
 
 // getMachineDeployments gets all live machine deployments for the cluster.
@@ -130,10 +135,10 @@ func machineDeploymentForWorkloadPool(objects []unstructured.Unstructured, name 
 
 // getExpectedMachineDeployments finds the expected machine deployments based on the
 // workload pool name annotations.
-func (p *Provisioner) getExpectedMachineDeployments(objects []unstructured.Unstructured) ([]unstructured.Unstructured, error) {
-	filtered := make([]unstructured.Unstructured, len(p.cluster.Spec.WorkloadPools.Pools))
+func (p *Provisioner) getExpectedMachineDeployments(cluster *unikornv1.KubernetesCluster, objects []unstructured.Unstructured) ([]unstructured.Unstructured, error) {
+	filtered := make([]unstructured.Unstructured, len(cluster.Spec.WorkloadPools.Pools))
 
-	for i, pool := range p.cluster.Spec.WorkloadPools.Pools {
+	for i, pool := range cluster.Spec.WorkloadPools.Pools {
 		object, err := machineDeploymentForWorkloadPool(objects, pool.Name)
 		if err != nil {
 			return nil, err
@@ -208,13 +213,14 @@ func deleteForeignResources(ctx context.Context, c client.Client, objects []unst
 //
 //nolint:cyclop
 func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) error {
-	if p.driver.Kind() != cd.DriverKindArgoCD {
+	if cd.FromContext(ctx).Kind() != cd.DriverKindArgoCD {
 		return nil
 	}
 
-	vc := vcluster.NewControllerRuntimeClient(p.driver.Client())
+	//nolint:forcetypeassert
+	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 
-	vclusterClient, err := vc.Client(ctx, p.cluster.Namespace, false)
+	vclusterClient, err := vcluster.NewControllerRuntimeClient().Client(ctx, cluster.Namespace, false)
 	if err != nil {
 		return fmt.Errorf("%w: failed to create vcluster client", err)
 	}
@@ -239,7 +245,7 @@ func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) erro
 		return err
 	}
 
-	expectedDeployments, err := p.getExpectedMachineDeployments(deployments)
+	expectedDeployments, err := p.getExpectedMachineDeployments(cluster, deployments)
 	if err != nil {
 		return err
 	}
