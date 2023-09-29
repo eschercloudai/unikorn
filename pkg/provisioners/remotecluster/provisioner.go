@@ -49,6 +49,10 @@ type RemoteCluster struct {
 
 	// currentCount tells us how many times remote provisioners have been called.
 	currentCount int
+
+	// parent indicates nested clusters, an therefore the need to do a bunch of
+	// ndirection...
+	parent *RemoteCluster
 }
 
 // New returns a new initialized provisioner object.
@@ -145,7 +149,7 @@ func (p *remoteClusterProvisioner) provisionRemote(ctx context.Context) error {
 		}
 
 		if err := cd.FromContext(ctx).CreateOrUpdateCluster(ctx, id, cluster); err != nil {
-			log.Info("remote cluster not ready, yielding", "remotecluster", id)
+			log.Info("remote cluster not ready, yielding", "remotecluster", id, "error", err)
 
 			return provisioners.ErrYield
 		}
@@ -211,7 +215,7 @@ func (p *remoteClusterProvisioner) Deprovision(ctx context.Context) error {
 		}
 	}
 
-	// Once all concurrent remote provisioner have done there stuff
+	// Once all concurrent remote provisioners have done their stuff
 	// they will wait on the lock...
 	p.remote.lock.Lock()
 	defer p.remote.lock.Unlock()

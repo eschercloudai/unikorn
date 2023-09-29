@@ -18,6 +18,10 @@ spec:
     reference:
       kind: HelmApplication
       name: cluster-api-0.1.10-1
+  - name: argocd
+    reference:
+      kind: HelmApplication
+      name: argocd-5.46.7-1
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ApplicationBundle

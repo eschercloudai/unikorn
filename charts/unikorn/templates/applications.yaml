@@ -1,6 +1,24 @@
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
+  name: argocd-5.46.7-1
+spec:
+  repo: https://argoproj.github.io/argo-helm
+  chart: argo-cd
+  version: 5.46.7
+  release: argocd # Fixed name so we can find it implicitly!
+  createNamespace: true
+  parameters:
+  - name: dex.enabled
+    value: 'false'
+  - name: notifications.enabled
+    value: 'false'
+  - name: applicationSet.enabled
+    value: 'false'
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
   name: cert-manager-1.11.0-1
 spec:
   repo: https://charts.jetstack.io
@@ -11,7 +29,6 @@ spec:
   parameters:
   - name: installCRDs
     value: "true"
-
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication

@@ -41,6 +41,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/prometheus"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/remoteprovisioner"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
 	provisionersutil "github.com/eschercloudai/unikorn/pkg/provisioners/util"
 	"github.com/eschercloudai/unikorn/pkg/util"
@@ -105,6 +106,8 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 
 	remoteControlPlane := remotecluster.New(vcluster.NewRemoteCluster(p.cluster.Namespace, controlPlane), false)
 
+	remoteProvisioner := remoteprovisioner.New(true)
+
 	controlPlanePrefix, err := util.GetNATPrefix(ctx)
 	if err != nil {
 		return nil, err
@@ -140,13 +143,13 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 			openstackplugincindercsi.New(),
 			metricsserver.New(),
 			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New()),
+			// TODO: these need to be delegated to an application controller.
 			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New()),
 			conditional.New("cert-manager", p.cluster.CertManagerEnabled, certManagerProvisioner),
 			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New()),
 			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New()),
 		),
 		concurrent.New("cluster add-ons wave 2",
-			// TODO: this hack where it needs the remote is pretty ugly.
 			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New()),
 		),
 	)
@@ -156,13 +159,15 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 	// are added.  Follow that up by the autoscaler as some addons may require worker
 	// nodes to schedule onto.
 	provisioner := remoteControlPlane.ProvisionOn(
-		serial.New("kubernetes cluster",
-			concurrent.New("kubernetes cluster",
-				clusterProvisioner,
-				remoteCluster.ProvisionOn(bootstrapProvisioner, remotecluster.BackgroundDeletion),
+		remoteProvisioner.ProvisionOn(
+			serial.New("kubernetes cluster",
+				concurrent.New("kubernetes cluster",
+					clusterProvisioner,
+					remoteCluster.ProvisionOn(bootstrapProvisioner, remotecluster.BackgroundDeletion),
+				),
+				clusterAutoscalerProvisioner,
+				remoteCluster.ProvisionOn(addonsProvisioner, remotecluster.BackgroundDeletion),
 			),
-			clusterAutoscalerProvisioner,
-			remoteCluster.ProvisionOn(addonsProvisioner, remotecluster.BackgroundDeletion),
 		),
 	)
 

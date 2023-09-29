@@ -30,6 +30,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterapi"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/remoteprovisioner"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/resource"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
@@ -137,8 +138,9 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 // getControlPlaneProvisioner returns a provisoner that encodes control plane
 // provisioning steps.
 func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.Provisioner {
-	remoteControlPlane := remotecluster.New(vcluster.NewRemoteCluster(namespace, &p.controlPlane), true)
+	remoteProvisioner := remoteprovisioner.New(true)
 
+	remoteControlPlane := remotecluster.New(vcluster.NewRemoteCluster(namespace, &p.controlPlane), true)
 	clusterAPIProvisioner := concurrent.New("cluster-api",
 		certmanager.New(),
 		clusterapi.New(),
@@ -151,7 +153,9 @@ func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.
 	// install cert manager and cluster API into it.
 	return serial.New("control plane",
 		vcluster.New().InNamespace(namespace),
-		remoteControlPlane.ProvisionOn(clusterAPIProvisioner),
+		remoteControlPlane.ProvisionOn(
+			remoteProvisioner.ProvisionOn(clusterAPIProvisioner),
+		),
 	)
 }
 
