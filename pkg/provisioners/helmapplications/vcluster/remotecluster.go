@@ -19,6 +19,7 @@ package vcluster
 import (
 	"context"
 
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
@@ -30,37 +31,41 @@ type RemoteCluster struct {
 	// namespace tells us where the vcluster lives.
 	namespace string
 
-	// labels are used to form a unique and context specific name for
-	// the remote cluster instance.
-	labels []string
+	// resource is used to identify the owner of and uniquely identify
+	// a remote cluster instance.
+	resource unikornv1.MutuallyExclusiveResource
 }
 
 // Ensure this implements the remotecluster.Generator interface.
 var _ provisioners.RemoteCluster = &RemoteCluster{}
 
 // NewRemoteCluster return a new instance of a remote cluster generator.
-func NewRemoteCluster(namespace string, labels []string) *RemoteCluster {
+func NewRemoteCluster(namespace string, resource unikornv1.MutuallyExclusiveResource) *RemoteCluster {
 	return &RemoteCluster{
 		namespace: namespace,
-		labels:    labels,
+		resource:  resource,
 	}
 }
 
 // ID implements the remotecluster.Generator interface.
 func (g *RemoteCluster) ID() *cd.ResourceIdentifier {
-	// TODO: the labels handling is a bit smelly,
+	// TODO: error checking.
+	resourceLabels, _ := g.resource.ResourceLabels()
+
+	var labels []cd.ResourceIdentifierLabel
+
+	for _, label := range constants.LabelPriorities() {
+		if value, ok := resourceLabels[label]; ok {
+			labels = append(labels, cd.ResourceIdentifierLabel{
+				Name:  label,
+				Value: value,
+			})
+		}
+	}
+
 	return &cd.ResourceIdentifier{
-		Name: "vcluster",
-		Labels: []cd.ResourceIdentifierLabel{
-			{
-				Name:  constants.ControlPlaneLabel,
-				Value: g.labels[0],
-			},
-			{
-				Name:  constants.ProjectLabel,
-				Value: g.labels[1],
-			},
-		},
+		Name:   "vcluster",
+		Labels: labels,
 	}
 }
 

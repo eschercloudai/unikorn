@@ -25,11 +25,11 @@ type key int
 //nolint:gochecknoglobals
 var resourceKey key
 
-func NewContext(ctx context.Context, resource MutuallyExclusiveResource) context.Context {
+func NewContext(ctx context.Context, resource OwningResource) context.Context {
 	return context.WithValue(ctx, resourceKey, resource)
 }
 
-func FromContext(ctx context.Context) MutuallyExclusiveResource {
+func FromContext(ctx context.Context) OwningResource {
 	//nolint:forcetypeassert
-	return ctx.Value(resourceKey).(MutuallyExclusiveResource)
+	return ctx.Value(resourceKey).(OwningResource)
 }

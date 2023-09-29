@@ -80,7 +80,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	object := provisioner.Object()
 
-	resource, _ := object.(application.MutuallyExclusiveResource)
+	// TODO: make a composite interface type.
+	resource, _ := object.(application.OwningResource)
 
 	ctx = clientlib.NewContext(ctx, r.client)
 	ctx = cd.NewContext(ctx, r.driverRunnable.Driver())

@@ -32,13 +32,6 @@ var (
 	ErrApplicationMissing = errors.New("bundle missing expected application")
 )
 
-// ApplicationBundleGetter is a type, typically a custom resource, that has an attached
-// application bundle.
-type ApplicationBundleGetter interface {
-	ApplicationBundleKind() unikornv1.ApplicationBundleResourceKind
-	ApplicationBundleName() string
-}
-
 type unbundleItem struct {
 	// r is where to store the resource.
 	r **unikornv1.HelmApplication
@@ -67,7 +60,7 @@ type Unbundler struct {
 	items []unbundleItem
 }
 
-func NewUnbundler(o ApplicationBundleGetter) *Unbundler {
+func NewUnbundler(o unikornv1.ApplicationBundleGetter) *Unbundler {
 	return &Unbundler{
 		name: o.ApplicationBundleName(),
 		kind: o.ApplicationBundleKind(),
