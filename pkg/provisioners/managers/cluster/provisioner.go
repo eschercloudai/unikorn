@@ -72,7 +72,7 @@ func (p *Provisioner) Object() client.Object {
 
 // getRemoteCluster returns a generator capable of reading the cluster
 // kubeconfig from the underlying control plane.
-func (p *Provisioner) getRemoteCluster(ctx context.Context) (*clusteropenstack.RemoteCluster, error) {
+func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusteropenstack.RemoteCluster, error) {
 	client, err := vcluster.NewControllerRuntimeClient().Client(ctx, p.cluster.Namespace, false)
 	if err != nil {
 		return nil, err
@@ -114,17 +114,19 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 		return nil, err
 	}
 
-	controlPlaneRemote := vcluster.NewRemoteCluster(p.cluster.Namespace, controlPlane)
+	remoteControlPlane := remotecluster.New(vcluster.NewRemoteCluster(p.cluster.Namespace, controlPlane), false)
 
 	controlPlanePrefix, err := util.GetNATPrefix(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	clusterRemote, err := p.getRemoteCluster(ctx)
+	remoteClusterGenerator, err := p.getRemoteClusterGenerator(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	remoteCluster := remotecluster.New(remoteClusterGenerator, true)
 
 	clusterProvisioner := clusteropenstack.New(controlPlanePrefix).InNamespace(p.cluster.Name)
 
@@ -161,15 +163,9 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 		),
 		concurrent.New("cluster add-ons wave 2",
 			// TODO: this hack where it needs the remote is pretty ugly.
-			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(clusterRemote)),
+			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(remoteClusterGenerator)),
 		),
 	)
-
-	// Set up the remote clusters for the various groups.
-	clusterProvisioner.OnRemote(controlPlaneRemote)
-	clusterAutoscalerProvisioner.OnRemote(controlPlaneRemote)
-	bootstrapProvisioner.OnRemote(clusterRemote)
-	addonsProvisioner.OnRemote(clusterRemote)
 
 	// Setup any deletion semantics.  These application sets all exist in "ephemeral"
 	// clusters, so we don't care about cleanup, we do care about cleaning up the cluster
@@ -183,14 +179,11 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 	// nodes to schedule onto.
 	provisioner := serial.New("kubernetes cluster",
 		concurrent.New("kubernetes cluster",
-			clusterProvisioner,
-			serial.New("cluster bootstrap",
-				remotecluster.New(clusterRemote),
-				bootstrapProvisioner,
-			),
+			remoteControlPlane.ProvisionOn(clusterProvisioner),
+			remoteCluster.ProvisionOn(bootstrapProvisioner),
 		),
-		clusterAutoscalerProvisioner,
-		addonsProvisioner,
+		remoteControlPlane.ProvisionOn(clusterAutoscalerProvisioner),
+		remoteCluster.ProvisionOn(addonsProvisioner),
 	)
 
 	return provisioner, nil
