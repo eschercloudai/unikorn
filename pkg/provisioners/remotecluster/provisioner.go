@@ -18,6 +18,7 @@ package remotecluster
 
 import (
 	"context"
+	"sync"
 
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
@@ -50,62 +51,143 @@ type Provisioner struct {
 
 	// generator provides a method to derive cluster names and configuration.
 	generator provisioners.RemoteCluster
+
+	// controller tells whether we "own" this resource or not.
+	controller bool
+
+	// lock provides synchronization around concurrrency.
+	lock sync.Mutex
+
+	// refCount tells us how many remote provisioners have been registered.
+	refCount int
+
+	// currentCount tells us how many times remote provisioners have been called.
+	currentCount int
 }
 
 // New returns a new initialized provisioner object.
-func New(generator provisioners.RemoteCluster) *Provisioner {
+func New(generator provisioners.RemoteCluster, controller bool) *Provisioner {
 	return &Provisioner{
 		ProvisionerMeta: provisioners.ProvisionerMeta{
 			Name: "remote-cluster",
 		},
-		generator: generator,
+		generator:  generator,
+		controller: controller,
 	}
 }
-
-// Ensure the Provisioner interface is implemented.
-var _ provisioners.Provisioner = &Provisioner{}
 
 func (p *Provisioner) ID() *cd.ResourceIdentifier {
 	return p.generator.ID()
 }
 
-// Provision implements the Provision interface.
-func (p *Provisioner) Provision(ctx context.Context) error {
+// ProvisionOn returns a provisioner that will provision the remote,
+// and provision the child provisioner on that remote.
+func (p *Provisioner) ProvisionOn(child provisioners.Provisioner) provisioners.Provisioner {
+	p.refCount++
+
+	return &remoteProvisioner{
+		ProvisionerMeta: provisioners.ProvisionerMeta{
+			Name: p.Name + "-dynamic",
+		},
+		provisioner: p,
+		child:       child,
+	}
+}
+
+type remoteProvisioner struct {
+	provisioners.ProvisionerMeta
+	provisioner *Provisioner
+	child       provisioners.Provisioner
+}
+
+// Ensure the Provisioner interface is implemented.
+var _ provisioners.Provisioner = &remoteProvisioner{}
+
+func (p *remoteProvisioner) provisionRemote(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("provisioning remote cluster", "remotecluster", p.Name)
+	p.provisioner.lock.Lock()
+	defer p.provisioner.lock.Unlock()
 
-	config, err := p.generator.Config(ctx)
-	if err != nil {
+	p.provisioner.currentCount++
+
+	id := p.provisioner.generator.ID()
+
+	// If this is the first remote cluster encountered, reconcile it.
+	if p.provisioner.controller && p.provisioner.currentCount == 1 {
+		log.Info("provisioning remote cluster", "remotecluster", id)
+
+		config, err := p.provisioner.generator.Config(ctx)
+		if err != nil {
+			return err
+		}
+
+		cluster := &cd.Cluster{
+			Config: config,
+		}
+
+		if err := cd.FromContext(ctx).CreateOrUpdateCluster(ctx, id, cluster); err != nil {
+			log.Info("remote cluster not ready, yielding", "remotecluster", id)
+
+			return provisioners.ErrYield
+		}
+
+		log.Info("remote cluster provisioned", "remotecluster", id)
+	}
+
+	return nil
+}
+
+// Provision implements the Provision interface.
+func (p *remoteProvisioner) Provision(ctx context.Context) error {
+	if err := p.provisionRemote(ctx); err != nil {
 		return err
 	}
 
-	cluster := &cd.Cluster{
-		Config: config,
+	// TODO: make this a shallow clone!
+	p.child.OnRemote(p.provisioner.generator)
+
+	// Remote is registered, create the remote applications.
+	if err := p.child.Provision(ctx); err != nil {
+		return err
 	}
-
-	if err := cd.FromContext(ctx).CreateOrUpdateCluster(ctx, p.generator.ID(), cluster); err != nil {
-		log.Info("remote cluster not ready, yielding", "remotecluster", p.Name)
-
-		return provisioners.ErrYield
-	}
-
-	log.Info("remote cluster provisioned", "remotecluster", p.Name)
 
 	return nil
 }
 
 // Deprovision implements the Provision interface.
-func (p *Provisioner) Deprovision(ctx context.Context) error {
+func (p *remoteProvisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	log.Info("deprovisioning remote cluster", "remotecluster", p.Name)
+	// TODO: make this a shallow clone!
+	p.child.OnRemote(p.provisioner.generator)
 
-	if err := cd.FromContext(ctx).DeleteCluster(ctx, p.generator.ID()); err != nil {
+	// Remove the applications.
+	if err := p.child.Deprovision(ctx); err != nil {
 		return err
 	}
 
-	log.Info("remote cluster deprovisioned", "remotecluster", p.Name)
+	// Once all concurrent remote provisioner have done there stuff
+	// they will wait on the lock...
+	p.provisioner.lock.Lock()
+	defer p.provisioner.lock.Unlock()
+
+	// ... adding themselves to the total...
+	p.provisioner.currentCount++
+
+	id := p.provisioner.generator.ID()
+
+	// ... and if all have completed without an error, then deprovision the
+	// remote cluster itself.
+	if p.provisioner.controller && p.provisioner.currentCount == p.provisioner.refCount {
+		log.Info("deprovisioning remote cluster", "remotecluster", id)
+
+		if err := cd.FromContext(ctx).DeleteCluster(ctx, id); err != nil {
+			return err
+		}
+
+		log.Info("remote cluster deprovisioned", "remotecluster", id)
+	}
 
 	return nil
 }
