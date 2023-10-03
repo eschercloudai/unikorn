@@ -44,11 +44,9 @@ func GetClient(ctx context.Context, generator provisioners.RemoteCluster) (clien
 	return client.New(restConfig, client.Options{})
 }
 
-// Provisioner provides generic handling of remote cluster instances.
+// RemoteCluster provides generic handling of remote cluster instances.
 // Specialization is delegated to a provider specific interface.
-type Provisioner struct {
-	provisioners.ProvisionerMeta
-
+type RemoteCluster struct {
 	// generator provides a method to derive cluster names and configuration.
 	generator provisioners.RemoteCluster
 
@@ -66,58 +64,74 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(generator provisioners.RemoteCluster, controller bool) *Provisioner {
-	return &Provisioner{
-		ProvisionerMeta: provisioners.ProvisionerMeta{
-			Name: "remote-cluster",
-		},
+func New(generator provisioners.RemoteCluster, controller bool) *RemoteCluster {
+	return &RemoteCluster{
 		generator:  generator,
 		controller: controller,
 	}
 }
 
-func (p *Provisioner) ID() *cd.ResourceIdentifier {
-	return p.generator.ID()
+// remoteClusterProvisioner is created when we want to run a provisioner on a remote
+// cluster.
+type remoteClusterProvisioner struct {
+	provisioners.ProvisionerMeta
+
+	// provisioner is a reference to the remote cluster, it contains global
+	// information about the remote cluster that this provisioner is operating
+	// on.
+	remote *RemoteCluster
+
+	// child is the provisioner to run on the remote cluster.
+	child provisioners.Provisioner
+}
+
+// Ensure the Provisioner interface is implemented.
+var _ provisioners.Provisioner = &remoteClusterProvisioner{}
+
+// Allows us to specify options for the provided provisioner.
+type ProvisionerOption func(p *remoteClusterProvisioner)
+
+func BackgroundDeletion(p *remoteClusterProvisioner) {
+	// TODO: This mutates the child and causes side effects, could we
+	// propagate this information via the context?
+	p.child.BackgroundDeletion()
 }
 
 // ProvisionOn returns a provisioner that will provision the remote,
 // and provision the child provisioner on that remote.
-func (p *Provisioner) ProvisionOn(child provisioners.Provisioner) provisioners.Provisioner {
-	p.refCount++
+func (r *RemoteCluster) ProvisionOn(child provisioners.Provisioner, options ...ProvisionerOption) provisioners.Provisioner {
+	r.refCount++
 
-	return &remoteProvisioner{
+	provisioner := &remoteClusterProvisioner{
 		ProvisionerMeta: provisioners.ProvisionerMeta{
-			Name: p.Name + "-dynamic",
+			Name: "remote-cluster",
 		},
-		provisioner: p,
-		child:       child,
+		remote: r,
+		child:  child,
 	}
+
+	for _, o := range options {
+		o(provisioner)
+	}
+
+	return provisioner
 }
 
-type remoteProvisioner struct {
-	provisioners.ProvisionerMeta
-	provisioner *Provisioner
-	child       provisioners.Provisioner
-}
-
-// Ensure the Provisioner interface is implemented.
-var _ provisioners.Provisioner = &remoteProvisioner{}
-
-func (p *remoteProvisioner) provisionRemote(ctx context.Context) error {
+func (p *remoteClusterProvisioner) provisionRemote(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	p.provisioner.lock.Lock()
-	defer p.provisioner.lock.Unlock()
+	p.remote.lock.Lock()
+	defer p.remote.lock.Unlock()
 
-	p.provisioner.currentCount++
+	p.remote.currentCount++
 
-	id := p.provisioner.generator.ID()
+	id := p.remote.generator.ID()
 
 	// If this is the first remote cluster encountered, reconcile it.
-	if p.provisioner.controller && p.provisioner.currentCount == 1 {
+	if p.remote.controller && p.remote.currentCount == 1 {
 		log.Info("provisioning remote cluster", "remotecluster", id)
 
-		config, err := p.provisioner.generator.Config(ctx)
+		config, err := p.remote.generator.Config(ctx)
 		if err != nil {
 			return err
 		}
@@ -139,13 +153,14 @@ func (p *remoteProvisioner) provisionRemote(ctx context.Context) error {
 }
 
 // Provision implements the Provision interface.
-func (p *remoteProvisioner) Provision(ctx context.Context) error {
+func (p *remoteClusterProvisioner) Provision(ctx context.Context) error {
 	if err := p.provisionRemote(ctx); err != nil {
 		return err
 	}
 
-	// TODO: make this a shallow clone!
-	p.child.OnRemote(p.provisioner.generator)
+	// TODO: This mutates the child and causes side effects, could we
+	// propagate this information via the context?
+	p.child.OnRemote(p.remote.generator)
 
 	// Remote is registered, create the remote applications.
 	if err := p.child.Provision(ctx); err != nil {
@@ -156,11 +171,12 @@ func (p *remoteProvisioner) Provision(ctx context.Context) error {
 }
 
 // Deprovision implements the Provision interface.
-func (p *remoteProvisioner) Deprovision(ctx context.Context) error {
+func (p *remoteClusterProvisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	// TODO: make this a shallow clone!
-	p.child.OnRemote(p.provisioner.generator)
+	// TODO: This mutates the child and causes side effects, could we
+	// propagate this information via the context?
+	p.child.OnRemote(p.remote.generator)
 
 	// Remove the applications.
 	if err := p.child.Deprovision(ctx); err != nil {
@@ -169,17 +185,17 @@ func (p *remoteProvisioner) Deprovision(ctx context.Context) error {
 
 	// Once all concurrent remote provisioner have done there stuff
 	// they will wait on the lock...
-	p.provisioner.lock.Lock()
-	defer p.provisioner.lock.Unlock()
+	p.remote.lock.Lock()
+	defer p.remote.lock.Unlock()
 
 	// ... adding themselves to the total...
-	p.provisioner.currentCount++
+	p.remote.currentCount++
 
-	id := p.provisioner.generator.ID()
+	id := p.remote.generator.ID()
 
 	// ... and if all have completed without an error, then deprovision the
 	// remote cluster itself.
-	if p.provisioner.controller && p.provisioner.currentCount == p.provisioner.refCount {
+	if p.remote.controller && p.remote.currentCount == p.remote.refCount {
 		log.Info("deprovisioning remote cluster", "remotecluster", id)
 
 		if err := cd.FromContext(ctx).DeleteCluster(ctx, id); err != nil {
