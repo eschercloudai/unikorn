@@ -167,12 +167,6 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 		),
 	)
 
-	// Setup any deletion semantics.  These application sets all exist in "ephemeral"
-	// clusters, so we don't care about cleanup, we do care about cleaning up the cluster
-	// resources though.
-	bootstrapProvisioner.BackgroundDeletion()
-	addonsProvisioner.BackgroundDeletion()
-
 	// Create the cluster and the boostrap components in parallel, the cluster will
 	// come up but never reach healthy until the CNI and cloud controller manager
 	// are added.  Follow that up by the autoscaler as some addons may require worker
@@ -180,10 +174,10 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 	provisioner := serial.New("kubernetes cluster",
 		concurrent.New("kubernetes cluster",
 			remoteControlPlane.ProvisionOn(clusterProvisioner),
-			remoteCluster.ProvisionOn(bootstrapProvisioner),
+			remoteCluster.ProvisionOn(bootstrapProvisioner, remotecluster.BackgroundDeletion),
 		),
 		remoteControlPlane.ProvisionOn(clusterAutoscalerProvisioner),
-		remoteCluster.ProvisionOn(addonsProvisioner),
+		remoteCluster.ProvisionOn(addonsProvisioner, remotecluster.BackgroundDeletion),
 	)
 
 	return provisioner, nil
