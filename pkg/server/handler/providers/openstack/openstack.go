@@ -439,7 +439,7 @@ func (o *Openstack) ListImages(r *http.Request) (generated.OpenstackImages, erro
 		return nil, errors.OAuth2ServerError("failed get image client").WithError(err)
 	}
 
-	result, err := client.Images(r.Context(), o.options.Key.key, o.options.ValidateProperties)
+	result, err := client.Images(r.Context(), o.options.Key.key, o.options.Properties)
 	if err != nil {
 		return nil, covertError(err)
 	}

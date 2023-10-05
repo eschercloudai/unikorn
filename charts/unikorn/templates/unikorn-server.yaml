@@ -111,7 +111,9 @@ spec:
         image: {{ include "unikorn.serverImage" . }}
         args:
         - --image-signing-key={{ .Values.server.imageSigningKey }}
-        - --validate-image-properties={{ .Values.server.validateImageProperties }}
+        {{- with $properties := .Values.server.imageProperties -}}
+          {{ printf "- --image-properties=%s" (join "," $properties) | nindent 8 }}
+        {{- end }}
         {{- with $credentials := .Values.server.applicationCredentials -}}
           {{- with $roles := $credentials.roles -}}
             {{ printf "- --application-credential-roles=%s" (join "," $roles) | nindent 8 }}

@@ -89,10 +89,10 @@ func (v *PublicKeyVar) Type() string {
 }
 
 type Options struct {
-	ComputeOptions     openstack.ComputeOptions
-	Key                PublicKeyVar
-	ServerGroupPolicy  string
-	ValidateProperties bool
+	ComputeOptions    openstack.ComputeOptions
+	Key               PublicKeyVar
+	ServerGroupPolicy string
+	Properties        []string
 	// applicationCredentialRoles sets the roles an application credential
 	// is granted on creation.
 	ApplicationCredentialRoles []string
@@ -101,7 +101,7 @@ type Options struct {
 func (o *Options) AddFlags(f *pflag.FlagSet) {
 	o.ComputeOptions.AddFlags(f)
 	f.Var(&o.Key, "image-signing-key", "Key used to verify valid images for use with the platform")
-	f.BoolVar(&o.ValidateProperties, "validate-image-properties", true, "Whether to validate image properties for a preloaded K8s and GPU driver version")
+	f.StringSliceVar(&o.Properties, "image-properties", nil, "Whether to validate image properties for a preloaded K8s and GPU driver version")
 	f.StringVar(&o.ServerGroupPolicy, "server-group-policy", "soft-anti-affinity", "Scheduling policy to use for server groups")
 	f.StringSliceVar(&o.ApplicationCredentialRoles, "application-credential-roles", nil, "A role to be added to application credentials on creation.  May be specified more than once.")
 }
