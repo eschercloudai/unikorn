@@ -91,6 +91,9 @@ const (
 	// between them.
 	ApplicationLabel = "unikorn.eschercloud.ai/application"
 
+	// ApplicationIDLabel is used to lookup applications based on their ID.
+	ApplicationIDLabel = "unikorn.eschercloud.ai/application-id"
+
 	// IngressEndpointAnnotation helps us find the ingress IP address.
 	IngressEndpointAnnotation = "unikorn.eschercloud.ai/ingress-endpoint"
 
