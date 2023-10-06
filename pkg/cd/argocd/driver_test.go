@@ -18,18 +18,20 @@ package argocd_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 
 	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
-	"github.com/eschercloudai/unikorn/pkg/cd/argocd/mock"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
+
+	corev1 "k8s.io/api/core/v1"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -39,7 +41,7 @@ type testContext struct {
 	driver *argocd.Driver
 }
 
-func mustNewTestContext(t *testing.T, client argocd.Client) *testContext {
+func mustNewTestContext(t *testing.T) *testContext {
 	t.Helper()
 
 	scheme, err := clientutil.NewScheme()
@@ -48,7 +50,7 @@ func mustNewTestContext(t *testing.T, client argocd.Client) *testContext {
 	}
 
 	tc := &testContext{
-		driver: argocd.NewDriver(fake.NewClientBuilder().WithScheme(scheme).Build(), client),
+		driver: argocd.New(fake.NewClientBuilder().WithScheme(scheme).Build()),
 	}
 
 	return tc
@@ -76,12 +78,7 @@ const (
 func TestApplicationCreateHelm(t *testing.T) {
 	t.Parallel()
 
-	c := gomock.NewController(t)
-	defer c.Finish()
-
-	client := mock.NewMockClient(c)
-
-	tc := mustNewTestContext(t, client)
+	tc := mustNewTestContext(t)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -126,12 +123,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 		valuesKey: valuesValue,
 	}
 
-	c := gomock.NewController(t)
-	defer c.Finish()
-
-	client := mock.NewMockClient(c)
-
-	tc := mustNewTestContext(t, client)
+	tc := mustNewTestContext(t)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -195,12 +187,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 func TestApplicationCreateGit(t *testing.T) {
 	t.Parallel()
 
-	c := gomock.NewController(t)
-	defer c.Finish()
-
-	client := mock.NewMockClient(c)
-
-	tc := mustNewTestContext(t, client)
+	tc := mustNewTestContext(t)
 
 	path := "bar"
 
@@ -235,12 +222,7 @@ func TestApplicationCreateGit(t *testing.T) {
 func TestApplicationUpdateAndDelete(t *testing.T) {
 	t.Parallel()
 
-	c := gomock.NewController(t)
-	defer c.Finish()
-
-	client := mock.NewMockClient(c)
-
-	tc := mustNewTestContext(t, client)
+	tc := mustNewTestContext(t)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -283,16 +265,140 @@ func TestApplicationUpdateAndDelete(t *testing.T) {
 func TestApplicationDeleteNotFound(t *testing.T) {
 	t.Parallel()
 
-	c := gomock.NewController(t)
-	defer c.Finish()
-
-	client := mock.NewMockClient(c)
-
-	tc := mustNewTestContext(t, client)
+	tc := mustNewTestContext(t)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
 	}
 
 	assert.NoError(t, tc.driver.DeleteHelmApplication(context.TODO(), id, false))
+}
+
+const (
+	clusterServer = "https://localhost:8443"
+)
+
+func clusterCA() []byte {
+	return []byte("foo")
+}
+
+func clusterClientCert() []byte {
+	return []byte("bar")
+}
+
+func clusterClientKey() []byte {
+	return []byte("baz")
+}
+
+func getKubeconfig() *clientcmdapi.Config {
+	return &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"default": {
+				Server:                   clusterServer,
+				CertificateAuthorityData: clusterCA(),
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"default": {
+				ClientCertificateData: clusterClientCert(),
+				ClientKeyData:         clusterClientKey(),
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"default": {
+				Cluster:  "default",
+				AuthInfo: "default",
+			},
+		},
+		CurrentContext: "default",
+	}
+}
+
+// mustGetClusterSecret gets the cluster secret for the id.
+func mustGetClusterSecret(t *testing.T, tc *testContext, id *cd.ResourceIdentifier) *corev1.Secret {
+	t.Helper()
+
+	secret, err := tc.driver.GetClusterSecret(context.TODO(), id)
+	assert.NoError(t, err)
+
+	return secret
+}
+
+// TestClusterCreate ensures we can successfully create a new cluster, read it back and
+// the contents are correct.
+func TestClusterCreate(t *testing.T) {
+	t.Parallel()
+
+	tc := mustNewTestContext(t)
+
+	id := &cd.ResourceIdentifier{
+		Name: "test",
+	}
+
+	cluster := &cd.Cluster{
+		Config: getKubeconfig(),
+	}
+
+	assert.NoError(t, tc.driver.CreateOrUpdateCluster(context.TODO(), id, cluster))
+
+	secret := mustGetClusterSecret(t, tc, id)
+
+	assert.Equal(t, []byte(clusterServer), secret.Data["server"])
+
+	var config argocd.ClusterConfig
+
+	assert.NoError(t, json.Unmarshal(secret.Data["config"], &config))
+	assert.Equal(t, clusterCA(), config.TLSClientConfig.CAData)
+	assert.Equal(t, clusterClientCert(), config.TLSClientConfig.CertData)
+	assert.Equal(t, clusterClientKey(), config.TLSClientConfig.KeyData)
+}
+
+// TestClusterUpdateAndDelete tests updates are reflected in the cluster e.g. certificate
+// rotation, and deletion does what it's supposed to.
+func TestClusterUpdateAndDelete(t *testing.T) {
+	t.Parallel()
+
+	tc := mustNewTestContext(t)
+
+	id := &cd.ResourceIdentifier{
+		Name: "test",
+	}
+
+	cluster := &cd.Cluster{
+		Config: getKubeconfig(),
+	}
+
+	assert.NoError(t, tc.driver.CreateOrUpdateCluster(context.TODO(), id, cluster))
+
+	newCAData := []byte("squirrel")
+
+	cluster.Config.Clusters["default"].CertificateAuthorityData = newCAData
+
+	assert.NoError(t, tc.driver.CreateOrUpdateCluster(context.TODO(), id, cluster))
+
+	secret := mustGetClusterSecret(t, tc, id)
+
+	var config argocd.ClusterConfig
+
+	assert.NoError(t, json.Unmarshal(secret.Data["config"], &config))
+	assert.Equal(t, newCAData, config.TLSClientConfig.CAData)
+
+	assert.NoError(t, tc.driver.DeleteCluster(context.TODO(), id))
+
+	_, err := tc.driver.GetClusterSecret(context.TODO(), id)
+	assert.ErrorIs(t, err, cd.ErrNotFound)
+}
+
+// TestClusterDeleteNotFound tests cluster deletion is idempotent when the cluster
+// secret doesn't exist.
+func TestClusterDeleteNotFound(t *testing.T) {
+	t.Parallel()
+
+	tc := mustNewTestContext(t)
+
+	id := &cd.ResourceIdentifier{
+		Name: "test",
+	}
+
+	assert.NoError(t, tc.driver.DeleteCluster(context.TODO(), id))
 }

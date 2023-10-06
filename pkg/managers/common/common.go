@@ -102,12 +102,7 @@ func (r *driverRunnable) Start(ctx context.Context) error {
 		return errors.ErrCDDriver
 	}
 
-	argoCDClient, err := argocd.NewInCluster(ctx, r.client)
-	if err != nil {
-		return err
-	}
-
-	r.driver = argocd.NewDriver(r.client, argoCDClient)
+	r.driver = argocd.New(r.client)
 
 	// This must block until told not to!
 	<-ctx.Done()

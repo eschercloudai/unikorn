@@ -5,7 +5,6 @@ go 1.21
 require (
 	github.com/coreos/go-oidc/v3 v3.6.0
 	github.com/deepmap/oapi-codegen v1.15.0
-	github.com/eschercloudai/argocd-client-go v0.0.0-20230310111928-80edec6b0b46
 	github.com/getkin/kin-openapi v0.120.0
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-logr/logr v1.2.4

@@ -18,7 +18,12 @@ package argocd
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"hash/fnv"
+	"net/url"
 	"reflect"
 	"strings"
 
@@ -27,10 +32,12 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 )
@@ -52,18 +59,15 @@ var (
 // unique and add context, plus this thwarts the 63 character limit.  There
 // is no custom resource for clusters, so have to use the API.
 type Driver struct {
-	argoCDClient Client
-
-	kubernetesClient client.Client
+	client client.Client
 }
 
 var _ cd.Driver = &Driver{}
 
-// NewDriver creates a new ArgoCD driver.
-func NewDriver(kubernetesClient client.Client, argoCDClient Client) *Driver {
+// New creates a new ArgoCD driver.
+func New(client client.Client) *Driver {
 	return &Driver{
-		argoCDClient:     argoCDClient,
-		kubernetesClient: kubernetesClient,
+		client: client,
 	}
 }
 
@@ -113,7 +117,7 @@ func (d *Driver) GetHelmApplication(ctx context.Context, id *cd.ResourceIdentifi
 
 	var resources argoprojv1.ApplicationList
 
-	if err := d.kubernetesClient.List(ctx, &resources, options); err != nil {
+	if err := d.client.List(ctx, &resources, options); err != nil {
 		return nil, err
 	}
 
@@ -230,7 +234,7 @@ func (d *Driver) CreateOrUpdateHelmApplication(ctx context.Context, id *cd.Resou
 	if resource == nil {
 		log.Info("creating new application", "application", id.Name)
 
-		if err := d.kubernetesClient.Create(ctx, required); err != nil {
+		if err := d.client.Create(ctx, required); err != nil {
 			return err
 		}
 
@@ -243,7 +247,7 @@ func (d *Driver) CreateOrUpdateHelmApplication(ctx context.Context, id *cd.Resou
 		temp.Labels = required.Labels
 		temp.Spec = required.Spec
 
-		if err := d.kubernetesClient.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
+		if err := d.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
 			return err
 		}
 
@@ -296,13 +300,13 @@ func (d *Driver) DeleteHelmApplication(ctx context.Context, id *cd.ResourceIdent
 	// https://github.com/argoproj/argo-cd/issues/12943
 	temp.Spec.SyncPolicy.Automated = nil
 
-	if err := d.kubernetesClient.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
+	if err := d.client.Patch(ctx, temp, client.MergeFrom(resource)); err != nil {
 		return err
 	}
 
 	log.Info("deleting application", "application", id.Name)
 
-	if err := d.kubernetesClient.Delete(ctx, resource); err != nil {
+	if err := d.client.Delete(ctx, resource); err != nil {
 		return err
 	}
 
@@ -313,21 +317,148 @@ func (d *Driver) DeleteHelmApplication(ctx context.Context, id *cd.ResourceIdent
 	return nil
 }
 
+type ClusterTLSClientConfig struct {
+	CAData   []byte `json:"caData"`
+	CertData []byte `json:"certData"`
+	KeyData  []byte `json:"keyData"`
+}
+
+type ClusterConfig struct {
+	TLSClientConfig ClusterTLSClientConfig `json:"tlsClientConfig"`
+}
+
+// clusterSecretName mirrors what Argo does for compatibility reasons.
+func clusterSecretName(host string) (string, error) {
+	url, err := url.Parse(host)
+	if err != nil {
+		return "", err
+	}
+
+	hasher := fnv.New32a()
+	hasher.Write([]byte(host))
+
+	hostname := strings.Split(url.Host, ":")
+
+	return fmt.Sprintf("cluster-%s-%d", hostname[0], hasher.Sum32()), nil
+}
+
+// clusterLabel we base the label on the ID to ensure uniqueness, but as this is
+// Kubernetes, we are restricted to 63 characters etc. like all DNS based stuff.
+func clusterLabel(id *cd.ResourceIdentifier) string {
+	sum := sha256.Sum256([]byte(clusterName(id)))
+
+	return fmt.Sprintf("cluster-%x", sum[:8])
+}
+
+// GetClusterSecret looks up the cluster secret via the ID, which is present for both
+// create and delete interfaces.
+func (d *Driver) GetClusterSecret(ctx context.Context, id *cd.ResourceIdentifier) (*corev1.Secret, error) {
+	applicationLabels := labels.Set{
+		constants.ApplicationIDLabel: clusterLabel(id),
+	}
+
+	options := &client.ListOptions{
+		Namespace:     namespace,
+		LabelSelector: labels.SelectorFromSet(applicationLabels),
+	}
+
+	var resources corev1.SecretList
+
+	if err := d.client.List(ctx, &resources, options); err != nil {
+		return nil, err
+	}
+
+	if len(resources.Items) == 0 {
+		return nil, cd.ErrNotFound
+	}
+
+	if len(resources.Items) > 1 {
+		return nil, ErrItemLengthMismatch
+	}
+
+	return &resources.Items[0], nil
+}
+
+func mustateSecret(current *corev1.Secret, labels map[string]string, data map[string][]byte) func() error {
+	return func() error {
+		current.Labels = labels
+		current.Data = data
+
+		return nil
+	}
+}
+
 // CreateOrUpdateCluster creates or updates a cluster idempotently.
 func (d *Driver) CreateOrUpdateCluster(ctx context.Context, id *cd.ResourceIdentifier, cluster *cd.Cluster) error {
-	// TODO: a whole load of error checking!
-	server := cluster.Config.Clusters[cluster.Config.Contexts[cluster.Config.CurrentContext].Cluster].Server
+	log := log.FromContext(ctx)
 
-	if err := d.argoCDClient.UpsertCluster(ctx, clusterName(id), server, cluster.Config); err != nil {
+	configContext := cluster.Config.Contexts[cluster.Config.CurrentContext]
+
+	clusterConfig := cluster.Config.Clusters[configContext.Cluster]
+
+	authInfo := cluster.Config.AuthInfos[configContext.AuthInfo]
+
+	config := &ClusterConfig{
+		TLSClientConfig: ClusterTLSClientConfig{
+			CAData:   clusterConfig.CertificateAuthorityData,
+			CertData: authInfo.ClientCertificateData,
+			KeyData:  authInfo.ClientKeyData,
+		},
+	}
+
+	configData, err := json.Marshal(config)
+	if err != nil {
 		return err
 	}
+
+	secretName, err := clusterSecretName(clusterConfig.Server)
+	if err != nil {
+		return err
+	}
+
+	current := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      secretName,
+		},
+	}
+
+	labels := map[string]string{
+		"argocd.argoproj.io/secret-type": "cluster",
+		constants.ApplicationIDLabel:     clusterLabel(id),
+	}
+	data := map[string][]byte{
+		"name":   []byte(clusterName(id)),
+		"server": []byte(clusterConfig.Server),
+		"config": configData,
+	}
+
+	log.Info("reconciling cluster", "id", id)
+
+	result, err := controllerutil.CreateOrPatch(ctx, d.client, current, mustateSecret(current, labels, data))
+	if err != nil {
+		log.Info("cluster reconcile failed", "error", err)
+
+		return err
+	}
+
+	log.Info("cluster reconciled", "id", id, "result", result)
 
 	return nil
 }
 
 // DeleteCluster deletes an existing cluster.
 func (d *Driver) DeleteCluster(ctx context.Context, id *cd.ResourceIdentifier) error {
-	if err := d.argoCDClient.DeleteCluster(ctx, clusterName(id)); err != nil {
+	resource, err := d.GetClusterSecret(ctx, id)
+	if err != nil {
+		if !errors.Is(err, cd.ErrNotFound) {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := d.client.Delete(ctx, resource); err != nil {
 		return err
 	}
 
