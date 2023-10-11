@@ -321,6 +321,21 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
+  name: ingress-nginx-4.8.0-1
+spec:
+  repo: https://kubernetes.github.io/ingress-nginx
+  chart: ingress-nginx
+  version: 4.8.0
+  createNamespace: true
+  parameters:
+  - name: controller.service.annotations.unikorn\.eschercloud\.ai/ingress-endpoint
+    value: 'true'
+  - name: controller.kind
+    value: 'DaemonSet'
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: HelmApplication
+metadata:
   name: kubernetes-dashboard-6.0.7-1
 spec:
   repo: https://kubernetes.github.io/dashboard
