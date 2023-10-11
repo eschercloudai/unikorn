@@ -81,6 +81,11 @@ server:
   # managed by vault.
   imageSigningKey: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUhZd0VBWUhLb1pJemowQ0FRWUZLNEVFQUNJRFlnQUVmOGs4RVY1TUg4M1BncThYd0JGUTd5YkU2NTEzRlh0awpHaG1jalp4WmYzbU5QOE0vb3VBbE0vZHdYWGpFeXZTNlJhVHdoT3A0aTdHL3VvbE5ZL0RJSCt1elc2VXNxR3VHClFpSW11Tm9BdzFSS1NQcEtyNWlJVXU2eEc1cDR3U3E5Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=
 
+  # Whether to filter based on the 'k8s' and 'gpu' image properties used to derive versions
+  imageProperties:
+  - k8s
+  - gpu
+
   keystone:
     endpoint: "https://nl1.eschercloud.com:5000"
     userDomain: "Default"
