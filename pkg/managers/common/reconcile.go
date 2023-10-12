@@ -99,8 +99,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	// TODO: make a composite interface type.
 	resource, _ := object.(application.OwningResource)
 
-	ctx = clientlib.NewContext(ctx, r.client)
+	// The static client is used by the application provisioner to get access to
+	// application bundles and definitions regardless of remote cluster scoping etc.
+	ctx = clientlib.NewContextWithStaticClient(ctx, r.client)
+
+	// The dynamic client context is updated as remote clusters are descended into.
+	ctx = clientlib.NewContextWithDynamicClient(ctx, r.client)
+
+	// The driver context is updated as remote provisioners are descended into.
 	ctx = cd.NewContext(ctx, driver)
+
+	// The application context contains a reference to the resource that caused
+	// their creation.
 	ctx = application.NewContext(ctx, resource)
 
 	// See if the object exists or not, if not it's been deleted.

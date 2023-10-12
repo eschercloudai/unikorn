@@ -58,7 +58,8 @@ func mutate() error {
 // Provision implements the Provision interface.
 func (p *Provisioner) Provision(ctx context.Context) error {
 	log := log.FromContext(ctx)
-	c := clientlib.FromContext(ctx)
+
+	c := clientlib.DynamicClientFromContext(ctx)
 
 	objectKey := client.ObjectKeyFromObject(p.resource)
 
@@ -77,7 +78,8 @@ func (p *Provisioner) Provision(ctx context.Context) error {
 // Deprovision implements the Provision interface.
 func (p *Provisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
-	c := clientlib.FromContext(ctx)
+
+	c := clientlib.DynamicClientFromContext(ctx)
 
 	objectKey := client.ObjectKeyFromObject(p.resource)
 

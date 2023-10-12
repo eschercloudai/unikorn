@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/client"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackcloudprovider"
@@ -87,7 +87,7 @@ func (p *Provisioner) Values(ctx context.Context, version *string) (interface{},
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 
-	client := client.FromContext(ctx)
+	client := clientlib.DynamicClientFromContext(ctx)
 
 	storageClasses := p.generateStorageClasses(cluster)
 

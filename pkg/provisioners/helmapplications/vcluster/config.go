@@ -102,7 +102,7 @@ func (c *ControllerRuntimeClient) GetSecret(ctx context.Context, namespace, name
 	log := log.FromContext(ctx)
 
 	secret := &corev1.Secret{}
-	if err := clientlib.FromContext(ctx).Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, secret); err != nil {
+	if err := clientlib.DynamicClientFromContext(ctx).Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, secret); err != nil {
 		if kerrors.IsNotFound(err) {
 			log.Info("vitual cluster kubeconfig does not exist, yielding")
 

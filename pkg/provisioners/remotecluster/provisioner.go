@@ -18,9 +18,11 @@ package remotecluster
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/eschercloudai/unikorn/pkg/cd"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -29,20 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-// GetClient gets a client from the remote generator.
-func GetClient(ctx context.Context, generator provisioners.RemoteCluster) (client.Client, error) {
-	getter := func() (*clientcmdapi.Config, error) {
-		return generator.Config(ctx)
-	}
-
-	restConfig, err := clientcmd.BuildConfigFromKubeconfigGetter("", getter)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.New(restConfig, client.Options{})
-}
 
 // RemoteCluster provides generic handling of remote cluster instances.
 // Specialization is delegated to a provider specific interface.
@@ -95,6 +83,22 @@ func BackgroundDeletion(p *remoteClusterProvisioner) {
 	// TODO: This mutates the child and causes side effects, could we
 	// propagate this information via the context?
 	p.child.BackgroundDeletion()
+}
+
+// GetClient gets a client from the remote generator.
+// NOTE: this must only be called in Provision/Deprovision so it
+// respects the context we are in as regards nested remotes.
+func (r *RemoteCluster) GetClient(ctx context.Context) (client.Client, error) {
+	getter := func() (*clientcmdapi.Config, error) {
+		return r.generator.Config(ctx)
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromKubeconfigGetter("", getter)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.New(restConfig, client.Options{Scheme: clientlib.DynamicClientFromContext(ctx).Scheme()})
 }
 
 // ProvisionOn returns a provisioner that will provision the remote,
@@ -158,8 +162,15 @@ func (p *remoteClusterProvisioner) Provision(ctx context.Context) error {
 		return err
 	}
 
+	client, err := p.remote.GetClient(ctx)
+	if err != nil {
+		return err
+	}
+
+	ctx = clientlib.NewContextWithDynamicClient(ctx, client)
+
 	// TODO: This mutates the child and causes side effects, could we
-	// propagate this information via the context?
+	// Remove the applications.
 	p.child.OnRemote(p.remote.generator)
 
 	// Remote is registered, create the remote applications.
@@ -174,13 +185,30 @@ func (p *remoteClusterProvisioner) Provision(ctx context.Context) error {
 func (p *remoteClusterProvisioner) Deprovision(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	// TODO: This mutates the child and causes side effects, could we
-	// propagate this information via the context?
-	p.child.OnRemote(p.remote.generator)
+	// If the client cannot be instantiated due to a yield error, then
+	// assume the client config is gone, and the child deprovisioning
+	// has completed successfully.
+	deprovisioned := false
 
-	// Remove the applications.
-	if err := p.child.Deprovision(ctx); err != nil {
-		return err
+	client, err := p.remote.GetClient(ctx)
+	if err != nil {
+		if !errors.Is(err, provisioners.ErrYield) {
+			return err
+		}
+
+		deprovisioned = true
+	}
+
+	if !deprovisioned {
+		ctx = clientlib.NewContextWithDynamicClient(ctx, client)
+
+		// TODO: This mutates the child and causes side effects, could we
+		// Remove the applications.
+		p.child.OnRemote(p.remote.generator)
+
+		if err := p.child.Deprovision(ctx); err != nil {
+			return err
+		}
 	}
 
 	// Once all concurrent remote provisioner have done there stuff

@@ -70,17 +70,6 @@ func (p *Provisioner) Object() client.Object {
 	return &p.cluster
 }
 
-// getRemoteCluster returns a generator capable of reading the cluster
-// kubeconfig from the underlying control plane.
-func (p *Provisioner) getRemoteClusterGenerator(ctx context.Context) (*clusteropenstack.RemoteCluster, error) {
-	client, err := vcluster.NewControllerRuntimeClient().Client(ctx, p.cluster.Namespace, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return clusteropenstack.NewRemoteCluster(client, &p.cluster), nil
-}
-
 // getControlPlane gets the control plane object that owns this cluster.
 func (p *Provisioner) getControlPlane(ctx context.Context) (*unikornv1.ControlPlane, error) {
 	// TODO: error checking.
@@ -101,7 +90,7 @@ func (p *Provisioner) getControlPlane(ctx context.Context) (*unikornv1.ControlPl
 		Name:      p.cluster.Labels[constants.ControlPlaneLabel],
 	}
 
-	if err := clientlib.FromContext(ctx).Get(ctx, key, &controlPlane); err != nil {
+	if err := clientlib.StaticClientFromContext(ctx).Get(ctx, key, &controlPlane); err != nil {
 		return nil, err
 	}
 
@@ -121,12 +110,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 		return nil, err
 	}
 
-	remoteClusterGenerator, err := p.getRemoteClusterGenerator(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	remoteCluster := remotecluster.New(remoteClusterGenerator, true)
+	remoteCluster := remotecluster.New(clusteropenstack.NewRemoteCluster(&p.cluster), true)
 
 	clusterProvisioner := clusteropenstack.New(controlPlanePrefix).InNamespace(p.cluster.Name)
 
@@ -163,7 +147,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 		),
 		concurrent.New("cluster add-ons wave 2",
 			// TODO: this hack where it needs the remote is pretty ugly.
-			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(remoteClusterGenerator)),
+			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New()),
 		),
 	)
 
@@ -171,13 +155,15 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 	// come up but never reach healthy until the CNI and cloud controller manager
 	// are added.  Follow that up by the autoscaler as some addons may require worker
 	// nodes to schedule onto.
-	provisioner := serial.New("kubernetes cluster",
-		concurrent.New("kubernetes cluster",
-			remoteControlPlane.ProvisionOn(clusterProvisioner),
-			remoteCluster.ProvisionOn(bootstrapProvisioner, remotecluster.BackgroundDeletion),
+	provisioner := remoteControlPlane.ProvisionOn(
+		serial.New("kubernetes cluster",
+			concurrent.New("kubernetes cluster",
+				clusterProvisioner,
+				remoteCluster.ProvisionOn(bootstrapProvisioner, remotecluster.BackgroundDeletion),
+			),
+			clusterAutoscalerProvisioner,
+			remoteCluster.ProvisionOn(addonsProvisioner, remotecluster.BackgroundDeletion),
 		),
-		remoteControlPlane.ProvisionOn(clusterAutoscalerProvisioner),
-		remoteCluster.ProvisionOn(addonsProvisioner, remotecluster.BackgroundDeletion),
 	)
 
 	return provisioner, nil

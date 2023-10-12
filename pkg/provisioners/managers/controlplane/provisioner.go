@@ -118,7 +118,7 @@ func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace
 
 // deprovisionClusters removes any kubernetes clusters, and frees up OpenStack resources.
 func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string) error {
-	c := clientlib.FromContext(ctx)
+	c := clientlib.StaticClientFromContext(ctx)
 
 	clusters := &unikornv1.KubernetesClusterList{}
 	if err := c.List(ctx, clusters, &client.ListOptions{Namespace: namespace}); err != nil {

@@ -24,14 +24,27 @@ import (
 
 type key int
 
-//nolint:gochecknoglobals
-var clientKey key
+const (
+	// staticClientKey is the client that is scoped to the static cluster.
+	staticClientKey key = iota
 
-func NewContext(ctx context.Context, client client.Client) context.Context {
-	return context.WithValue(ctx, clientKey, client)
+	// dynamicClientKey is the current client that is scoped to the current remote cluster.
+	dynamicClientKey
+)
+
+func NewContextWithStaticClient(ctx context.Context, client client.Client) context.Context {
+	return context.WithValue(ctx, staticClientKey, client)
 }
 
-func FromContext(ctx context.Context) client.Client {
+func StaticClientFromContext(ctx context.Context) client.Client {
 	//nolint:forcetypeassert
-	return ctx.Value(clientKey).(client.Client)
+	return ctx.Value(staticClientKey).(client.Client)
+}
+func NewContextWithDynamicClient(ctx context.Context, client client.Client) context.Context {
+	return context.WithValue(ctx, dynamicClientKey, client)
+}
+
+func DynamicClientFromContext(ctx context.Context) client.Client {
+	//nolint:forcetypeassert
+	return ctx.Value(dynamicClientKey).(client.Client)
 }

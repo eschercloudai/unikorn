@@ -81,7 +81,7 @@ func (u *Unbundler) AddApplication(r **unikornv1.HelmApplication, name string, o
 }
 
 func (u *Unbundler) Unbundle(ctx context.Context) error {
-	c := clientlib.FromContext(ctx)
+	c := clientlib.StaticClientFromContext(ctx)
 
 	key := client.ObjectKey{
 		Name: u.name,
