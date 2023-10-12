@@ -18,8 +18,8 @@ package project
 
 import (
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/managers/common"
+	"github.com/eschercloudai/unikorn/pkg/managers/options"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/project"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,8 +37,8 @@ type Factory struct{}
 var _ common.ControllerFactory = &Factory{}
 
 // Reconciler returns a new reconciler instance.
-func (*Factory) Reconciler(manager manager.Manager, driverRunnable cd.DriverRunnable) reconcile.Reconciler {
-	return common.NewReconciler(manager.GetClient(), driverRunnable, project.New)
+func (*Factory) Reconciler(options *options.Options, manager manager.Manager) reconcile.Reconciler {
+	return common.NewReconciler(options, manager.GetClient(), project.New)
 }
 
 // RegisterWatches adds any watches that would trigger a reconcile.

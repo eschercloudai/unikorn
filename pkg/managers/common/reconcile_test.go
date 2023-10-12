@@ -29,9 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	mockcd "github.com/eschercloudai/unikorn/pkg/cd/mock"
+	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/managers/common"
+	"github.com/eschercloudai/unikorn/pkg/managers/options"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	mockprovisioners "github.com/eschercloudai/unikorn/pkg/provisioners/mock"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
@@ -113,6 +114,14 @@ func mustAssertStatus(t *testing.T, resource unikornv1.ConditionResource, status
 	}
 }
 
+func managerOptions() *options.Options {
+	return &options.Options{
+		CDDriver: cd.DriverKindFlag{
+			Kind: cd.DriverKindArgoCD,
+		},
+	}
+}
+
 const (
 	testNamespace = "foo"
 	testName      = "bar"
@@ -136,10 +145,7 @@ func TestReconcileDeleted(t *testing.T) {
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)
@@ -162,14 +168,11 @@ func TestReconcileCreate(t *testing.T) {
 	tc := mustNewTestContext(t, request)
 	ctx := context.Background()
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 	p.EXPECT().Provision(gomock.Any()).Return(nil)
 
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)
@@ -200,14 +203,11 @@ func TestReconcileCreateYield(t *testing.T) {
 	tc := mustNewTestContext(t, request)
 	ctx := context.Background()
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 	p.EXPECT().Provision(gomock.Any()).Return(provisioners.ErrYield)
 
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)
@@ -240,14 +240,11 @@ func TestReconcileCreateCancelled(t *testing.T) {
 
 	cancel()
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 	p.EXPECT().Provision(gomock.Any()).Return(ctx.Err())
 
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)
@@ -278,14 +275,11 @@ func TestReconcileCreateError(t *testing.T) {
 	tc := mustNewTestContext(t, request)
 	ctx := context.Background()
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 	p.EXPECT().Provision(gomock.Any()).Return(errUnhandled)
 
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)
@@ -322,14 +316,11 @@ func TestReconcileDelete(t *testing.T) {
 	tc := mustNewTestContext(t, request)
 	ctx := context.Background()
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 	p.EXPECT().Deprovision(gomock.Any()).Return(nil)
 
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)
@@ -367,14 +358,11 @@ func TestReconcileDeleteYield(t *testing.T) {
 	tc := mustNewTestContext(t, request)
 	ctx := context.Background()
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 	p.EXPECT().Deprovision(gomock.Any()).Return(provisioners.ErrYield)
 
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)
@@ -413,14 +401,11 @@ func TestReconcileDeleteCancelled(t *testing.T) {
 
 	cancel()
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 	p.EXPECT().Deprovision(gomock.Any()).Return(ctx.Err())
 
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)
@@ -457,14 +442,11 @@ func TestReconcileDeleteError(t *testing.T) {
 	tc := mustNewTestContext(t, request)
 	ctx := context.Background()
 
-	d := mockcd.NewMockDriverRunnable(c)
-	d.EXPECT().Driver().Return(nil)
-
 	p := mockprovisioners.NewMockManagerProvisioner(c)
 	p.EXPECT().Object().Return(&unikornv1.Project{})
 	p.EXPECT().Deprovision(gomock.Any()).Return(errUnhandled)
 
-	reconciler := common.NewReconciler(tc.client, d, func() provisioners.ManagerProvisioner { return p })
+	reconciler := common.NewReconciler(managerOptions(), tc.client, func() provisioners.ManagerProvisioner { return p })
 
 	_, err := reconciler.Reconcile(ctx, newRequest(testNamespace, testName))
 	assert.NoError(t, err)

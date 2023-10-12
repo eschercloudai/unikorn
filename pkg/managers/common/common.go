@@ -23,10 +23,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/eschercloudai/unikorn/pkg/cd"
-	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/errors"
 	"github.com/eschercloudai/unikorn/pkg/managers/options"
 	utilclient "github.com/eschercloudai/unikorn/pkg/util/client"
 
@@ -46,7 +43,7 @@ import (
 // minimal code.
 type ControllerFactory interface {
 	// Reconciler returns a new reconciler instance.
-	Reconciler(manager.Manager, cd.DriverRunnable) reconcile.Reconciler
+	Reconciler(*options.Options, manager.Manager) reconcile.Reconciler
 
 	// RegisterWatches adds any watches that would trigger a reconcile.
 	RegisterWatches(manager.Manager, controller.Controller) error
@@ -57,71 +54,18 @@ type ControllerFactory interface {
 	Upgrade(client.Client) error
 }
 
-// driverRunnable implments the cd.DriverRunnable interface.
-type driverRunnable struct {
-	// kind is the prover provider to create.
-	kind cd.DriverKind
-
-	// client is the Kubernetes client.
-	client client.Client
-
-	// driver will be filled in during initialization.
-	driver cd.Driver
-}
-
-var _ cd.DriverRunnable = &driverRunnable{}
-
-// NewDriverRunnable creates a new runnable task to initialize the driver when
-// we are able to.
-func NewDriverRunnable(client client.Client, kind cd.DriverKind) cd.DriverRunnable {
-	return &driverRunnable{
-		kind:   kind,
-		client: client,
-	}
-}
-
-// Driver returns the driver for use by a reconciler.
-func (r *driverRunnable) Driver() cd.Driver {
-	return r.driver
-}
-
-// NeedLeaderElection tells controller runtime to start this before leader
-// election happens, so it's a race condition basically...
-func (r *driverRunnable) NeedLeaderElection() bool {
-	return false
-}
-
-// Start is called when the clients are initialized, and before the reconcillers
-// are invoked.
-func (r *driverRunnable) Start(ctx context.Context) error {
-	log := log.FromContext(ctx)
-
-	log.Info("Starting continuous deployment driver", "kind", r.kind)
-
-	if r.kind != cd.DriverKindArgoCD {
-		return errors.ErrCDDriver
-	}
-
-	r.driver = argocd.New(r.client)
-
-	// This must block until told not to!
-	<-ctx.Done()
-
-	return nil
-}
-
 // getManager returns a generic manager.
-func getManager(o *options.Options) (manager.Manager, cd.DriverRunnable, error) {
+func getManager() (manager.Manager, error) {
 	// Create a manager with leadership election to prevent split brain
 	// problems, and set the scheme so it gets propagated to the client.
 	config, err := clientconfig.GetConfig()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	scheme, err := utilclient.NewScheme()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	options := manager.Options{
@@ -132,22 +76,14 @@ func getManager(o *options.Options) (manager.Manager, cd.DriverRunnable, error) 
 
 	manager, err := manager.New(config, options)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// Add the driver initialiser so it's setup after the client caches are
-	// started but before the reconciler is called.
-	driverRunnable := NewDriverRunnable(manager.GetClient(), o.CDDriver.Kind)
-
-	if err := manager.Add(driverRunnable); err != nil {
-		return nil, nil, err
-	}
-
-	return manager, driverRunnable, nil
+	return manager, nil
 }
 
 // getController returns a generic controller.
-func getController(o *options.Options, manager manager.Manager, f ControllerFactory, driverRunnable cd.DriverRunnable) (controller.Controller, error) {
+func getController(o *options.Options, manager manager.Manager, f ControllerFactory) (controller.Controller, error) {
 	// This prevents a single bad reconcile from affecting all the rest by
 	// boning the whole container.
 	recoverPanic := true
@@ -155,7 +91,7 @@ func getController(o *options.Options, manager manager.Manager, f ControllerFact
 	controllerOptions := controller.Options{
 		MaxConcurrentReconciles: o.MaxConcurrentReconciles,
 		RecoverPanic:            &recoverPanic,
-		Reconciler:              f.Reconciler(manager, driverRunnable),
+		Reconciler:              f.Reconciler(o, manager),
 	}
 
 	c, err := controller.New(constants.Application, manager, controllerOptions)
@@ -204,13 +140,13 @@ func Run(f ControllerFactory) {
 		os.Exit(1)
 	}
 
-	manager, driverRunnable, err := getManager(o)
+	manager, err := getManager()
 	if err != nil {
 		logger.Error(err, "manager creation error")
 		os.Exit(1)
 	}
 
-	controller, err := getController(o, manager, f, driverRunnable)
+	controller, err := getController(o, manager, f)
 	if err != nil {
 		logger.Error(err, "controller creation error")
 		os.Exit(1)

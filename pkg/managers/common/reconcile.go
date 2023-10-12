@@ -23,8 +23,11 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
+	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
 	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	uerrors "github.com/eschercloudai/unikorn/pkg/errors"
+	"github.com/eschercloudai/unikorn/pkg/managers/options"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 
@@ -48,27 +51,35 @@ type ProvisionerCreateFunc func() provisioners.ManagerProvisioner
 
 // Reconciler is a generic reconciler for all manager types.
 type Reconciler struct {
+	// options allows CLI options to be interrogated in the reconciler.
+	options *options.Options
+
 	// client is the Kubernetes client.
 	client client.Client
-
-	// driverRunnable gives access the CD driver that provisions and deprovisions applications.
-	driverRunnable cd.DriverRunnable
 
 	// createProvisioner provides a type agnosic method to create a root provisioner.
 	createProvisioner ProvisionerCreateFunc
 }
 
 // NewReconciler creates a new reconciler.
-func NewReconciler(client client.Client, driverRunnable cd.DriverRunnable, createProvisioner ProvisionerCreateFunc) *Reconciler {
+func NewReconciler(options *options.Options, client client.Client, createProvisioner ProvisionerCreateFunc) *Reconciler {
 	return &Reconciler{
+		options:           options,
 		client:            client,
-		driverRunnable:    driverRunnable,
 		createProvisioner: createProvisioner,
 	}
 }
 
 // Ensure this implements the reconcile.Reconciler interface.
 var _ reconcile.Reconciler = &Reconciler{}
+
+func (r *Reconciler) getDriver() (cd.Driver, error) {
+	if r.options.CDDriver.Kind != cd.DriverKindArgoCD {
+		return nil, uerrors.ErrCDDriver
+	}
+
+	return argocd.New(r.client), nil
+}
 
 // Reconcile is the top-level reconcile interface that controller-runtime will
 // dispatch to.  It initialises the provisioner, extracts the request object and
@@ -80,11 +91,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	object := provisioner.Object()
 
+	driver, err := r.getDriver()
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// TODO: make a composite interface type.
 	resource, _ := object.(application.OwningResource)
 
 	ctx = clientlib.NewContext(ctx, r.client)
-	ctx = cd.NewContext(ctx, r.driverRunnable.Driver())
+	ctx = cd.NewContext(ctx, driver)
 	ctx = application.NewContext(ctx, resource)
 
 	// See if the object exists or not, if not it's been deleted.
