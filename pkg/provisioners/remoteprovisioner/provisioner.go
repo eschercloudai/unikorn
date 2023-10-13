@@ -31,14 +31,9 @@ type RemoteProvisioner struct {
 	// controller tells whether we "own" this resource or not.
 	controller bool
 
-	// lock provides synchronization around concurrrency.
-	lock sync.Mutex
+	initializer sync.Once
 
-	// refCount tells us how many remote provisioners have been registered.
-	refCount int
-
-	// currentCount tells us how many times remote provisioners have been called.
-	currentCount int
+	finalizer sync.WaitGroup
 }
 
 func New(controller bool) *RemoteProvisioner {
@@ -48,7 +43,7 @@ func New(controller bool) *RemoteProvisioner {
 }
 
 func (r *RemoteProvisioner) ProvisionOn(child provisioners.Provisioner) provisioners.Provisioner {
-	r.refCount++
+	r.finalizer.Add(1)
 
 	return &remoteProvisionerProvisioner{
 		ProvisionerMeta: provisioners.ProvisionerMeta{
@@ -68,28 +63,47 @@ type remoteProvisionerProvisioner struct {
 }
 
 func (p *remoteProvisionerProvisioner) provisionRemoteProvisioner(ctx context.Context) error {
-	p.provisioner.lock.Lock()
-	defer p.provisioner.lock.Unlock()
+	if !p.provisioner.controller {
+		return nil
+	}
 
-	p.provisioner.currentCount++
+	provisioner := argocd.New()
+	provisioner.OnRemote(p.Remote)
 
-	if p.provisioner.controller && p.provisioner.currentCount == 1 {
-		provisioner := argocd.New()
-		provisioner.OnRemote(p.Remote)
+	if err := provisioner.Provision(ctx); err != nil {
+		return err
+	}
 
-		if err := provisioner.Provision(ctx); err != nil {
-			return err
-		}
+	return nil
+}
+
+func (p *remoteProvisionerProvisioner) deprovisionRemoteProvisioner(ctx context.Context) error {
+	if p.provisioner.controller {
+		return nil
+	}
+
+	provisioner := argocd.New()
+	provisioner.OnRemote(p.Remote)
+
+	if err := provisioner.Deprovision(ctx); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func (p *remoteProvisionerProvisioner) Provision(ctx context.Context) error {
-	if err := p.provisionRemoteProvisioner(ctx); err != nil {
+	// Run the provisioner on the first time we encounter this, all other instances
+	// will wait until the provisioner has executed successfully.
+	var err error
+
+	p.initializer.Do(func() { err = p.provisionRemoteProvisioner(ctx) })
+
+	if err != nil {
 		return err
 	}
 
+	// Run the child provisioner with a new driver context.
 	childCtx := cd.NewContext(ctx, argodriver.New(clientlib.DynamicClientFromContext(ctx)))
 
 	if err := p.child.Provision(childCtx); err != nil {
@@ -100,29 +114,22 @@ func (p *remoteProvisionerProvisioner) Provision(ctx context.Context) error {
 }
 
 func (p *remoteProvisionerProvisioner) Deprovision(ctx context.Context) error {
+	// Run the child provisioner with a new driver context.
 	childCtx := cd.NewContext(ctx, argodriver.New(clientlib.DynamicClientFromContext(ctx)))
 
 	if err := p.child.Deprovision(childCtx); err != nil {
 		return err
 	}
 
-	// Once all concurrent remote provisioners have done their stuff
-	// they will wait on the lock...
-	p.provisioner.lock.Lock()
-	defer p.provisioner.lock.Unlock()
+	// TODO: this logic is "elegant" but wrong, fix me.
+	p.provisioner.finalizer.Done()
+	p.provisioner.finalizer.Wait()
 
-	// ... adding themselves to the total...
-	p.provisioner.currentCount++
+	var err error
 
-	// ... and if all have completed without an error, then deprovision the
-	// remote cluster itself.
-	if p.provisioner.controller && p.provisioner.currentCount == p.provisioner.refCount {
-		provisioner := argocd.New()
-		provisioner.OnRemote(p.Remote)
-
-		if err := provisioner.Deprovision(ctx); err != nil {
-			return err
-		}
+	p.provisioner.initializer.Do(func() { err = deprovisionRemoteProvisioner(ctx) })
+	if err != nil {
+		return err
 	}
 
 	return nil
