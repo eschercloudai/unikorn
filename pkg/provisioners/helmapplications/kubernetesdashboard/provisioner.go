@@ -23,10 +23,9 @@ import (
 	"net"
 	"strings"
 
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,31 +41,20 @@ var (
 	ErrIngressIPNotFound = errors.New("unable to find remote ingress IP address")
 )
 
-type Provisioner struct {
-	remote provisioners.RemoteCluster
-}
+type Provisioner struct{}
 
 // Ensure the Provisioner interface is implemented.
 var _ application.ValuesGenerator = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New(remote provisioners.RemoteCluster) *application.Provisioner {
-	p := &Provisioner{
-		remote: remote,
-	}
-
-	return application.New(applicationName).WithGenerator(p).InNamespace("kube-system")
+func New() *application.Provisioner {
+	return application.New(applicationName).WithGenerator(&Provisioner{}).InNamespace("kube-system")
 }
 
 func (p *Provisioner) remoteIngressIP(ctx context.Context) (net.IP, error) {
-	c, err := remotecluster.GetClient(ctx, p.remote)
-	if err != nil {
-		return nil, err
-	}
-
 	var services corev1.ServiceList
 
-	if err := c.List(ctx, &services); err != nil {
+	if err := clientlib.DynamicClientFromContext(ctx).List(ctx, &services); err != nil {
 		return nil, err
 	}
 

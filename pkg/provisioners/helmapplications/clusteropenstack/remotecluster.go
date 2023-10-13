@@ -23,6 +23,7 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 
@@ -61,10 +62,6 @@ func KubeconfigSecretName(cluster *unikornv1.KubernetesCluster) string {
 }
 
 type RemoteCluster struct {
-	// client provides access to the Kubernetes instance where
-	// the cluster API resources live.
-	client client.Client
-
 	// cluster is the cluster we are referring to.
 	cluster *unikornv1.KubernetesCluster
 }
@@ -73,9 +70,8 @@ type RemoteCluster struct {
 var _ provisioners.RemoteCluster = &RemoteCluster{}
 
 // NewRemoteCluster return a new instance of a remote cluster generator.
-func NewRemoteCluster(client client.Client, cluster *unikornv1.KubernetesCluster) *RemoteCluster {
+func NewRemoteCluster(cluster *unikornv1.KubernetesCluster) *RemoteCluster {
 	return &RemoteCluster{
-		client:  client,
 		cluster: cluster,
 	}
 }
@@ -116,7 +112,7 @@ func (g *RemoteCluster) Config(ctx context.Context) (*clientcmdapi.Config, error
 	}
 
 	// Retry getting the secret until it exists.
-	if err := g.client.Get(ctx, secretKey, secret); err != nil {
+	if err := clientlib.DynamicClientFromContext(ctx).Get(ctx, secretKey, secret); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("kubernetes cluster kubeconfig does not exist, yielding")
 

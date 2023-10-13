@@ -132,7 +132,7 @@ func (c *Client) GetKubeconfig(ctx context.Context, controlPlaneName generated.C
 
 	// TODO: propagate the client like we do in the controllers, then code sharing
 	// becomes a lot easier!
-	ctx = clientlib.NewContext(ctx, c.client)
+	ctx = clientlib.NewContextWithDynamicClient(ctx, c.client)
 
 	vc := vcluster.NewControllerRuntimeClient()
 

@@ -36,7 +36,7 @@ var (
 )
 
 func GetResourceNamespace(ctx context.Context, l labels.Set) (*corev1.Namespace, error) {
-	c := clientlib.FromContext(ctx)
+	c := clientlib.StaticClientFromContext(ctx)
 
 	namespaces := &corev1.NamespaceList{}
 	if err := c.List(ctx, namespaces, &client.ListOptions{LabelSelector: l.AsSelector()}); err != nil {

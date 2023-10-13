@@ -153,7 +153,7 @@ func TestApplicationCreateHelm(t *testing.T) {
 	owner := &mutuallyExclusiveResource{}
 
 	ctx := context.Background()
-	ctx = clientlib.NewContext(ctx, tc.client)
+	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
 	ctx = cd.NewContext(ctx, driver)
 	ctx = application.NewContext(ctx, owner)
 
@@ -254,7 +254,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	ctx = clientlib.NewContext(ctx, tc.client)
+	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
 	ctx = cd.NewContext(ctx, driver)
 	ctx = application.NewContext(ctx, owner)
 
@@ -303,7 +303,7 @@ func TestApplicationCreateGit(t *testing.T) {
 	owner := &mutuallyExclusiveResource{}
 
 	ctx := context.Background()
-	ctx = clientlib.NewContext(ctx, tc.client)
+	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
 	ctx = cd.NewContext(ctx, driver)
 	ctx = application.NewContext(ctx, owner)
 
@@ -430,7 +430,7 @@ func TestApplicationCreateMutate(t *testing.T) {
 	owner := &mutuallyExclusiveResource{}
 
 	ctx := context.Background()
-	ctx = clientlib.NewContext(ctx, tc.client)
+	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
 	ctx = cd.NewContext(ctx, driver)
 	ctx = application.NewContext(ctx, owner)
 

@@ -23,8 +23,8 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
+	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -220,27 +220,24 @@ func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) erro
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 
-	vclusterClient, err := vcluster.NewControllerRuntimeClient().Client(ctx, cluster.Namespace, false)
-	if err != nil {
-		return fmt.Errorf("%w: failed to create vcluster client", err)
-	}
+	client := clientlib.DynamicClientFromContext(ctx)
 
-	deployments, err := p.getMachineDeployments(ctx, vclusterClient)
+	deployments, err := p.getMachineDeployments(ctx, client)
 	if err != nil {
 		return err
 	}
 
-	kubeadmConfigTemplates, err := p.getKubeadmConfigTemplates(ctx, vclusterClient)
+	kubeadmConfigTemplates, err := p.getKubeadmConfigTemplates(ctx, client)
 	if err != nil {
 		return err
 	}
 
-	kubeadmControlPlanes, err := p.getKubeadmControlPlanes(ctx, vclusterClient)
+	kubeadmControlPlanes, err := p.getKubeadmControlPlanes(ctx, client)
 	if err != nil {
 		return err
 	}
 
-	openstackMachineTemplates, err := p.getOpenstackMachineTemplates(ctx, vclusterClient)
+	openstackMachineTemplates, err := p.getOpenstackMachineTemplates(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -261,15 +258,15 @@ func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) erro
 	kubeadmConfigTemplatesNames := getExpectedKubeadmConfigTemplateNames(expectedDeployments)
 	openstackMachineTemplatesNames := getExpectedOpenstackMachineTemplateNames(expectedDeployments, kubeadmControlPlanes)
 
-	if err := deleteForeignResources(ctx, vclusterClient, deployments, deploymentNames); err != nil {
+	if err := deleteForeignResources(ctx, client, deployments, deploymentNames); err != nil {
 		return err
 	}
 
-	if err := deleteForeignResources(ctx, vclusterClient, kubeadmConfigTemplates, kubeadmConfigTemplatesNames); err != nil {
+	if err := deleteForeignResources(ctx, client, kubeadmConfigTemplates, kubeadmConfigTemplatesNames); err != nil {
 		return err
 	}
 
-	if err := deleteForeignResources(ctx, vclusterClient, openstackMachineTemplates, openstackMachineTemplatesNames); err != nil {
+	if err := deleteForeignResources(ctx, client, openstackMachineTemplates, openstackMachineTemplatesNames); err != nil {
 		return err
 	}
 
