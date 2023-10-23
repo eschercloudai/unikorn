@@ -152,6 +152,7 @@ func convertFeatures(in *unikornv1.KubernetesCluster) *generated.KubernetesClust
 		KubernetesDashboard: in.Spec.Features.KubernetesDashboard,
 		FileStorage:         in.Spec.Features.FileStorage,
 		Prometheus:          in.Spec.Features.Prometheus,
+		NvidiaOperator:      in.Spec.Features.NvidiaOperator,
 	}
 
 	return features
@@ -269,7 +270,7 @@ func createNetwork(options *generated.KubernetesCluster) (*unikornv1.KubernetesC
 	return network, nil
 }
 
-// createAPI creates the Kuebernetes API part of the cluster.
+// createAPI creates the Kubernetes API part of the cluster.
 func createAPI(options *generated.KubernetesCluster) (*unikornv1.KubernetesClusterAPISpec, error) {
 	if options.Api == nil {
 		//nolint:nilnil
@@ -442,6 +443,7 @@ func createFeatures(options *generated.KubernetesCluster) *unikornv1.KubernetesC
 		KubernetesDashboard: options.Features.KubernetesDashboard,
 		FileStorage:         options.Features.FileStorage,
 		Prometheus:          options.Features.Prometheus,
+		NvidiaOperator:      options.Features.NvidiaOperator,
 	}
 
 	return features
@@ -449,6 +451,10 @@ func createFeatures(options *generated.KubernetesCluster) *unikornv1.KubernetesC
 
 type createClusterContext struct {
 	hasGPUWorkloadPool bool
+}
+
+func installNvidiaOperator(features *unikornv1.KubernetesClusterFeaturesSpec) bool {
+	return features.NvidiaOperator == nil || *features.NvidiaOperator
 }
 
 // createCluster creates the full cluster custom resource.
@@ -465,7 +471,7 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 		return nil, err
 	}
 
-	kubernetesCcontrolPlane, err := c.createControlPlane(options)
+	kubernetesControlPlane, err := c.createControlPlane(options)
 	if err != nil {
 		return nil, err
 	}
@@ -491,19 +497,21 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 			Openstack:                    createOpenstack(options),
 			Network:                      network,
 			API:                          api,
-			ControlPlane:                 kubernetesCcontrolPlane,
+			ControlPlane:                 kubernetesControlPlane,
 			WorkloadPools:                kubernetesWorkloadPools,
 			Features:                     createFeatures(options),
 		},
 	}
 
-	// Automatically install the nvidia operator if a workload pool has GPUs.
-	// TODO: provide a way to opt-out... if anyone ever asks for it.
+	// Automatically install the nvidia operator if a workload pool has GPUs, check if it's
+	// been explicitly set to false
 	if cluster.Spec.Features == nil {
 		cluster.Spec.Features = &unikornv1.KubernetesClusterFeaturesSpec{}
 	}
 
-	cluster.Spec.Features.NvidiaOperator = &clusterContext.hasGPUWorkloadPool
+	if installNvidiaOperator(cluster.Spec.Features) {
+		cluster.Spec.Features.NvidiaOperator = &clusterContext.hasGPUWorkloadPool
+	}
 
 	return cluster, nil
 }

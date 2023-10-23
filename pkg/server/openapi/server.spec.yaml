@@ -977,6 +977,9 @@ components:
         prometheus:
           description: Enable Prometheus.
           type: boolean
+        nvidiaOperator:
+          description: Install the NVIDIA Operator
+          type: boolean
     kubernetesCluster:
       description: Kubernetes cluster creation parameters.
       type: object
@@ -1468,6 +1471,7 @@ components:
               ingress: false
               kubernetesDashboard: false
               prometheus: false
+              nvidiaOperator: false
             name: cluster
             network:
               dnsNameservers:
@@ -1518,6 +1522,7 @@ components:
               ingress: false
               kubernetesDashboard: false
               prometheus: false
+              nvidiaOperator: false
             name: cluster
             network:
               dnsNameservers:
