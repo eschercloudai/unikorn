@@ -2,7 +2,7 @@
 
 A badass, opinionated, deployer of souls!
 
-![Unikorn](https://github.com/eschercloudai/unikorn/blob/6e51f1f10b69de0f069f3a858af432894de45723/docs/unikornapi.png)
+![Unikorn](docs/unikornapi.png)
 
 ## Overview
 
@@ -42,8 +42,6 @@ Unikorn is split up into domain specific micro-services:
   Most notably, this includes automatic upgrades.
 
 ## Installation
-
-Consult the [developer documentation](DEVELOPER.md) for local development instructions.
 
 ### Installing the Management Binary
 
@@ -308,3 +306,9 @@ unikornctl create --help
 ### API (Unikorn Server)
 
 Consult the [server readme](pkg/server/README.md) to get started.
+
+## Development
+
+Consult the [developer documentation](DEVELOPER.md) for local development instructions.
+
+The [architecture documentation](ARCHITECTURE.md) details how it all works, and the design considerations.
