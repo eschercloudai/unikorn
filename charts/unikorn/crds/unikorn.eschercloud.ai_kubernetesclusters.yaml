@@ -326,7 +326,8 @@ spec:
                       features.
                     type: boolean
                   nvidiaOperator:
-                    description: NvidiaOperator, if true install the Nvidia Operator.
+                    description: NvidiaOperator, if false do not install the Nvidia
+                      Operator, otherwise install if GPU flavors are detected
                     type: boolean
                   prometheus:
                     description: Prometheus, if true, installs the Prometheus Operator.

@@ -512,7 +512,8 @@ type KubernetesClusterFeaturesSpec struct {
 	FileStorage *bool `json:"fileStorage,omitempty"`
 	// Prometheus, if true, installs the Prometheus Operator.
 	Prometheus *bool `json:"prometheus,omitempty"`
-	// NvidiaOperator, if true install the Nvidia Operator.
+	// NvidiaOperator, if false do not install the Nvidia Operator, otherwise
+	// install if GPU flavors are detected
 	NvidiaOperator *bool `json:"nvidiaOperator,omitempty"`
 }
 
