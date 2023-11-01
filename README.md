@@ -50,7 +50,7 @@ Unikorn is split up into domain specific micro-services:
 Download the official binary (update the version as appropriate):
 
 ```shell
-wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.3.52/unikornctl-linux-amd64
+wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.3.53/unikornctl-linux-amd64
 ```
 
 ### Set up shell completion
@@ -230,7 +230,7 @@ spec:
   source:
     path: charts/unikorn
     repoURL: git@github.com:eschercloudai/unikorn
-    targetRevision: 0.3.52
+    targetRevision: 0.3.53
     helm:
       parameters:
       - name: dockerConfig
