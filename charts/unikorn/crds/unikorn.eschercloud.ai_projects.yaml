@@ -46,6 +46,10 @@ spec:
             type: object
           spec:
             description: ProjectSpec defines project specific metadata.
+            properties:
+              pause:
+                description: Pause, if true, will inhibit reconciliation.
+                type: boolean
             type: object
           status:
             description: ProjectStatus defines the status of the project.

@@ -27,8 +27,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -51,7 +49,7 @@ func New() provisioners.ManagerProvisioner {
 // Ensure the ManagerProvisioner interface is implemented.
 var _ provisioners.ManagerProvisioner = &Provisioner{}
 
-func (p *Provisioner) Object() client.Object {
+func (p *Provisioner) Object() unikornv1.ManagableResourceInterface {
 	return &p.project
 }
 

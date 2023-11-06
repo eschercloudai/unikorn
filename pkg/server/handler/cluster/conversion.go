@@ -170,7 +170,7 @@ func convertStatus(in *unikornv1.KubernetesCluster) *generated.KubernetesResourc
 		out.DeletionTime = &in.DeletionTimestamp.Time
 	}
 
-	condition, err := in.LookupCondition(unikornv1.ConditionAvailable)
+	condition, err := in.StatusConditionRead(unikornv1.ConditionAvailable)
 	if err == nil {
 		out.Status = string(condition.Reason)
 	}

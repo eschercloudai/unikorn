@@ -66,7 +66,7 @@ func New() provisioners.ManagerProvisioner {
 // Ensure the ManagerProvisioner interface is implemented.
 var _ provisioners.ManagerProvisioner = &Provisioner{}
 
-func (p *Provisioner) Object() client.Object {
+func (p *Provisioner) Object() unikornv1.ManagableResourceInterface {
 	return &p.cluster
 }
 

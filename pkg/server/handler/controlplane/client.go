@@ -219,7 +219,7 @@ func (c *Client) convert(ctx context.Context, in *unikornv1.ControlPlane) (*gene
 		out.Status.DeletionTime = &in.DeletionTimestamp.Time
 	}
 
-	if condition, err := in.LookupCondition(unikornv1.ConditionAvailable); err == nil {
+	if condition, err := in.StatusConditionRead(unikornv1.ConditionAvailable); err == nil {
 		out.Status.Status = string(condition.Reason)
 	}
 

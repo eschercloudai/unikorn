@@ -233,6 +233,8 @@ type Project struct {
 
 // ProjectSpec defines project specific metadata.
 type ProjectSpec struct {
+	// Pause, if true, will inhibit reconciliation.
+	Pause bool `json:"pause,omitempty"`
 }
 
 // ProjectStatus defines the status of the project.
@@ -272,6 +274,8 @@ type ControlPlane struct {
 
 // ControlPlaneSpec defines any control plane specific options.
 type ControlPlaneSpec struct {
+	// Pause, if true, will inhibit reconciliation.
+	Pause bool `json:"pause,omitempty"`
 	// Timeout defines how long a control plane is allowed to provision for before
 	// a timeout is triggerd and the request aborts.
 	// +kubebuilder:default="10m"
@@ -424,6 +428,8 @@ type KubernetesCluster struct {
 
 // KubernetesClusterSpec defines the requested state of the Kubernetes cluster.
 type KubernetesClusterSpec struct {
+	// Pause, if true, will inhibit reconciliation.
+	Pause bool `json:"pause,omitempty"`
 	// Timeout is the maximum time to attempt to provision a cluster before aborting.
 	// +kubebuilder:default="20m"
 	Timeout *metav1.Duration `json:"timeout"`

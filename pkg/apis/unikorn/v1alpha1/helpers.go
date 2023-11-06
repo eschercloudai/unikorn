@@ -51,22 +51,20 @@ func IPv4AddressSliceFromIPSlice(in []net.IP) []IPv4Address {
 	return out
 }
 
-// ConditionResource is an API type that has a set of conditions.
-type ConditionResource interface {
-	// LookupCondition scans the status conditions for an existing condition
-	// whose type matches.
-	LookupCondition(t ConditionType) (*Condition, error)
-
-	// UpdateCondition either adds or updates a condition in the control plane
-	// status. If the condition, status and message match an existing condition
-	// the update is ignored.
-	UpdateCondition(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string)
+// Paused implements the ReconcilePauser interface.
+func (c *Project) Paused() bool {
+	return c.Spec.Pause
 }
 
-// These resources have managers, and must implment this generic interface.
-var _ ConditionResource = &Project{}
-var _ ConditionResource = &ControlPlane{}
-var _ ConditionResource = &KubernetesCluster{}
+// Paused implements the ReconcilePauser interface.
+func (c *ControlPlane) Paused() bool {
+	return c.Spec.Pause
+}
+
+// Paused implements the ReconcilePauser interface.
+func (c *KubernetesCluster) Paused() bool {
+	return c.Spec.Pause
+}
 
 // getCondition is a generic condition lookup function.
 func getCondition(conditions []Condition, t ConditionType) (*Condition, error) {
@@ -108,16 +106,16 @@ func updateCondition(conditions *[]Condition, t ConditionType, status corev1.Con
 	}
 }
 
-// LookupCondition scans the status conditions for an existing condition whose type
+// StatusConditionRead scans the status conditions for an existing condition whose type
 // matches.
-func (c *Project) LookupCondition(t ConditionType) (*Condition, error) {
+func (c *Project) StatusConditionRead(t ConditionType) (*Condition, error) {
 	return getCondition(c.Status.Conditions, t)
 }
 
-// UpdateCondition either adds or updates a condition in the control plane status.
+// StatusConditionWrite either adds or updates a condition in the control plane status.
 // If the condition, status and message match an existing condition the update is
 // ignored.
-func (c *Project) UpdateCondition(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
+func (c *Project) StatusConditionWrite(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
 	updateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 
@@ -132,16 +130,24 @@ func (c *Project) ResourceLabels() (labels.Set, error) {
 	return labels, nil
 }
 
-// LookupCondition scans the status conditions for an existing condition whose type
+func (c *Project) ApplicationBundleKind() ApplicationBundleResourceKind {
+	return ""
+}
+
+func (c *Project) ApplicationBundleName() string {
+	return ""
+}
+
+// StatusConditionRead scans the status conditions for an existing condition whose type
 // matches.
-func (c *ControlPlane) LookupCondition(t ConditionType) (*Condition, error) {
+func (c *ControlPlane) StatusConditionRead(t ConditionType) (*Condition, error) {
 	return getCondition(c.Status.Conditions, t)
 }
 
-// UpdateCondition either adds or updates a condition in the control plane status.
+// StatusConditionWrite either adds or updates a condition in the control plane status.
 // If the condition, status and message match an existing condition the update is
 // ignored.
-func (c *ControlPlane) UpdateCondition(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
+func (c *ControlPlane) StatusConditionWrite(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
 	updateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 
@@ -178,16 +184,16 @@ func (c ControlPlane) UpgradeSpec() *ApplicationBundleAutoUpgradeSpec {
 	return c.Spec.ApplicationBundleAutoUpgrade
 }
 
-// LookupCondition scans the status conditions for an existing condition whose type
+// StatusConditionRead scans the status conditions for an existing condition whose type
 // matches.
-func (c *KubernetesCluster) LookupCondition(t ConditionType) (*Condition, error) {
+func (c *KubernetesCluster) StatusConditionRead(t ConditionType) (*Condition, error) {
 	return getCondition(c.Status.Conditions, t)
 }
 
-// UpdateCondition either adds or updates a condition in the cluster status.
+// StatusConditionWrite either adds or updates a condition in the cluster status.
 // If the condition, status and message match an existing condition the update is
 // ignored.
-func (c *KubernetesCluster) UpdateCondition(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
+func (c *KubernetesCluster) StatusConditionWrite(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
 	updateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 

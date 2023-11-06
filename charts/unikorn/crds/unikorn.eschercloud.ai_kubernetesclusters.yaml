@@ -406,6 +406,9 @@ spec:
                 - externalNetworkId
                 - failureDomain
                 type: object
+              pause:
+                description: Pause, if true, will inhibit reconciliation.
+                type: boolean
               timeout:
                 default: 20m
                 description: Timeout is the maximum time to attempt to provision a

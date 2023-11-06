@@ -27,13 +27,13 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/cd/mock"
 	clientlib "github.com/eschercloudai/unikorn/pkg/client"
+	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	mockprovisioners "github.com/eschercloudai/unikorn/pkg/provisioners/mock"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -48,20 +48,39 @@ const (
 	resourceBundleKind = unikornv1.ApplicationBundleResourceKindControlPlane
 )
 
-// mutuallyExclusiveResource defines an abstract type that is able to uniquely
-// identify itself with a set of labels.
-type mutuallyExclusiveResource labels.Set
+func newResource() unikornv1.ManagableResourceInterface {
+	b := resourceBundleName
 
-func (m mutuallyExclusiveResource) ApplicationBundleKind() unikornv1.ApplicationBundleResourceKind {
-	return resourceBundleKind
+	return &unikornv1.ControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			Labels: map[string]string{
+				constants.ProjectLabel: "foo",
+			},
+		},
+		Spec: unikornv1.ControlPlaneSpec{
+			ApplicationBundle: &b,
+		},
+	}
 }
 
-func (m mutuallyExclusiveResource) ApplicationBundleName() string {
-	return resourceBundleName
-}
+func newResourceLabels() []cd.ResourceIdentifierLabel {
+	return []cd.ResourceIdentifierLabel{
+		{
+			Name:  constants.ControlPlaneLabel,
+			Value: "bar",
+		},
 
-func (m mutuallyExclusiveResource) ResourceLabels() (labels.Set, error) {
-	return labels.Set(m), nil
+		{
+			Name:  constants.KindLabel,
+			Value: constants.KindLabelValueControlPlane,
+		},
+
+		{
+			Name:  constants.ProjectLabel,
+			Value: "foo",
+		},
+	}
 }
 
 // testContext provides a common framework for test execution.
@@ -140,7 +159,8 @@ func TestApplicationCreateHelm(t *testing.T) {
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: applicationName,
+		Name:   applicationName,
+		Labels: newResourceLabels(),
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -150,7 +170,7 @@ func TestApplicationCreateHelm(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := &mutuallyExclusiveResource{}
+	owner := newResource()
 
 	ctx := context.Background()
 	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
@@ -172,8 +192,6 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	release := "epic"
 	parameter := "foo"
 	value := "bah"
-	idLabel1 := "cow"
-	idLabel1Value := "moo"
 	remoteClusterName := "bar"
 	remoteClusterLabel1 := "dog"
 	remoteClusterLabel1Value := "woof"
@@ -223,13 +241,8 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	r.EXPECT().ID().Return(remoteID)
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: overrideApplicationName,
-		Labels: []cd.ResourceIdentifierLabel{
-			{
-				Name:  idLabel1,
-				Value: idLabel1Value,
-			},
-		},
+		Name:   overrideApplicationName,
+		Labels: newResourceLabels(),
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -249,9 +262,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := &mutuallyExclusiveResource{
-		idLabel1: idLabel1Value,
-	}
+	owner := newResource()
 
 	ctx := context.Background()
 	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
@@ -290,7 +301,8 @@ func TestApplicationCreateGit(t *testing.T) {
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: applicationName,
+		Name:   applicationName,
+		Labels: newResourceLabels(),
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -300,7 +312,7 @@ func TestApplicationCreateGit(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := &mutuallyExclusiveResource{}
+	owner := newResource()
 
 	ctx := context.Background()
 	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
@@ -399,7 +411,8 @@ func TestApplicationCreateMutate(t *testing.T) {
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: applicationName,
+		Name:   applicationName,
+		Labels: newResourceLabels(),
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -427,7 +440,7 @@ func TestApplicationCreateMutate(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := &mutuallyExclusiveResource{}
+	owner := newResource()
 
 	ctx := context.Background()
 	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
@@ -452,11 +465,12 @@ func TestApplicationDeleteNotFound(t *testing.T) {
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
-		Name: applicationName,
+		Name:   applicationName,
+		Labels: newResourceLabels(),
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := &mutuallyExclusiveResource{}
+	owner := newResource()
 
 	ctx := context.Background()
 	ctx = cd.NewContext(ctx, driver)

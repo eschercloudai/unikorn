@@ -19,19 +19,8 @@ package application
 import (
 	"context"
 
-	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 )
-
-// OwningResource defines the interfaces an owning resource has to implement
-// to support application deployment.
-type OwningResource interface {
-	// The resource must contain an getter to access it's catalog of applications.
-	unikornv1.ApplicationBundleGetter
-
-	// The resource must be able to uniquely identify an application.
-	unikornv1.MutuallyExclusiveResource
-}
 
 // ReleaseNamer is an interface that allows generators to supply an implicit release
 // name to Helm.
