@@ -56,6 +56,23 @@ spec:
                   a namespace to be created by the tooling, rather than the chart
                   itself.
                 type: boolean
+              description:
+                description: 'Description describes what the application does. TODO:
+                  remove optional once upgrade is complete.'
+                type: string
+              documentation:
+                description: 'Documentation defines a URL to 3rd party documentation.
+                  TODO: remove optional once upgrade is complete.'
+                type: string
+              exported:
+                description: Exported defines whether the application should be exported
+                  to the user visiable application manager.
+                type: boolean
+              icon:
+                description: 'Icon is a base64 encoded icon for the application. TODO:
+                  remove optional once upgrade is complete.'
+                format: byte
+                type: string
               interface:
                 description: Interface is the name of a Unikorn function that configures
                   the application. In particular it's used when reading values from
@@ -66,6 +83,14 @@ spec:
                   For example, building a Openstack Cloud Provider configuration from
                   a clouds.yaml is going to be bloody tricky without some proper code
                   to handle it.
+                type: string
+              license:
+                description: 'License describes the licence the application is released
+                  under. TODO: remove optional once upgrade is complete.'
+                type: string
+              name:
+                description: 'Name is the human readable application name. TODO: remove
+                  optional once upgrade is complete.'
                 type: string
               parameters:
                 description: Parameters is a set of static --set parameters to pass

@@ -566,6 +566,24 @@ type HelmApplication struct {
 }
 
 type HelmApplicationSpec struct {
+	// Name is the human readable application name.
+	// TODO: remove optional once upgrade is complete.
+	Name *string `json:"name,omitempty"`
+	// Description describes what the application does.
+	// TODO: remove optional once upgrade is complete.
+	Description *string `json:"description,omitempty"`
+	// Documentation defines a URL to 3rd party documentation.
+	// TODO: remove optional once upgrade is complete.
+	Documentation *string `json:"documentation,omitempty"`
+	// License describes the licence the application is released under.
+	// TODO: remove optional once upgrade is complete.
+	License *string `json:"license,omitempty"`
+	// Icon is a base64 encoded icon for the application.
+	// TODO: remove optional once upgrade is complete.
+	Icon []byte `json:"icon,omitempty"`
+	// Exported defines whether the application should be exported to
+	// the user visiable application manager.
+	Exported *bool `json:"exported,omitempty"`
 	// Repo is either a Helm chart repository, or git repository.
 	Repo *string `json:"repo"`
 	// Chart is the chart name in the repository.
