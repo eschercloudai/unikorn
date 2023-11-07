@@ -50,7 +50,7 @@ Unikorn is split up into domain specific micro-services:
 Download the official binary (update the version as appropriate):
 
 ```shell
-wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.3.53/unikornctl-linux-amd64
+wget -O ~/bin/unikornctl https://github.com/eschercloudai/unikorn/releases/download/0.3.54/unikornctl-linux-amd64
 ```
 
 ### Set up shell completion
@@ -104,14 +104,6 @@ helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update
 helm install argocd argo/argo-cd -n argocd --create-namespace
 ```
-
-To add the credentials go to `Settings`, `Repositories` and `Connect Repo`, then fill in:
-
-* **Connection method**: `SSH`
-* **Name**: `unikorn`
-* **Project**: `default`
-* **Repository URL**: `git@github.com:eschercloudai/unikorn`
-* **SSH private key data**: the contents of `~/.ssh/id_blahBlahBlah`
 
 #### Installing Prerequisites
 
@@ -229,8 +221,8 @@ spec:
   project: default
   source:
     path: charts/unikorn
-    repoURL: git@github.com:eschercloudai/unikorn
-    targetRevision: 0.3.53
+    repoURL: https://github.com/eschercloudai/unikorn
+    targetRevision: 0.3.54
     helm:
       parameters:
       - name: dockerConfig
