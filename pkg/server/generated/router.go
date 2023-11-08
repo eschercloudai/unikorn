@@ -21,6 +21,9 @@ type ServerInterface interface {
 	// (GET /api/v1/applicationbundles/controlPlane)
 	GetApiV1ApplicationbundlesControlPlane(w http.ResponseWriter, r *http.Request)
 
+	// (GET /api/v1/applications)
+	GetApiV1Applications(w http.ResponseWriter, r *http.Request)
+
 	// (GET /api/v1/auth/jwks)
 	GetApiV1AuthJwks(w http.ResponseWriter, r *http.Request)
 
@@ -131,6 +134,23 @@ func (siw *ServerInterfaceWrapper) GetApiV1ApplicationbundlesControlPlane(w http
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetApiV1ApplicationbundlesControlPlane(w, r)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetApiV1Applications operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1Applications(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, Oauth2AuthenticationScopes, []string{""})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1Applications(w, r)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -810,6 +830,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/applicationbundles/controlPlane", wrapper.GetApiV1ApplicationbundlesControlPlane)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/applications", wrapper.GetApiV1Applications)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/auth/jwks", wrapper.GetApiV1AuthJwks)

@@ -25,6 +25,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/authorization"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+	"github.com/eschercloudai/unikorn/pkg/server/handler/application"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/cluster"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
@@ -298,6 +299,17 @@ func (h *Handler) GetApiV1ApplicationbundlesControlPlane(w http.ResponseWriter, 
 
 func (h *Handler) GetApiV1ApplicationbundlesCluster(w http.ResponseWriter, r *http.Request) {
 	result, err := applicationbundle.NewClient(h.client).ListCluster(r.Context())
+	if err != nil {
+		errors.HandleError(w, r, err)
+		return
+	}
+
+	h.setUncacheable(w)
+	util.WriteJSONResponse(w, r, http.StatusOK, result)
+}
+
+func (h *Handler) GetApiV1Applications(w http.ResponseWriter, r *http.Request) {
+	result, err := application.NewClient(h.client).List(r.Context())
 	if err != nil {
 		errors.HandleError(w, r, err)
 		return

@@ -34,6 +34,30 @@ const (
 	UnsupportedResponseType Oauth2ErrorError = "unsupported_response_type"
 )
 
+// Application An application.
+type Application struct {
+	// Description Verbose description of what the application provides.
+	Description string `json:"description"`
+
+	// Documentation Documentation link for the application.
+	Documentation string `json:"documentation"`
+
+	// HumanReadableName Human readable application name.
+	HumanReadableName string `json:"humanReadableName"`
+
+	// Icon A base64 encoded SVG icon.  This should work in both light and dark themes.
+	Icon []byte `json:"icon"`
+
+	// License The license under which the application is released.
+	License string `json:"license"`
+
+	// Name Unique application name.
+	Name string `json:"name"`
+
+	// Version Application version.
+	Version string `json:"version"`
+}
+
 // ApplicationBundle A bundle of applications. This forms the basis of resource versions. Bundles marked
 // as preview should not be selected by default, and end of life bundles should not be
 // used to avoid unnecessary upgrades. If enabled, automatic upgrades will occur if
@@ -63,6 +87,9 @@ type ApplicationBundleAutoUpgrade struct {
 
 // ApplicationBundles A list of application bundles.
 type ApplicationBundles = []ApplicationBundle
+
+// Applications A list of appications.
+type Applications = []Application
 
 // AutoUpgradeDaysOfWeek Days of the week and time windows that permit operations to be performed in.
 type AutoUpgradeDaysOfWeek struct {
@@ -502,6 +529,9 @@ type ControlPlaneNameParameter = KubernetesNameParameter
 
 // ApplicationBundleResponse A list of application bundles.
 type ApplicationBundleResponse = ApplicationBundles
+
+// ApplicationResponse A list of appications.
+type ApplicationResponse = Applications
 
 // BadRequestResponse Generic error message.
 type BadRequestResponse = Oauth2Error

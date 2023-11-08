@@ -24,7 +24,6 @@ rules:
   - projects
   - controlplanes
   - kubernetesclusters
-  - kubernetesworkloadpools
   verbs:
   - create
   - get
@@ -36,6 +35,7 @@ rules:
   - unikorn.eschercloud.ai
   resources:
   - applicationbundles
+  - helmapplications
   verbs:
   - list
   - watch

@@ -31,6 +31,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 	mockprovisioners "github.com/eschercloudai/unikorn/pkg/provisioners/mock"
+	"github.com/eschercloudai/unikorn/pkg/util"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,10 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
-
-func toPointer[T any](t T) *T {
-	return &t
-}
 
 const (
 	resourceBundleName = "bundle-x.y.z"
@@ -116,10 +113,10 @@ func newBundle(applications ...*unikornv1.HelmApplication) *unikornv1.Applicatio
 
 	for _, application := range applications {
 		apps = append(apps, unikornv1.ApplicationBundleApplication{
-			Name: toPointer(application.Name),
+			Name: util.ToPointer(application.Name),
 			Reference: &unikornv1.ApplicationReference{
-				Kind: toPointer(unikornv1.ApplicationReferenceKindHelm),
-				Name: toPointer(application.Name),
+				Kind: util.ToPointer(unikornv1.ApplicationReferenceKindHelm),
+				Name: util.ToPointer(application.Name),
 			},
 		})
 	}
@@ -129,7 +126,7 @@ func newBundle(applications ...*unikornv1.HelmApplication) *unikornv1.Applicatio
 			Name: resourceBundleName,
 		},
 		Spec: unikornv1.ApplicationBundleSpec{
-			Kind:         toPointer(resourceBundleKind),
+			Kind:         util.ToPointer(resourceBundleKind),
 			Applications: apps,
 		},
 	}
@@ -147,9 +144,9 @@ func TestApplicationCreateHelm(t *testing.T) {
 			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    toPointer(repo),
-			Chart:   toPointer(chart),
-			Version: toPointer(version),
+			Repo:    util.ToPointer(repo),
+			Chart:   util.ToPointer(chart),
+			Version: util.ToPointer(version),
 		},
 	}
 
@@ -203,18 +200,18 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    toPointer(repo),
-			Chart:   toPointer(chart),
-			Version: toPointer(version),
-			Release: toPointer(release),
+			Repo:    util.ToPointer(repo),
+			Chart:   util.ToPointer(chart),
+			Version: util.ToPointer(version),
+			Release: util.ToPointer(release),
 			Parameters: []unikornv1.HelmApplicationSpecParameter{
 				{
-					Name:  toPointer(parameter),
-					Value: toPointer(value),
+					Name:  util.ToPointer(parameter),
+					Value: util.ToPointer(value),
 				},
 			},
-			CreateNamespace: toPointer(true),
-			ServerSideApply: toPointer(true),
+			CreateNamespace: util.ToPointer(true),
+			ServerSideApply: util.ToPointer(true),
 		},
 	}
 
@@ -290,9 +287,9 @@ func TestApplicationCreateGit(t *testing.T) {
 			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    toPointer(repo),
-			Path:    toPointer(path),
-			Version: toPointer(version),
+			Repo:    util.ToPointer(repo),
+			Path:    util.ToPointer(path),
+			Version: util.ToPointer(version),
 		},
 	}
 
@@ -400,9 +397,9 @@ func TestApplicationCreateMutate(t *testing.T) {
 			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    toPointer(repo),
-			Chart:   toPointer(chart),
-			Version: toPointer(version),
+			Repo:    util.ToPointer(repo),
+			Chart:   util.ToPointer(chart),
+			Version: util.ToPointer(version),
 		},
 	}
 
