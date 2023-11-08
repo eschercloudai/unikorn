@@ -18,6 +18,8 @@ package application
 
 import (
 	"context"
+
+	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 )
 
 type key int
@@ -25,11 +27,11 @@ type key int
 //nolint:gochecknoglobals
 var resourceKey key
 
-func NewContext(ctx context.Context, resource OwningResource) context.Context {
+func NewContext(ctx context.Context, resource unikornv1.ManagableResourceInterface) context.Context {
 	return context.WithValue(ctx, resourceKey, resource)
 }
 
-func FromContext(ctx context.Context) OwningResource {
+func FromContext(ctx context.Context) unikornv1.ManagableResourceInterface {
 	//nolint:forcetypeassert
-	return ctx.Value(resourceKey).(OwningResource)
+	return ctx.Value(resourceKey).(unikornv1.ManagableResourceInterface)
 }

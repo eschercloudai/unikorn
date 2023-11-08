@@ -18,11 +18,13 @@ package application
 
 import (
 	"context"
+	"slices"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
+	uutil "github.com/eschercloudai/unikorn/pkg/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -103,10 +105,14 @@ func (p *Provisioner) getResourceID(ctx context.Context) (*cd.ResourceIdentifier
 	if len(l) > 0 {
 		id.Labels = make([]cd.ResourceIdentifierLabel, 0, len(l))
 
-		for k, v := range l {
+		// Make label ordering deterministic for the sake of testing...
+		k := uutil.Keys(l)
+		slices.Sort(k)
+
+		for _, key := range k {
 			id.Labels = append(id.Labels, cd.ResourceIdentifierLabel{
-				Name:  k,
-				Value: v,
+				Name:  key,
+				Value: l[key],
 			})
 		}
 	}

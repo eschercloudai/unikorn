@@ -12,11 +12,11 @@ import (
 	context "context"
 	reflect "reflect"
 
+	v1alpha1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	cd "github.com/eschercloudai/unikorn/pkg/cd"
 	provisioners "github.com/eschercloudai/unikorn/pkg/provisioners"
 	gomock "go.uber.org/mock/gomock"
 	api "k8s.io/client-go/tools/clientcmd/api"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MockRemoteCluster is a mock of RemoteCluster interface.
@@ -210,10 +210,10 @@ func (mr *MockManagerProvisionerMockRecorder) Deprovision(arg0 any) *gomock.Call
 }
 
 // Object mocks base method.
-func (m *MockManagerProvisioner) Object() client.Object {
+func (m *MockManagerProvisioner) Object() v1alpha1.ManagableResourceInterface {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Object")
-	ret0, _ := ret[0].(client.Object)
+	ret0, _ := ret[0].(v1alpha1.ManagableResourceInterface)
 	return ret0
 }
 

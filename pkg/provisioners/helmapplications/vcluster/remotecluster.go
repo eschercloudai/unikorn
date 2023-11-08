@@ -31,26 +31,26 @@ type RemoteCluster struct {
 	// namespace tells us where the vcluster lives.
 	namespace string
 
-	// resource is used to identify the owner of and uniquely identify
+	// labeller is used to identify the owner of and uniquely identify
 	// a remote cluster instance.
-	resource unikornv1.MutuallyExclusiveResource
+	labeller unikornv1.ResourceLabeller
 }
 
 // Ensure this implements the remotecluster.Generator interface.
 var _ provisioners.RemoteCluster = &RemoteCluster{}
 
 // NewRemoteCluster return a new instance of a remote cluster generator.
-func NewRemoteCluster(namespace string, resource unikornv1.MutuallyExclusiveResource) *RemoteCluster {
+func NewRemoteCluster(namespace string, labeller unikornv1.ResourceLabeller) *RemoteCluster {
 	return &RemoteCluster{
 		namespace: namespace,
-		resource:  resource,
+		labeller:  labeller,
 	}
 }
 
 // ID implements the remotecluster.Generator interface.
 func (g *RemoteCluster) ID() *cd.ResourceIdentifier {
 	// TODO: error checking.
-	resourceLabels, _ := g.resource.ResourceLabels()
+	resourceLabels, _ := g.labeller.ResourceLabels()
 
 	var labels []cd.ResourceIdentifierLabel
 

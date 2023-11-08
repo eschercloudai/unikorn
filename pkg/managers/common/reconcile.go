@@ -96,9 +96,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 
-	// TODO: make a composite interface type.
-	resource, _ := object.(application.OwningResource)
-
 	// The static client is used by the application provisioner to get access to
 	// application bundles and definitions regardless of remote cluster scoping etc.
 	ctx = clientlib.NewContextWithStaticClient(ctx, r.client)
@@ -111,7 +108,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	// The application context contains a reference to the resource that caused
 	// their creation.
-	ctx = application.NewContext(ctx, resource)
+	ctx = application.NewContext(ctx, object)
 
 	// See if the object exists or not, if not it's been deleted.
 	if err := r.client.Get(ctx, request.NamespacedName, object); err != nil {
@@ -122,6 +119,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		}
 
 		return reconcile.Result{}, err
+	}
+
+	if object.Paused() {
+		log.Info("reconcilication paused")
+
+		return reconcile.Result{}, nil
 	}
 
 	// If it's being deleted, ignore if there are no finalizers, Kubernetes is in
@@ -143,7 +146,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 // reconcileDelete handles object deletion.
-func (r *Reconciler) reconcileDelete(ctx context.Context, provisioner provisioners.ManagerProvisioner, object client.Object) (reconcile.Result, error) {
+func (r *Reconciler) reconcileDelete(ctx context.Context, provisioner provisioners.Provisioner, object unikornv1.ManagableResourceInterface) (reconcile.Result, error) {
 	perr := provisioner.Deprovision(ctx)
 
 	if err := r.handleReconcileCondition(ctx, object, perr, true); err != nil {
@@ -170,7 +173,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, provisioner provisione
 
 // reconcileNormal adds the application finalizer, provisions the resource and
 // updates the resource status to indicate progress.
-func (r *Reconciler) reconcileNormal(ctx context.Context, provisioner provisioners.ManagerProvisioner, object client.Object) (reconcile.Result, error) {
+func (r *Reconciler) reconcileNormal(ctx context.Context, provisioner provisioners.Provisioner, object unikornv1.ManagableResourceInterface) (reconcile.Result, error) {
 	// Add the finalizer so we can orchestrate resource garbage collection.
 	if ok := controllerutil.AddFinalizer(object, constants.Finalizer); ok {
 		if err := r.client.Update(ctx, object); err != nil {
@@ -198,7 +201,7 @@ func (r *Reconciler) reconcileNormal(ctx context.Context, provisioner provisione
 
 // handleReconcileCondition inspects the error, if any, that halted the provisioning and reports
 // this as a ppropriate in the status.
-func (r *Reconciler) handleReconcileCondition(ctx context.Context, object client.Object, err error, deprovision bool) error {
+func (r *Reconciler) handleReconcileCondition(ctx context.Context, object unikornv1.ManagableResourceInterface, err error, deprovision bool) error {
 	var status corev1.ConditionStatus
 
 	var reason unikornv1.ConditionReason
@@ -234,12 +237,7 @@ func (r *Reconciler) handleReconcileCondition(ctx context.Context, object client
 		message = fmt.Sprintf("Unhandled error: %v", err)
 	}
 
-	resource, ok := object.(unikornv1.ConditionResource)
-	if !ok {
-		return ErrResourceError
-	}
-
-	resource.UpdateCondition(unikornv1.ConditionAvailable, status, reason, message)
+	object.StatusConditionWrite(unikornv1.ConditionAvailable, status, reason, message)
 
 	if err := r.client.Status().Update(ctx, object); err != nil {
 		return err
