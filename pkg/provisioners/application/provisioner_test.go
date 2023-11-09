@@ -259,6 +259,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 		Cluster:         remoteID,
 		CreateNamespace: true,
 		ServerSideApply: true,
+		AllowDegraded:   true,
 	}
 
 	driver := mock.NewMockDriver(c)
@@ -271,7 +272,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
-	provisioner := application.New(applicationName).WithApplicationName(overrideApplicationName)
+	provisioner := application.New(applicationName).WithApplicationName(overrideApplicationName).AllowDegraded()
 	provisioner.OnRemote(r)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)

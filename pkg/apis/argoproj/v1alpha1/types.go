@@ -141,6 +141,10 @@ const (
 	// Healthy is when the chart is synchronized and all resources have
 	// got to a healthy status e.g. deployments scaled up etc.
 	Healthy ApplicationHealthStatus = "Healthy"
+
+	// Degraded is when things are osensibly working, but not fully healthy
+	// yet.
+	Degraded ApplicationHealthStatus = "Degraded"
 )
 
 type ApplicationHealth struct {

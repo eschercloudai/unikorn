@@ -49,7 +49,7 @@ func New(controlPlanePrefix string) *application.Provisioner {
 		controlPlanePrefix: controlPlanePrefix,
 	}
 
-	return application.New(applicationName).WithApplicationName(legacyApplicationName).WithGenerator(provisioner)
+	return application.New(applicationName).WithApplicationName(legacyApplicationName).WithGenerator(provisioner).AllowDegraded()
 }
 
 // Ensure the Provisioner interface is implemented.

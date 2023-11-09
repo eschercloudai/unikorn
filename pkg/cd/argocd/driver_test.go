@@ -23,25 +23,30 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	argoprojv1 "github.com/eschercloudai/unikorn/pkg/apis/argoproj/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/cd/argocd"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/util"
 	clientutil "github.com/eschercloudai/unikorn/pkg/util/client"
+	mockutil "github.com/eschercloudai/unikorn/pkg/util/mock"
 
 	corev1 "k8s.io/api/core/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 // testContext provides a common framework for test execution.
 type testContext struct {
+	client client.Client
 	driver *argocd.Driver
 }
 
-func mustNewTestContext(t *testing.T) *testContext {
+func mustNewTestContext(t *testing.T, tester util.K8SAPITester) *testContext {
 	t.Helper()
 
 	scheme, err := clientutil.NewScheme()
@@ -49,8 +54,15 @@ func mustNewTestContext(t *testing.T) *testContext {
 		t.Fatal(err)
 	}
 
+	o := argocd.Options{
+		K8SAPITester: tester,
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).Build()
+
 	tc := &testContext{
-		driver: argocd.New(fake.NewClientBuilder().WithScheme(scheme).Build()),
+		client: c,
+		driver: argocd.New(c, o),
 	}
 
 	return tc
@@ -78,7 +90,12 @@ const (
 func TestApplicationCreateHelm(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	tester := mockutil.NewMockK8SAPITester(c)
+
+	tc := mustNewTestContext(t, tester)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -103,6 +120,20 @@ func TestApplicationCreateHelm(t *testing.T) {
 	assert.True(t, application.Spec.SyncPolicy.Automated.SelfHeal)
 	assert.True(t, application.Spec.SyncPolicy.Automated.Prune)
 	assert.Nil(t, application.Spec.SyncPolicy.SyncOptions)
+
+	application.Status.Health = &argoprojv1.ApplicationHealth{
+		Status: argoprojv1.Degraded,
+	}
+	assert.NoError(t, tc.client.Update(context.TODO(), application))
+	assert.ErrorIs(t, tc.driver.CreateOrUpdateHelmApplication(context.TODO(), id, app), provisioners.ErrYield)
+
+	app.AllowDegraded = true
+	assert.NoError(t, tc.driver.CreateOrUpdateHelmApplication(context.TODO(), id, app))
+
+	application = mustGetApplication(t, tc, id)
+	application.Status.Health.Status = argoprojv1.Healthy
+	assert.NoError(t, tc.client.Update(context.TODO(), application))
+	assert.NoError(t, tc.driver.CreateOrUpdateHelmApplication(context.TODO(), id, app))
 }
 
 // TestApplicationCreateHelmExtended tests that given the requested input the provisioner
@@ -123,7 +154,12 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 		valuesKey: valuesValue,
 	}
 
-	tc := mustNewTestContext(t)
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	tester := mockutil.NewMockK8SAPITester(c)
+
+	tc := mustNewTestContext(t, tester)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -187,7 +223,12 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 func TestApplicationCreateGit(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	tester := mockutil.NewMockK8SAPITester(c)
+
+	tc := mustNewTestContext(t, tester)
 
 	path := "bar"
 
@@ -222,7 +263,12 @@ func TestApplicationCreateGit(t *testing.T) {
 func TestApplicationUpdateAndDelete(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	tester := mockutil.NewMockK8SAPITester(c)
+
+	tc := mustNewTestContext(t, tester)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -265,7 +311,12 @@ func TestApplicationUpdateAndDelete(t *testing.T) {
 func TestApplicationDeleteNotFound(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	tester := mockutil.NewMockK8SAPITester(c)
+
+	tc := mustNewTestContext(t, tester)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -329,7 +380,14 @@ func mustGetClusterSecret(t *testing.T, tc *testContext, id *cd.ResourceIdentifi
 func TestClusterCreate(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
+	ctx := context.TODO()
+
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	tester := mockutil.NewMockK8SAPITester(c)
+
+	tc := mustNewTestContext(t, tester)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -339,7 +397,9 @@ func TestClusterCreate(t *testing.T) {
 		Config: getKubeconfig(),
 	}
 
-	assert.NoError(t, tc.driver.CreateOrUpdateCluster(context.TODO(), id, cluster))
+	tester.EXPECT().Connect(ctx, cluster.Config).Return(nil)
+
+	assert.NoError(t, tc.driver.CreateOrUpdateCluster(ctx, id, cluster))
 
 	secret := mustGetClusterSecret(t, tc, id)
 
@@ -358,7 +418,14 @@ func TestClusterCreate(t *testing.T) {
 func TestClusterUpdateAndDelete(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
+	ctx := context.TODO()
+
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	tester := mockutil.NewMockK8SAPITester(c)
+
+	tc := mustNewTestContext(t, tester)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",
@@ -368,7 +435,9 @@ func TestClusterUpdateAndDelete(t *testing.T) {
 		Config: getKubeconfig(),
 	}
 
-	assert.NoError(t, tc.driver.CreateOrUpdateCluster(context.TODO(), id, cluster))
+	tester.EXPECT().Connect(ctx, cluster.Config).Return(nil)
+
+	assert.NoError(t, tc.driver.CreateOrUpdateCluster(ctx, id, cluster))
 
 	newCAData := []byte("squirrel")
 
@@ -394,7 +463,12 @@ func TestClusterUpdateAndDelete(t *testing.T) {
 func TestClusterDeleteNotFound(t *testing.T) {
 	t.Parallel()
 
-	tc := mustNewTestContext(t)
+	c := gomock.NewController(t)
+	defer c.Finish()
+
+	tester := mockutil.NewMockK8SAPITester(c)
+
+	tc := mustNewTestContext(t, tester)
 
 	id := &cd.ResourceIdentifier{
 		Name: "test",

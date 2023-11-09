@@ -31,8 +31,10 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	"github.com/eschercloudai/unikorn/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -53,21 +55,27 @@ var (
 	ErrItemLengthMismatch = errors.New("item count not as expected")
 )
 
+type Options struct {
+	K8SAPITester util.K8SAPITester
+}
+
 // Driver implements a CD driver for ArgoCD.  Applications are fairly
 // straight forward as they are implemented with custom resources.  We use
 // the application ID to generate a resource name, and labels to make them
 // unique and add context, plus this thwarts the 63 character limit.  There
 // is no custom resource for clusters, so have to use the API.
 type Driver struct {
-	client client.Client
+	client  client.Client
+	options Options
 }
 
 var _ cd.Driver = &Driver{}
 
 // New creates a new ArgoCD driver.
-func New(client client.Client) *Driver {
+func New(client client.Client, options Options) *Driver {
 	return &Driver{
-		client: client,
+		client:  client,
+		options: options,
 	}
 }
 
@@ -218,6 +226,8 @@ func generateApplication(id *cd.ResourceIdentifier, app *cd.HelmApplication) (*a
 }
 
 // CreateOrUpdateHelmApplication creates or updates a helm application idempotently.
+//
+//nolint:cyclop
 func (d *Driver) CreateOrUpdateHelmApplication(ctx context.Context, id *cd.ResourceIdentifier, app *cd.HelmApplication) error {
 	log := log.FromContext(ctx)
 
@@ -254,10 +264,18 @@ func (d *Driver) CreateOrUpdateHelmApplication(ctx context.Context, id *cd.Resou
 		resource = temp
 	}
 
-	// NOTE: This isn't necessarily accurate, take CAPI clusters for instance,
-	// that's just a bunch of CRs, and they are instantly healthy until
-	// CAPI/CAPO take note and start making status updates...
-	if resource.Status.Health == nil || resource.Status.Health.Status != argoprojv1.Healthy {
+	if resource.Status.Health == nil {
+		return provisioners.ErrYield
+	}
+
+	// Bit of a hack, for clusters, we know they are working and gated on
+	// remote cluster creation, so can allow the rest to provision while it's
+	// still sorting its control plane out.
+	if app.AllowDegraded && resource.Status.Health.Status == argoprojv1.Degraded {
+		return nil
+	}
+
+	if resource.Status.Health.Status != argoprojv1.Healthy {
 		return provisioners.ErrYield
 	}
 
@@ -396,6 +414,48 @@ func (d *Driver) CreateOrUpdateCluster(ctx context.Context, id *cd.ResourceIdent
 
 	clusterConfig := cluster.Config.Clusters[configContext.Cluster]
 
+	secretName, err := clusterSecretName(clusterConfig.Server)
+	if err != nil {
+		return err
+	}
+
+	// This next bit is a slight hack, if we install a remote without it being
+	// contactable yet, then Argo will stall installing applications on it, and
+	// not reconnect until ~5 minutes later, so only install the remote when we
+	// can hit the API.
+	// TODO: there may be a tunable to do this for us, but this is quickest :D
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      secretName,
+	}
+
+	var object corev1.Secret
+
+	//nolint:nestif
+	if err := d.client.Get(ctx, key, &object); err != nil {
+		if !kerrors.IsNotFound(err) {
+			return err
+		}
+
+		log.Info("awaiting cluster connectivity")
+
+		tester := d.options.K8SAPITester
+
+		if tester == nil {
+			tester = &util.DefaultK8SAPITester{}
+		}
+
+		if err := tester.Connect(ctx, cluster.Config); err != nil {
+			if !errors.Is(err, util.ErrK8SConnectionError) {
+				return err
+			}
+
+			log.Info("failed to get kubernetes service")
+
+			return provisioners.ErrYield
+		}
+	}
+
 	authInfo := cluster.Config.AuthInfos[configContext.AuthInfo]
 
 	config := &ClusterConfig{
@@ -407,11 +467,6 @@ func (d *Driver) CreateOrUpdateCluster(ctx context.Context, id *cd.ResourceIdent
 	}
 
 	configData, err := json.Marshal(config)
-	if err != nil {
-		return err
-	}
-
-	secretName, err := clusterSecretName(clusterConfig.Server)
 	if err != nil {
 		return err
 	}

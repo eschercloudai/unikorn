@@ -49,6 +49,9 @@ type Provisioner struct {
 
 	// generator provides application generation functionality.
 	generator interface{}
+
+	// allowDegraded accepts a degraded status as a success for an application.
+	allowDegraded bool
 }
 
 // New returns a new initialized provisioner object.
@@ -82,6 +85,13 @@ func (p *Provisioner) WithApplicationName(name string) *Provisioner {
 // you cannot do it all from the default set of arguments.
 func (p *Provisioner) WithGenerator(generator interface{}) *Provisioner {
 	p.generator = generator
+
+	return p
+}
+
+// AllowDegraded accepts a degraded status as a success for an application.
+func (p *Provisioner) AllowDegraded() *Provisioner {
+	p.allowDegraded = true
 
 	return p
 }
@@ -243,13 +253,14 @@ func (p *Provisioner) generateApplication(ctx context.Context) (*cd.HelmApplicat
 	}
 
 	cdApplication := &cd.HelmApplication{
-		Repo:       *application.Spec.Repo,
-		Version:    *application.Spec.Version,
-		Release:    p.getReleaseName(ctx, application),
-		Parameters: parameters,
-		Values:     values,
-		Cluster:    p.getClusterID(),
-		Namespace:  p.namespace,
+		Repo:          *application.Spec.Repo,
+		Version:       *application.Spec.Version,
+		Release:       p.getReleaseName(ctx, application),
+		Parameters:    parameters,
+		Values:        values,
+		Cluster:       p.getClusterID(),
+		Namespace:     p.namespace,
+		AllowDegraded: p.allowDegraded,
 	}
 
 	if application.Spec.Chart != nil {
