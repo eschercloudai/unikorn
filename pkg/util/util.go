@@ -19,9 +19,16 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // natPrefix provides a cache/memoization for GetNATPrefix, be nice to our
@@ -80,4 +87,30 @@ func Keys[T any](m map[string]T) []string {
 	}
 
 	return r
+}
+
+var (
+	ErrK8SConnectionError = errors.New("unable to connection the kubernetes API")
+)
+
+type DefaultK8SAPITester struct{}
+
+func (t *DefaultK8SAPITester) Connect(ctx context.Context, config *clientcmdapi.Config) error {
+	restConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	c, err := client.New(restConfig, client.Options{})
+	if err != nil {
+		return err
+	}
+
+	var svc corev1.Service
+
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "default", Name: "kubernetes"}, &svc); err != nil {
+		return ErrK8SConnectionError
+	}
+
+	return nil
 }

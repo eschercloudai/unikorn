@@ -126,7 +126,7 @@ spec:
   - name: cluster-openstack
     reference:
       kind: HelmApplication
-      name: cluster-openstack-0.3.26-1
+      name: cluster-openstack-0.3.27-1
   - name: cilium
     reference:
       kind: HelmApplication

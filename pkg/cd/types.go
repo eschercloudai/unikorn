@@ -127,6 +127,10 @@ type HelmApplication struct {
 	// TODO: This is the default in flux2 (v0.18.0), and can be deprecated if
 	// argo can be moved to using it by default.
 	ServerSideApply bool
+
+	// AllowDegraded allows us to tolerate degraded state and allow a success
+	// to be reported rather than a failure.
+	AllowDegraded bool
 }
 
 // Cluster identifies a Kubernetes cluster and allows a CD driver to

@@ -78,7 +78,7 @@ func (r *Reconciler) getDriver() (cd.Driver, error) {
 		return nil, uerrors.ErrCDDriver
 	}
 
-	return argocd.New(r.client), nil
+	return argocd.New(r.client, argocd.Options{}), nil
 }
 
 // Reconcile is the top-level reconcile interface that controller-runtime will
