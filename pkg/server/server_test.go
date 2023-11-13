@@ -1139,7 +1139,7 @@ func TestApiV1ClustersGet(t *testing.T) {
 	project := mustCreateProjectFixture(t, tc, projectID)
 	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
-	mustKubernetesClusterApplicationBundleFixture(t, tc)
+	mustCreateKubernetesClusterApplicationBundleFixture(t, tc)
 
 	unikornClient := MustNewScopedClient(t, tc)
 
@@ -1217,7 +1217,7 @@ func TestApiV1ClustersList(t *testing.T) {
 	project := mustCreateProjectFixture(t, tc, projectID)
 	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
-	mustKubernetesClusterApplicationBundleFixture(t, tc)
+	mustCreateKubernetesClusterApplicationBundleFixture(t, tc)
 
 	unikornClient := MustNewScopedClient(t, tc)
 
@@ -1390,7 +1390,7 @@ func TestApiV1ClustersDelete(t *testing.T) {
 	project := mustCreateProjectFixture(t, tc, projectID)
 	controlPlane := mustCreateControlPlaneFixture(t, tc, project.Status.Namespace, "foo")
 	mustCreateKubernetesClusterFixture(t, tc, controlPlane.Status.Namespace, "foo")
-	mustKubernetesClusterApplicationBundleFixture(t, tc)
+	mustCreateKubernetesClusterApplicationBundleFixture(t, tc)
 
 	unikornClient := MustNewScopedClient(t, tc)
 
@@ -1431,6 +1431,36 @@ func TestApiV1ClustersDeleteNotFound(t *testing.T) {
 	serverErr := *response.JSON404
 
 	assert.Equal(t, serverErr.Error, generated.NotFound)
+}
+
+// TestApiV1ApplicationsList tests applications can be listed.
+func TestApiV1ApplicationsList(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	mustCreateHelmApplicationFixture(t, tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ApplicationsWithResponse(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
+	assert.NotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, applicationName, results[0].Name)
+	assert.Equal(t, applicationHumanReadableName, results[0].HumanReadableName)
+	assert.Equal(t, applicationDescription, results[0].Description)
+	assert.Equal(t, applicationDocumentation, results[0].Documentation)
+	assert.Equal(t, applicationLicense, results[0].License)
+	assert.Equal(t, []byte(applicationIcon), results[0].Icon)
+	assert.Equal(t, applicationVersion, results[0].Version)
 }
 
 // TestApiV1ProvidersOpenstackProjects tests OpenStack projects can be listed.

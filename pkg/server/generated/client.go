@@ -95,6 +95,9 @@ type ClientInterface interface {
 	// GetApiV1ApplicationbundlesControlPlane request
 	GetApiV1ApplicationbundlesControlPlane(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiV1Applications request
+	GetApiV1Applications(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetApiV1AuthJwks request
 	GetApiV1AuthJwks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -197,6 +200,18 @@ func (c *Client) GetApiV1ApplicationbundlesCluster(ctx context.Context, reqEdito
 
 func (c *Client) GetApiV1ApplicationbundlesControlPlane(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiV1ApplicationbundlesControlPlaneRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiV1Applications(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiV1ApplicationsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -616,6 +631,33 @@ func NewGetApiV1ApplicationbundlesControlPlaneRequest(server string) (*http.Requ
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/applicationbundles/controlPlane")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiV1ApplicationsRequest generates requests for GetApiV1Applications
+func NewGetApiV1ApplicationsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/applications")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1526,6 +1568,9 @@ type ClientWithResponsesInterface interface {
 	// GetApiV1ApplicationbundlesControlPlane request
 	GetApiV1ApplicationbundlesControlPlaneWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1ApplicationbundlesControlPlaneResponse, error)
 
+	// GetApiV1Applications request
+	GetApiV1ApplicationsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1ApplicationsResponse, error)
+
 	// GetApiV1AuthJwks request
 	GetApiV1AuthJwksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1AuthJwksResponse, error)
 
@@ -1658,6 +1703,31 @@ func (r GetApiV1ApplicationbundlesControlPlaneResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetApiV1ApplicationbundlesControlPlaneResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetApiV1ApplicationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Applications
+	JSON400      *Oauth2Error
+	JSON401      *Oauth2Error
+	JSON500      *Oauth2Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiV1ApplicationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiV1ApplicationsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2305,6 +2375,15 @@ func (c *ClientWithResponses) GetApiV1ApplicationbundlesControlPlaneWithResponse
 	return ParseGetApiV1ApplicationbundlesControlPlaneResponse(rsp)
 }
 
+// GetApiV1ApplicationsWithResponse request returning *GetApiV1ApplicationsResponse
+func (c *ClientWithResponses) GetApiV1ApplicationsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1ApplicationsResponse, error) {
+	rsp, err := c.GetApiV1Applications(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiV1ApplicationsResponse(rsp)
+}
+
 // GetApiV1AuthJwksWithResponse request returning *GetApiV1AuthJwksResponse
 func (c *ClientWithResponses) GetApiV1AuthJwksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1AuthJwksResponse, error) {
 	rsp, err := c.GetApiV1AuthJwks(ctx, reqEditors...)
@@ -2641,6 +2720,53 @@ func ParseGetApiV1ApplicationbundlesControlPlaneResponse(rsp *http.Response) (*G
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ApplicationBundles
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Oauth2Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Oauth2Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Oauth2Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiV1ApplicationsResponse parses an HTTP response from a GetApiV1ApplicationsWithResponse call
+func ParseGetApiV1ApplicationsResponse(rsp *http.Response) (*GetApiV1ApplicationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiV1ApplicationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Applications
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

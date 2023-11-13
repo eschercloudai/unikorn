@@ -285,6 +285,23 @@ func CompareApplicationBundle(a, b ApplicationBundle) int {
 	return strings.Compare(*a.Spec.Version, *b.Spec.Version)
 }
 
+func CompareHelmApplication(a, b HelmApplication) int {
+	return strings.Compare(a.Name, b.Name)
+}
+
+// Exported returns all applications that are exported, and thus end-user installable.
+func (l HelmApplicationList) Exported() HelmApplicationList {
+	result := HelmApplicationList{}
+
+	for i := range l.Items {
+		if l.Items[i].Spec.Exported != nil && *l.Items[i].Spec.Exported {
+			result.Items = append(result.Items, l.Items[i])
+		}
+	}
+
+	return result
+}
+
 // Get retrieves the named bundle.
 func (l ApplicationBundleList) Get(name string) *ApplicationBundle {
 	for i := range l.Items {

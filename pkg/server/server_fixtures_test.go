@@ -25,6 +25,7 @@ import (
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/constants"
+	"github.com/eschercloudai/unikorn/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,19 +138,8 @@ const (
 func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace, name string) {
 	t.Helper()
 
-	bundleName := kubernetesClusterApplicationBundleName
-	computeFailureDomain := clusterComputeFailureDomain
-	storageFailureDomain := clusterStorageFailureDomain
-	sshKeyName := clusterSSHKeyName
-	externalNetworkID := clusterExternalNetworkID
-	controlPlaneReplicas := clusterControlPlaneReplicas
-	controlPlaneImageName := imageName
 	controlPlaneKubernetesVersion := unikornv1.SemanticVersion("v" + imageK8sVersion)
-	controlPlaneFlavor := flavorName
-	workloadPoolReplicas := clusterWorkloadPoolReplicas
-	workloadPoolImageName := imageName
 	workloadPoolKubernetesVersion := unikornv1.SemanticVersion("v" + imageK8sVersion)
-	workloadPoolFlavor := flavorName
 
 	_, nodenetwork, err := net.ParseCIDR(clusterNodeNetwork)
 	assert.NoError(t, err)
@@ -166,12 +156,12 @@ func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace
 			Name:      name,
 		},
 		Spec: unikornv1.KubernetesClusterSpec{
-			ApplicationBundle: &bundleName,
+			ApplicationBundle: util.ToPointer(kubernetesClusterApplicationBundleName),
 			Openstack: &unikornv1.KubernetesClusterOpenstackSpec{
-				FailureDomain:       &computeFailureDomain,
-				VolumeFailureDomain: &storageFailureDomain,
-				SSHKeyName:          &sshKeyName,
-				ExternalNetworkID:   &externalNetworkID,
+				FailureDomain:       util.ToPointer(clusterComputeFailureDomain),
+				VolumeFailureDomain: util.ToPointer(clusterStorageFailureDomain),
+				SSHKeyName:          util.ToPointer(clusterSSHKeyName),
+				ExternalNetworkID:   util.ToPointer(clusterExternalNetworkID),
 			},
 			Network: &unikornv1.KubernetesClusterNetworkSpec{
 				NodeNetwork:    &unikornv1.IPv4Prefix{IPNet: *nodenetwork},
@@ -183,10 +173,10 @@ func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace
 			},
 			ControlPlane: &unikornv1.KubernetesClusterControlPlaneSpec{
 				MachineGeneric: unikornv1.MachineGeneric{
-					Replicas: &controlPlaneReplicas,
+					Replicas: util.ToPointer(clusterControlPlaneReplicas),
 					Version:  &controlPlaneKubernetesVersion,
-					Image:    &controlPlaneImageName,
-					Flavor:   &controlPlaneFlavor,
+					Image:    util.ToPointer(imageName),
+					Flavor:   util.ToPointer(flavorName),
 				},
 			},
 			WorkloadPools: &unikornv1.KubernetesClusterWorkloadPoolsSpec{
@@ -195,10 +185,10 @@ func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace
 						KubernetesWorkloadPoolSpec: unikornv1.KubernetesWorkloadPoolSpec{
 							Name: clusterWorkloadPoolName,
 							MachineGeneric: unikornv1.MachineGeneric{
-								Replicas: &workloadPoolReplicas,
+								Replicas: util.ToPointer(clusterWorkloadPoolReplicas),
 								Version:  &workloadPoolKubernetesVersion,
-								Image:    &workloadPoolImageName,
-								Flavor:   &workloadPoolFlavor,
+								Image:    util.ToPointer(imageName),
+								Flavor:   util.ToPointer(flavorName),
 							},
 						},
 					},
@@ -229,16 +219,13 @@ const (
 func mustCreateControlPlaneApplicationBundleFixture(t *testing.T, tc *TestContext) {
 	t.Helper()
 
-	kind := unikornv1.ApplicationBundleResourceKindControlPlane
-	version := controlPlaneApplicationBundleVersion
-
 	bundle := &unikornv1.ApplicationBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: controlPlaneApplicationBundleName,
 		},
 		Spec: unikornv1.ApplicationBundleSpec{
-			Kind:    &kind,
-			Version: &version,
+			Kind:    util.ToPointer(unikornv1.ApplicationBundleResourceKindControlPlane),
+			Version: util.ToPointer(controlPlaneApplicationBundleVersion),
 		},
 	}
 
@@ -250,23 +237,51 @@ const (
 	kubernetesClusterApplicationBundleVersion = "2.0.0"
 )
 
-// mustKubernetesClusterApplicationBundleFixture creates a basic application bundle
+// mustCreateKubernetesClusterApplicationBundleFixture creates a basic application bundle
 // for a Kubernetes cluster.
-func mustKubernetesClusterApplicationBundleFixture(t *testing.T, tc *TestContext) {
+func mustCreateKubernetesClusterApplicationBundleFixture(t *testing.T, tc *TestContext) {
 	t.Helper()
-
-	kind := unikornv1.ApplicationBundleResourceKindKubernetesCluster
-	version := kubernetesClusterApplicationBundleVersion
 
 	bundle := &unikornv1.ApplicationBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: kubernetesClusterApplicationBundleName,
 		},
 		Spec: unikornv1.ApplicationBundleSpec{
-			Kind:    &kind,
-			Version: &version,
+			Kind:    util.ToPointer(unikornv1.ApplicationBundleResourceKindKubernetesCluster),
+			Version: util.ToPointer(kubernetesClusterApplicationBundleVersion),
 		},
 	}
 
 	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), bundle))
+}
+
+const (
+	applicationName              = "my-app-1.0.0"
+	applicationHumanReadableName = "My Application"
+	applicationDescription       = "Blah blah blah."
+	applicationDocumentation     = "https://docs.my-app.io"
+	applicationLicense           = "Apache License-2.0"
+	applicationIcon              = "<svg />"
+	applicationVersion           = "1.0.0"
+)
+
+func mustCreateHelmApplicationFixture(t *testing.T, tc *TestContext) {
+	t.Helper()
+
+	app := &unikornv1.HelmApplication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: applicationName,
+		},
+		Spec: unikornv1.HelmApplicationSpec{
+			Name:          util.ToPointer(applicationHumanReadableName),
+			Description:   util.ToPointer(applicationDescription),
+			Documentation: util.ToPointer(applicationDocumentation),
+			License:       util.ToPointer(applicationLicense),
+			Icon:          []byte(applicationIcon),
+			Version:       util.ToPointer(applicationVersion),
+			Exported:      util.ToPointer(true),
+		},
+	}
+
+	assert.NoError(t, tc.KubernetesClient().Create(context.TODO(), app))
 }

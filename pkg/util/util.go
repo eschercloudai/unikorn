@@ -76,6 +76,11 @@ func GetNATPrefix(ctx context.Context) (string, error) {
 	return natPrefix, nil
 }
 
+// ToPointer is usually used in tests to get a pointer to a const.
+func ToPointer[T any](t T) *T {
+	return &t
+}
+
 // Keys returns the keys from a string map.
 //
 //nolint:prealloc
