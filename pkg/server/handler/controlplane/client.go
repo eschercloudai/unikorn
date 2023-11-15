@@ -199,7 +199,7 @@ func (c *Client) Metadata(ctx context.Context, name string) (*Meta, error) {
 
 // convert converts from Kubernetes into OpenAPI types.
 func (c *Client) convert(ctx context.Context, in *unikornv1.ControlPlane) (*generated.ControlPlane, error) {
-	bundle, err := applicationbundle.NewClient(c.client).Get(ctx, *in.Spec.ApplicationBundle)
+	bundle, err := applicationbundle.NewClient(c.client).GetControlPlane(ctx, *in.Spec.ApplicationBundle)
 	if err != nil {
 		return nil, err
 	}

@@ -219,12 +219,11 @@ const (
 func mustCreateControlPlaneApplicationBundleFixture(t *testing.T, tc *TestContext) {
 	t.Helper()
 
-	bundle := &unikornv1.ApplicationBundle{
+	bundle := &unikornv1.ControlPlaneApplicationBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: controlPlaneApplicationBundleName,
 		},
 		Spec: unikornv1.ApplicationBundleSpec{
-			Kind:    util.ToPointer(unikornv1.ApplicationBundleResourceKindControlPlane),
 			Version: util.ToPointer(controlPlaneApplicationBundleVersion),
 		},
 	}
@@ -242,12 +241,11 @@ const (
 func mustCreateKubernetesClusterApplicationBundleFixture(t *testing.T, tc *TestContext) {
 	t.Helper()
 
-	bundle := &unikornv1.ApplicationBundle{
+	bundle := &unikornv1.KubernetesClusterApplicationBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: kubernetesClusterApplicationBundleName,
 		},
 		Spec: unikornv1.ApplicationBundleSpec{
-			Kind:    util.ToPointer(unikornv1.ApplicationBundleResourceKindKubernetesCluster),
 			Version: util.ToPointer(kubernetesClusterApplicationBundleVersion),
 		},
 	}

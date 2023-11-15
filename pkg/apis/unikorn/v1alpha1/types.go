@@ -631,15 +631,15 @@ type HelmApplicationSpecParameter struct {
 
 type HelmApplicationStatus struct{}
 
-// ApplicationBundleList defines a list of application bundles.
+// ControlPlaneApplicationBundleList defines a list of application bundles.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type ApplicationBundleList struct {
+type ControlPlaneApplicationBundleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ApplicationBundle `json:"items"`
+	Items           []ControlPlaneApplicationBundle `json:"items"`
 }
 
-// ApplicationBundle defines a bundle of applications related with a particular custom
+// ControlPlaneApplicationBundle defines a bundle of applications related with a particular custom
 // resource e.g. a ControlPlane has vcluster, cert-manager and cluster-api applications
 // associated with it.  This forms the backbone of upgrades by allowing bundles to be
 // switched out in control planes etc.
@@ -652,7 +652,35 @@ type ApplicationBundleList struct {
 // +kubebuilder:printcolumn:name="preview",type="string",JSONPath=".spec.preview"
 // +kubebuilder:printcolumn:name="end of life",type="string",JSONPath=".spec.endOfLife"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
-type ApplicationBundle struct {
+type ControlPlaneApplicationBundle struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              ApplicationBundleSpec   `json:"spec"`
+	Status            ApplicationBundleStatus `json:"status,omitempty"`
+}
+
+// KubernetesClusterApplicationBundleList defines a list of application bundles.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type KubernetesClusterApplicationBundleList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []KubernetesClusterApplicationBundle `json:"items"`
+}
+
+// KubernetesClusterApplicationBundle defines a bundle of applications related with a particular custom
+// resource e.g. a ControlPlane has vcluster, cert-manager and cluster-api applications
+// associated with it.  This forms the backbone of upgrades by allowing bundles to be
+// switched out in control planes etc.
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:scope=Cluster,categories=unikorn
+// +kubebuilder:printcolumn:name="kind",type="string",JSONPath=".spec.kind"
+// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.version"
+// +kubebuilder:printcolumn:name="preview",type="string",JSONPath=".spec.preview"
+// +kubebuilder:printcolumn:name="end of life",type="string",JSONPath=".spec.endOfLife"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+type KubernetesClusterApplicationBundle struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              ApplicationBundleSpec   `json:"spec"`
@@ -660,9 +688,6 @@ type ApplicationBundle struct {
 }
 
 type ApplicationBundleSpec struct {
-	// Kind is the resource type the bundle can be used with.
-	// +kubebuilder:validation:Enum=ControlPlane;KubernetesCluster
-	Kind *ApplicationBundleResourceKind `json:"kind"`
 	// Version is a semantic version of the bundle, must be unique.
 	Version *string `json:"version"`
 	// Preview indicates that this bundle is a preview and should not be

@@ -1,0 +1,40 @@
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: ControlPlaneApplicationBundle
+metadata:
+  name: control-plane-1.1.0
+spec:
+  version: 1.1.0
+  endOfLife: 2023-12-04T00:00:00Z
+  applications:
+  - name: vcluster
+    reference:
+      kind: HelmApplication
+      name: vcluster-0.15.0-1
+  - name: cert-manager
+    reference:
+      kind: HelmApplication
+      name: cert-manager-1.11.0-1
+  - name: cluster-api
+    reference:
+      kind: HelmApplication
+      name: cluster-api-0.1.10-1
+---
+apiVersion: unikorn.eschercloud.ai/v1alpha1
+kind: ControlPlaneApplicationBundle
+metadata:
+  name: control-plane-1.2.0
+spec:
+  version: 1.2.0
+  applications:
+  - name: vcluster
+    reference:
+      kind: HelmApplication
+      name: vcluster-0.15.7-1
+  - name: cert-manager
+    reference:
+      kind: HelmApplication
+      name: cert-manager-1.12.4-1
+  - name: cluster-api
+    reference:
+      kind: HelmApplication
+      name: cluster-api-0.1.10-1

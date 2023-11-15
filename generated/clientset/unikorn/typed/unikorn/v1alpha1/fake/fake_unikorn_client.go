@@ -28,12 +28,12 @@ type FakeUnikornV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeUnikornV1alpha1) ApplicationBundles() v1alpha1.ApplicationBundleInterface {
-	return &FakeApplicationBundles{c}
-}
-
 func (c *FakeUnikornV1alpha1) ControlPlanes(namespace string) v1alpha1.ControlPlaneInterface {
 	return &FakeControlPlanes{c, namespace}
+}
+
+func (c *FakeUnikornV1alpha1) ControlPlaneApplicationBundles() v1alpha1.ControlPlaneApplicationBundleInterface {
+	return &FakeControlPlaneApplicationBundles{c}
 }
 
 func (c *FakeUnikornV1alpha1) HelmApplications() v1alpha1.HelmApplicationInterface {
@@ -42,6 +42,10 @@ func (c *FakeUnikornV1alpha1) HelmApplications() v1alpha1.HelmApplicationInterfa
 
 func (c *FakeUnikornV1alpha1) KubernetesClusters(namespace string) v1alpha1.KubernetesClusterInterface {
 	return &FakeKubernetesClusters{c, namespace}
+}
+
+func (c *FakeUnikornV1alpha1) KubernetesClusterApplicationBundles() v1alpha1.KubernetesClusterApplicationBundleInterface {
+	return &FakeKubernetesClusterApplicationBundles{c}
 }
 
 func (c *FakeUnikornV1alpha1) Projects() v1alpha1.ProjectInterface {

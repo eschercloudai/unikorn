@@ -53,7 +53,7 @@ rules:
   - unikorn.eschercloud.ai
   resources:
   - helmapplications
-  - applicationbundles
+  - kubernetesclusterapplicationbundles
   verbs:
   - list
   - watch

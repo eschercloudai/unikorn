@@ -55,15 +55,15 @@ func getClient(f cmdutil.Factory) (unikorn.Interface, error) {
 	return client, nil
 }
 
-// CompleteApplicationBundle provides tab completion for application bundles.
-func CompleteApplicationBundle(f cmdutil.Factory, kind unikornv1.ApplicationBundleResourceKind) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// CompleteControlPlaneApplicationBundle provides tab completion for application bundles.
+func CompleteControlPlaneApplicationBundle(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		client, err := getClient(f)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		applicationBundles, err := client.UnikornV1alpha1().ApplicationBundles().List(context.TODO(), metav1.ListOptions{})
+		applicationBundles, err := client.UnikornV1alpha1().ControlPlaneApplicationBundles().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -71,9 +71,30 @@ func CompleteApplicationBundle(f cmdutil.Factory, kind unikornv1.ApplicationBund
 		var matches []string
 
 		for _, b := range applicationBundles.Items {
-			if *b.Spec.Kind == kind {
-				matches = append(matches, b.Name)
-			}
+			matches = append(matches, b.Name)
+		}
+
+		return matches, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// CompleteKubernetesClusterApplicationBundle provides tab completion for application bundles.
+func CompleteKubernetesClusterApplicationBundle(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		client, err := getClient(f)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		applicationBundles, err := client.UnikornV1alpha1().KubernetesClusterApplicationBundles().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		var matches []string
+
+		for _, b := range applicationBundles.Items {
+			matches = append(matches, b.Name)
 		}
 
 		return matches, cobra.ShellCompDirectiveNoFileComp

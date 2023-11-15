@@ -205,7 +205,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	assert.Equal(t, version, application.Spec.Source.TargetRevision)
 	assert.NotNil(t, application.Spec.Source.Helm)
 	assert.Equal(t, release, application.Spec.Source.Helm.ReleaseName)
-	assert.Equal(t, 1, len(application.Spec.Source.Helm.Parameters))
+	assert.Len(t, application.Spec.Source.Helm.Parameters, 1)
 	assert.Equal(t, parameter, application.Spec.Source.Helm.Parameters[0].Name)
 	assert.Equal(t, value, application.Spec.Source.Helm.Parameters[0].Value)
 	assert.Equal(t, fmt.Sprintf("%s: %s\n", valuesKey, valuesValue), application.Spec.Source.Helm.Values)
@@ -213,7 +213,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	assert.Equal(t, "", application.Spec.Destination.Namespace)
 	assert.True(t, application.Spec.SyncPolicy.Automated.SelfHeal)
 	assert.True(t, application.Spec.SyncPolicy.Automated.Prune)
-	assert.Equal(t, 2, len(application.Spec.SyncPolicy.SyncOptions))
+	assert.Len(t, application.Spec.SyncPolicy.SyncOptions, 2)
 	assert.Equal(t, argoprojv1.CreateNamespace, application.Spec.SyncPolicy.SyncOptions[0])
 	assert.Equal(t, argoprojv1.ServerSideApply, application.Spec.SyncPolicy.SyncOptions[1])
 }

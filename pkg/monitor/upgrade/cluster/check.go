@@ -41,7 +41,7 @@ func New(client client.Client) *Checker {
 	}
 }
 
-func (c *Checker) upgradeResource(ctx context.Context, resource *unikornv1.KubernetesCluster, bundles *unikornv1.ApplicationBundleList, target *unikornv1.ApplicationBundle) error {
+func (c *Checker) upgradeResource(ctx context.Context, resource *unikornv1.KubernetesCluster, bundles *unikornv1.KubernetesClusterApplicationBundleList, target *unikornv1.KubernetesClusterApplicationBundle) error {
 	logger := log.FromContext(ctx)
 
 	bundle := bundles.Get(resource.ApplicationBundleName())
@@ -103,23 +103,20 @@ func (c *Checker) Check(ctx context.Context) error {
 
 	logger.Info("checking for kubernetes cluster upgrades")
 
-	allBundles := &unikornv1.ApplicationBundleList{}
+	allBundles := &unikornv1.KubernetesClusterApplicationBundleList{}
 
 	if err := c.client.List(ctx, allBundles); err != nil {
 		return err
 	}
 
-	// Select only the pertinent bundles for this type.
-	allBundlesByKind := allBundles.ByKind(unikornv1.ApplicationBundleResourceKindKubernetesCluster)
-
 	// Extract the potential upgrade target bundles, these are sorted by version, so
 	// the newest is on the top, we shall see why later...
-	bundles := allBundlesByKind.Upgradable()
+	bundles := allBundles.Upgradable()
 	if len(bundles.Items) == 0 {
 		return errors.ErrNoBundles
 	}
 
-	slices.SortStableFunc(bundles.Items, unikornv1.CompareApplicationBundle)
+	slices.SortStableFunc(bundles.Items, unikornv1.CompareKubernetesClusterApplicationBundle)
 
 	// Pick the most recent as our upgrade target.
 	upgradeTarget := &bundles.Items[len(bundles.Items)-1]
@@ -135,7 +132,7 @@ func (c *Checker) Check(ctx context.Context) error {
 
 		logger := logger.WithValues("project", resource.Labels[constants.ProjectLabel], "controlplane", resource.Labels[constants.ControlPlaneLabel], "cluster", resource.Name)
 
-		if err := c.upgradeResource(log.IntoContext(ctx, logger), resource, allBundlesByKind, upgradeTarget); err != nil {
+		if err := c.upgradeResource(log.IntoContext(ctx, logger), resource, allBundles, upgradeTarget); err != nil {
 			return err
 		}
 	}

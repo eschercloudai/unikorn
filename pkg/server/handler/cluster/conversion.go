@@ -180,7 +180,7 @@ func convertStatus(in *unikornv1.KubernetesCluster) *generated.KubernetesResourc
 
 // convert converts from a custom resource into the API definition.
 func (c *Client) convert(ctx context.Context, in *unikornv1.KubernetesCluster) (*generated.KubernetesCluster, error) {
-	bundle, err := applicationbundle.NewClient(c.client).Get(ctx, *in.Spec.ApplicationBundle)
+	bundle, err := applicationbundle.NewClient(c.client).GetKubernetesCluster(ctx, *in.Spec.ApplicationBundle)
 	if err != nil {
 		return nil, err
 	}

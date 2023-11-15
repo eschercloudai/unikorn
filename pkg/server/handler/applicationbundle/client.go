@@ -40,7 +40,7 @@ func NewClient(client client.Client) *Client {
 	}
 }
 
-func convert(in *unikornv1.ApplicationBundle) *generated.ApplicationBundle {
+func convertControlPlane(in *unikornv1.ControlPlaneApplicationBundle) *generated.ApplicationBundle {
 	out := &generated.ApplicationBundle{
 		Name:    in.Name,
 		Version: *in.Spec.Version,
@@ -54,46 +54,80 @@ func convert(in *unikornv1.ApplicationBundle) *generated.ApplicationBundle {
 	return out
 }
 
-func convertList(in []unikornv1.ApplicationBundle) []*generated.ApplicationBundle {
-	out := make([]*generated.ApplicationBundle, len(in))
+func convertKubernetesCluster(in *unikornv1.KubernetesClusterApplicationBundle) *generated.ApplicationBundle {
+	out := &generated.ApplicationBundle{
+		Name:    in.Name,
+		Version: *in.Spec.Version,
+		Preview: in.Spec.Preview,
+	}
 
-	for i := range in {
-		out[i] = convert(&in[i])
+	if in.Spec.EndOfLife != nil {
+		out.EndOfLife = &in.Spec.EndOfLife.Time
 	}
 
 	return out
 }
 
-func (c *Client) listByKind(ctx context.Context, kind unikornv1.ApplicationBundleResourceKind) ([]*generated.ApplicationBundle, error) {
-	result := &unikornv1.ApplicationBundleList{}
+func convertControlPlaneList(in []unikornv1.ControlPlaneApplicationBundle) []*generated.ApplicationBundle {
+	out := make([]*generated.ApplicationBundle, len(in))
 
-	if err := c.client.List(ctx, result); err != nil {
-		return nil, errors.OAuth2ServerError("failed to list application bundles").WithError(err)
+	for i := range in {
+		out[i] = convertControlPlane(&in[i])
 	}
 
-	resultByKind := result.ByKind(kind)
-
-	slices.SortStableFunc(resultByKind.Items, unikornv1.CompareApplicationBundle)
-
-	return convertList(resultByKind.Items), nil
+	return out
 }
 
-// TODO: while not exposed, it doesn't check the kind yet, which could be seen as
-// an escalation of sorts.
-func (c *Client) Get(ctx context.Context, name string) (*generated.ApplicationBundle, error) {
-	result := &unikornv1.ApplicationBundle{}
+func convertKubernetesClusterList(in []unikornv1.KubernetesClusterApplicationBundle) []*generated.ApplicationBundle {
+	out := make([]*generated.ApplicationBundle, len(in))
+
+	for i := range in {
+		out[i] = convertKubernetesCluster(&in[i])
+	}
+
+	return out
+}
+
+func (c *Client) GetControlPlane(ctx context.Context, name string) (*generated.ApplicationBundle, error) {
+	result := &unikornv1.ControlPlaneApplicationBundle{}
 
 	if err := c.client.Get(ctx, client.ObjectKey{Name: name}, result); err != nil {
 		return nil, errors.HTTPNotFound().WithError(err)
 	}
 
-	return convert(result), nil
+	return convertControlPlane(result), nil
+}
+
+func (c *Client) GetKubernetesCluster(ctx context.Context, name string) (*generated.ApplicationBundle, error) {
+	result := &unikornv1.KubernetesClusterApplicationBundle{}
+
+	if err := c.client.Get(ctx, client.ObjectKey{Name: name}, result); err != nil {
+		return nil, errors.HTTPNotFound().WithError(err)
+	}
+
+	return convertKubernetesCluster(result), nil
 }
 
 func (c *Client) ListControlPlane(ctx context.Context) ([]*generated.ApplicationBundle, error) {
-	return c.listByKind(ctx, unikornv1.ApplicationBundleResourceKindControlPlane)
+	result := &unikornv1.ControlPlaneApplicationBundleList{}
+
+	if err := c.client.List(ctx, result); err != nil {
+		return nil, errors.OAuth2ServerError("failed to list application bundles").WithError(err)
+	}
+
+	slices.SortStableFunc(result.Items, unikornv1.CompareControlPlaneApplicationBundle)
+
+	return convertControlPlaneList(result.Items), nil
 }
 
 func (c *Client) ListCluster(ctx context.Context) ([]*generated.ApplicationBundle, error) {
-	return c.listByKind(ctx, unikornv1.ApplicationBundleResourceKindKubernetesCluster)
+	result := &unikornv1.KubernetesClusterApplicationBundleList{}
+
+	if err := c.client.List(ctx, result); err != nil {
+		return nil, errors.OAuth2ServerError("failed to list application bundles").WithError(err)
+	}
+
+	slices.SortStableFunc(result.Items, unikornv1.CompareKubernetesClusterApplicationBundle)
+
+	return convertKubernetesClusterList(result.Items), nil
 }

@@ -279,7 +279,13 @@ func CompareKubernetesCluster(a, b KubernetesCluster) int {
 	return strings.Compare(a.Name, b.Name)
 }
 
-func CompareApplicationBundle(a, b ApplicationBundle) int {
+func CompareControlPlaneApplicationBundle(a, b ControlPlaneApplicationBundle) int {
+	// TODO: while this works now, it won't unless we parse and compare as
+	// a semantic version.
+	return strings.Compare(*a.Spec.Version, *b.Spec.Version)
+}
+
+func CompareKubernetesClusterApplicationBundle(a, b KubernetesClusterApplicationBundle) int {
 	// TODO: while this works now, it won't unless we parse and compare as
 	// a semantic version.
 	return strings.Compare(*a.Spec.Version, *b.Spec.Version)
@@ -303,7 +309,7 @@ func (l HelmApplicationList) Exported() HelmApplicationList {
 }
 
 // Get retrieves the named bundle.
-func (l ApplicationBundleList) Get(name string) *ApplicationBundle {
+func (l ControlPlaneApplicationBundleList) Get(name string) *ControlPlaneApplicationBundle {
 	for i := range l.Items {
 		if l.Items[i].Name == name {
 			return &l.Items[i]
@@ -313,23 +319,20 @@ func (l ApplicationBundleList) Get(name string) *ApplicationBundle {
 	return nil
 }
 
-// ByKind returns a new list of bundles for a specifc kind e.g. clusters or control planes.
-func (l ApplicationBundleList) ByKind(kind ApplicationBundleResourceKind) *ApplicationBundleList {
-	result := &ApplicationBundleList{}
-
-	for _, bundle := range l.Items {
-		if *bundle.Spec.Kind == kind {
-			result.Items = append(result.Items, bundle)
+func (l KubernetesClusterApplicationBundleList) Get(name string) *KubernetesClusterApplicationBundle {
+	for i := range l.Items {
+		if l.Items[i].Name == name {
+			return &l.Items[i]
 		}
 	}
 
-	return result
+	return nil
 }
 
 // Upgradable returns a new list of bundles that are "stable" e.g. not end of life and
 // not a preview.
-func (l ApplicationBundleList) Upgradable() *ApplicationBundleList {
-	result := &ApplicationBundleList{}
+func (l ControlPlaneApplicationBundleList) Upgradable() *ControlPlaneApplicationBundleList {
+	result := &ControlPlaneApplicationBundleList{}
 
 	for _, bundle := range l.Items {
 		if bundle.Spec.Preview != nil && *bundle.Spec.Preview {
@@ -346,10 +349,28 @@ func (l ApplicationBundleList) Upgradable() *ApplicationBundleList {
 	return result
 }
 
-func (b *ApplicationBundle) GetApplication(name string) *ApplicationBundleApplication {
-	for i := range b.Spec.Applications {
-		if *b.Spec.Applications[i].Name == name {
-			return &b.Spec.Applications[i]
+func (l KubernetesClusterApplicationBundleList) Upgradable() *KubernetesClusterApplicationBundleList {
+	result := &KubernetesClusterApplicationBundleList{}
+
+	for _, bundle := range l.Items {
+		if bundle.Spec.Preview != nil && *bundle.Spec.Preview {
+			continue
+		}
+
+		if bundle.Spec.EndOfLife != nil {
+			continue
+		}
+
+		result.Items = append(result.Items, bundle)
+	}
+
+	return result
+}
+
+func (s ApplicationBundleSpec) GetApplication(name string) *ApplicationBundleApplication {
+	for i := range s.Applications {
+		if *s.Applications[i].Name == name {
+			return &s.Applications[i]
 		}
 	}
 
