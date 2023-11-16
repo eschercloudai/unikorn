@@ -34,7 +34,8 @@ rules:
 - apiGroups:
   - unikorn.eschercloud.ai
   resources:
-  - applicationbundles
+  - controlplaneapplicationbundles
+  - kubernetesclusterapplicationbundles
   - helmapplications
   verbs:
   - list

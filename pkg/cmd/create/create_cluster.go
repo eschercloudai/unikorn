@@ -159,7 +159,7 @@ func (o *createClusterOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	o.controlPlaneFlags.AddFlags(f, cmd)
 
 	// Unikorn options.
-	flags.RequiredStringVarWithCompletion(cmd, &o.applicationBundle, "application-bundle", "", "Application bundle, defining component versions, to deploy", flags.CompleteApplicationBundle(f, unikornv1.ApplicationBundleResourceKindKubernetesCluster))
+	flags.RequiredStringVarWithCompletion(cmd, &o.applicationBundle, "application-bundle", "", "Application bundle, defining component versions, to deploy", flags.CompleteKubernetesClusterApplicationBundle(f))
 
 	// Openstack configuration options.
 	flags.RequiredStringVarWithCompletion(cmd, &o.cloud, "cloud", "", "Cloud config to use within clouds.yaml.", completion.CloudCompletionFunc)

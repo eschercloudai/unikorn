@@ -65,18 +65,23 @@ func parseResourceFile[T any](path string) ([]T, error) {
 
 // parseResources loads all the manifest files, and returns list types of application bundles
 // and helm applications.
-func parseResources() (*unikornv1.ApplicationBundleList, *unikornv1.HelmApplicationList, error) {
-	applicationBundles, err := parseResourceFile[unikornv1.ApplicationBundle]("charts/unikorn/templates/applicationbundles.yaml")
+func parseResources() (*unikornv1.ControlPlaneApplicationBundleList, *unikornv1.KubernetesClusterApplicationBundleList, *unikornv1.HelmApplicationList, error) {
+	controlPlaneApplicationBundles, err := parseResourceFile[unikornv1.ControlPlaneApplicationBundle]("charts/unikorn/templates/controlplaneapplicationbundles.yaml")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	kubernetesClusterApplicationBundles, err := parseResourceFile[unikornv1.KubernetesClusterApplicationBundle]("charts/unikorn/templates/kubernetesclusterapplicationbundles.yaml")
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	applications, err := parseResourceFile[unikornv1.HelmApplication]("charts/unikorn/templates/applications.yaml")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return &unikornv1.ApplicationBundleList{Items: applicationBundles}, &unikornv1.HelmApplicationList{Items: applications}, nil
+	return &unikornv1.ControlPlaneApplicationBundleList{Items: controlPlaneApplicationBundles}, &unikornv1.KubernetesClusterApplicationBundleList{Items: kubernetesClusterApplicationBundles}, &unikornv1.HelmApplicationList{Items: applications}, nil
 }
 
 // getApplication looks up an application by name.
@@ -244,12 +249,12 @@ func generatePackage(repo, chart, version string) ([]*spdx.Package, error) {
 }
 
 // generateSBOM does the actual meat!
-func generateSBOM(applicationBundle *unikornv1.ApplicationBundle, applications *unikornv1.HelmApplicationList) error {
+func generateSBOM(name string, spec *unikornv1.ApplicationBundleSpec, applications *unikornv1.HelmApplicationList) error {
 	document := &spdx.Document{
 		SPDXVersion:       spdx.Version,
 		DataLicense:       spdx.DataLicense,
 		SPDXIdentifier:    "DOCUMENT",
-		DocumentName:      applicationBundle.Name,
+		DocumentName:      name,
 		DocumentNamespace: "unikorn.eschercloud.ai",
 		CreationInfo: &spdx.CreationInfo{
 			Creators: []spdx_common.Creator{
@@ -266,7 +271,7 @@ func generateSBOM(applicationBundle *unikornv1.ApplicationBundle, applications *
 		},
 	}
 
-	for _, applicationRef := range applicationBundle.Spec.Applications {
+	for _, applicationRef := range spec.Applications {
 		application, err := getApplication(*applicationRef.Reference.Name, applications)
 		if err != nil {
 			return err
@@ -293,7 +298,7 @@ func generateSBOM(applicationBundle *unikornv1.ApplicationBundle, applications *
 		return err
 	}
 
-	file, err := os.Create("sboms/" + applicationBundle.Name + ".spdx")
+	file, err := os.Create("sboms/" + name + ".spdx")
 	if err != nil {
 		return err
 	}
@@ -310,7 +315,7 @@ func generateSBOM(applicationBundle *unikornv1.ApplicationBundle, applications *
 // main gets the necessary helm template definitions then generates an SBOM for each
 // application bundle.
 func main() {
-	applicationBundles, applications, err := parseResources()
+	controlPlaneApplicationBundles, kubernetesClusterApplicationBundles, applications, err := parseResources()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -321,8 +326,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	for i := range applicationBundles.Items {
-		if err := generateSBOM(&applicationBundles.Items[i], applications); err != nil {
+	for i := range controlPlaneApplicationBundles.Items {
+		bundle := &controlPlaneApplicationBundles.Items[i]
+
+		if err := generateSBOM(bundle.Name, &bundle.Spec, applications); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	}
+
+	for i := range kubernetesClusterApplicationBundles.Items {
+		bundle := &kubernetesClusterApplicationBundles.Items[i]
+
+		if err := generateSBOM(bundle.Name, &bundle.Spec, applications); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}

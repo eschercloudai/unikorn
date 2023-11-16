@@ -28,10 +28,11 @@ import (
 
 type UnikornV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	ApplicationBundlesGetter
 	ControlPlanesGetter
+	ControlPlaneApplicationBundlesGetter
 	HelmApplicationsGetter
 	KubernetesClustersGetter
+	KubernetesClusterApplicationBundlesGetter
 	ProjectsGetter
 }
 
@@ -40,12 +41,12 @@ type UnikornV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *UnikornV1alpha1Client) ApplicationBundles() ApplicationBundleInterface {
-	return newApplicationBundles(c)
-}
-
 func (c *UnikornV1alpha1Client) ControlPlanes(namespace string) ControlPlaneInterface {
 	return newControlPlanes(c, namespace)
+}
+
+func (c *UnikornV1alpha1Client) ControlPlaneApplicationBundles() ControlPlaneApplicationBundleInterface {
+	return newControlPlaneApplicationBundles(c)
 }
 
 func (c *UnikornV1alpha1Client) HelmApplications() HelmApplicationInterface {
@@ -54,6 +55,10 @@ func (c *UnikornV1alpha1Client) HelmApplications() HelmApplicationInterface {
 
 func (c *UnikornV1alpha1Client) KubernetesClusters(namespace string) KubernetesClusterInterface {
 	return newKubernetesClusters(c, namespace)
+}
+
+func (c *UnikornV1alpha1Client) KubernetesClusterApplicationBundles() KubernetesClusterApplicationBundleInterface {
+	return newKubernetesClusterApplicationBundles(c)
 }
 
 func (c *UnikornV1alpha1Client) Projects() ProjectInterface {

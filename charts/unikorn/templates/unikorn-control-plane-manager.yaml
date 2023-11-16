@@ -59,7 +59,7 @@ rules:
   - unikorn.eschercloud.ai
   resources:
   - helmapplications
-  - applicationbundles
+  - controlplaneapplicationbundles
   verbs:
   - list
   - watch

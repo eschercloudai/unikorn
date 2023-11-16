@@ -87,18 +87,31 @@ func (u *Unbundler) Unbundle(ctx context.Context) error {
 		Name: u.name,
 	}
 
-	bundle := &unikornv1.ApplicationBundle{}
+	var spec *unikornv1.ApplicationBundleSpec
 
-	if err := c.Get(ctx, key, bundle); err != nil {
-		return err
-	}
+	switch u.kind {
+	case unikornv1.ApplicationBundleResourceKindControlPlane:
+		bundle := &unikornv1.ControlPlaneApplicationBundle{}
 
-	if *bundle.Spec.Kind != u.kind {
+		if err := c.Get(ctx, key, bundle); err != nil {
+			return err
+		}
+
+		spec = &bundle.Spec
+	case unikornv1.ApplicationBundleResourceKindKubernetesCluster:
+		bundle := &unikornv1.KubernetesClusterApplicationBundle{}
+
+		if err := c.Get(ctx, key, bundle); err != nil {
+			return err
+		}
+
+		spec = &bundle.Spec
+	default:
 		return ErrBundleType
 	}
 
 	for _, item := range u.items {
-		applicationReference := bundle.GetApplication(item.name)
+		applicationReference := spec.GetApplication(item.name)
 		if applicationReference == nil {
 			if item.optional {
 				continue

@@ -30,7 +30,8 @@ rules:
 - apiGroups:
   - unikorn.eschercloud.ai
   resources:
-  - applicationbundles
+  - controlplaneapplicationbundles
+  - kubernetesclusterapplicationbundles
   verbs:
   - list
   - watch

@@ -808,7 +808,7 @@ func TestApiV1ControlPlanesList(t *testing.T) {
 
 	results := *response.JSON200
 
-	assert.Equal(t, 1, len(results))
+	assert.Len(t, results, 1)
 	assert.Equal(t, "foo", results[0].Name)
 	assert.Equal(t, controlPlaneApplicationBundleName, results[0].ApplicationBundle.Name)
 	assert.Equal(t, controlPlaneApplicationBundleVersion, results[0].ApplicationBundle.Version)
@@ -1163,13 +1163,13 @@ func TestApiV1ClustersGet(t *testing.T) {
 	assert.Equal(t, clusterNodeNetwork, result.Network.NodePrefix)
 	assert.Equal(t, clusterServiceNetwork, result.Network.ServicePrefix)
 	assert.Equal(t, clusterPodNetwork, result.Network.PodPrefix)
-	assert.Equal(t, 1, len(result.Network.DnsNameservers))
+	assert.Len(t, result.Network.DnsNameservers, 1)
 	assert.Equal(t, clusterDNSNameserver, result.Network.DnsNameservers[0])
 	assert.Equal(t, "v"+imageK8sVersion, result.ControlPlane.Version)
 	assert.Equal(t, imageName, result.ControlPlane.ImageName)
 	assert.Equal(t, flavorName, result.ControlPlane.FlavorName)
 	assert.Equal(t, clusterControlPlaneReplicas, result.ControlPlane.Replicas)
-	assert.Equal(t, 1, len(result.WorkloadPools))
+	assert.Len(t, result.WorkloadPools, 1)
 	assert.Equal(t, clusterWorkloadPoolName, result.WorkloadPools[0].Name)
 	assert.Equal(t, "v"+imageK8sVersion, result.WorkloadPools[0].Machine.Version)
 	assert.Equal(t, imageName, result.WorkloadPools[0].Machine.ImageName)
@@ -1228,7 +1228,7 @@ func TestApiV1ClustersList(t *testing.T) {
 
 	results := *response.JSON200
 
-	assert.Equal(t, 1, len(results))
+	assert.Len(t, results, 1)
 	assert.Equal(t, "foo", results[0].Name)
 	assert.NotNil(t, results[0].Status)
 	assert.Equal(t, "Provisioned", results[0].Status.Status)
@@ -1242,13 +1242,13 @@ func TestApiV1ClustersList(t *testing.T) {
 	assert.Equal(t, clusterNodeNetwork, results[0].Network.NodePrefix)
 	assert.Equal(t, clusterServiceNetwork, results[0].Network.ServicePrefix)
 	assert.Equal(t, clusterPodNetwork, results[0].Network.PodPrefix)
-	assert.Equal(t, 1, len(results[0].Network.DnsNameservers))
+	assert.Len(t, results[0].Network.DnsNameservers, 1)
 	assert.Equal(t, clusterDNSNameserver, results[0].Network.DnsNameservers[0])
 	assert.Equal(t, "v"+imageK8sVersion, results[0].ControlPlane.Version)
 	assert.Equal(t, imageName, results[0].ControlPlane.ImageName)
 	assert.Equal(t, flavorName, results[0].ControlPlane.FlavorName)
 	assert.Equal(t, clusterControlPlaneReplicas, results[0].ControlPlane.Replicas)
-	assert.Equal(t, 1, len(results[0].WorkloadPools))
+	assert.Len(t, results[0].WorkloadPools, 1)
 	assert.Equal(t, clusterWorkloadPoolName, results[0].WorkloadPools[0].Name)
 	assert.Equal(t, "v"+imageK8sVersion, results[0].WorkloadPools[0].Machine.Version)
 	assert.Equal(t, imageName, results[0].WorkloadPools[0].Machine.ImageName)
@@ -1433,6 +1433,57 @@ func TestApiV1ClustersDeleteNotFound(t *testing.T) {
 	assert.Equal(t, serverErr.Error, generated.NotFound)
 }
 
+// TestApiV1ApplicationBundlesListControlPlane tests control plane application bundles can
+// be listed.
+func TestApiV1ApplicationBundlesListControlPlane(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	mustCreateControlPlaneApplicationBundleFixture(t, tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ApplicationbundlesControlPlaneWithResponse(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
+	assert.NotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	assert.Len(t, results, 1)
+	assert.Equal(t, controlPlaneApplicationBundleName, results[0].Name)
+	assert.Equal(t, controlPlaneApplicationBundleVersion, results[0].Version)
+}
+
+// TestApiV1ApplicationBundlesListCluster tests cluster application bundles can be listed.
+func TestApiV1ApplicationBundlesListCluster(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	mustCreateKubernetesClusterApplicationBundleFixture(t, tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ApplicationbundlesClusterWithResponse(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode)
+	assert.NotNil(t, response.JSON200)
+
+	results := *response.JSON200
+
+	assert.Len(t, results, 1)
+	assert.Equal(t, kubernetesClusterApplicationBundleName, results[0].Name)
+	assert.Equal(t, kubernetesClusterApplicationBundleVersion, results[0].Version)
+}
+
 // TestApiV1ApplicationsList tests applications can be listed.
 func TestApiV1ApplicationsList(t *testing.T) {
 	t.Parallel()
@@ -1453,7 +1504,7 @@ func TestApiV1ApplicationsList(t *testing.T) {
 
 	results := *response.JSON200
 
-	assert.Equal(t, 1, len(results))
+	assert.Len(t, results, 1)
 	assert.Equal(t, applicationName, results[0].Name)
 	assert.Equal(t, applicationHumanReadableName, results[0].HumanReadableName)
 	assert.Equal(t, applicationDescription, results[0].Description)
@@ -1481,7 +1532,7 @@ func TestApiV1ProvidersOpenstackProjects(t *testing.T) {
 
 	results := *response.JSON200
 
-	assert.Equal(t, 1, len(results))
+	assert.Len(t, results, 1)
 	assert.Equal(t, projectID, results[0].Id)
 	assert.Equal(t, projectName, results[0].Name)
 }
@@ -1531,7 +1582,7 @@ func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 	results := *response.JSON200
 
 	// NOTE: server converts from MiB to GiB of memory.
-	assert.Equal(t, 4, len(results))
+	assert.Len(t, results, 4)
 	assert.Equal(t, flavorID, results[0].Id)
 	assert.Equal(t, flavorName, results[0].Name)
 	assert.Equal(t, flavorCpus, results[0].Cpus)
@@ -1589,7 +1640,7 @@ func TestApiV1ProvidersOpenstackImages(t *testing.T) {
 
 	// NOTE: server converts kubernetes version to a proper semver so it's compatible
 	// with the CAPI kubeadm controller.
-	assert.Equal(t, 2, len(results))
+	assert.Len(t, results, 2)
 	assert.Equal(t, imageID, results[0].Id)
 	assert.Equal(t, imageName, results[0].Name)
 	assert.Equal(t, ts, results[0].Created)
@@ -1640,7 +1691,7 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesCompute(t *testing.T) {
 
 	results := *response.JSON200
 
-	assert.Equal(t, 1, len(results))
+	assert.Len(t, results, 1)
 	assert.Equal(t, computeAvailabilityZoneName, results[0].Name)
 }
 
@@ -1686,7 +1737,7 @@ func TestApiV1ProvidersOpenstackAvailabilityZonesBlockStorage(t *testing.T) {
 
 	results := *response.JSON200
 
-	assert.Equal(t, 1, len(results))
+	assert.Len(t, results, 1)
 	assert.Equal(t, blockStorageAvailabilityZone, results[0].Name)
 }
 
@@ -1732,7 +1783,7 @@ func TestApiV1ProvidersOpenstackExternalNetworks(t *testing.T) {
 
 	results := *response.JSON200
 
-	assert.Equal(t, 1, len(results))
+	assert.Len(t, results, 1)
 	assert.Equal(t, externalNetworkID, results[0].Id)
 }
 
@@ -1778,7 +1829,7 @@ func TestApiV1ProvidersOpenstackKeyPairs(t *testing.T) {
 
 	results := *response.JSON200
 
-	assert.Equal(t, 1, len(results))
+	assert.Len(t, results, 1)
 	assert.Equal(t, keyPairName, results[0].Name)
 }
 

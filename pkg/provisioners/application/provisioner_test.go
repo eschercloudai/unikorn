@@ -42,10 +42,9 @@ import (
 
 const (
 	resourceBundleName = "bundle-x.y.z"
-	resourceBundleKind = unikornv1.ApplicationBundleResourceKindControlPlane
 )
 
-func newResource() unikornv1.ManagableResourceInterface {
+func newControlPlaneResource() unikornv1.ManagableResourceInterface {
 	b := resourceBundleName
 
 	return &unikornv1.ControlPlane{
@@ -61,7 +60,24 @@ func newResource() unikornv1.ManagableResourceInterface {
 	}
 }
 
-func newResourceLabels() []cd.ResourceIdentifierLabel {
+func newKubernetesClusterResource() unikornv1.ManagableResourceInterface {
+	b := resourceBundleName
+
+	return &unikornv1.KubernetesCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			Labels: map[string]string{
+				constants.ProjectLabel:      "foo",
+				constants.ControlPlaneLabel: "baz",
+			},
+		},
+		Spec: unikornv1.KubernetesClusterSpec{
+			ApplicationBundle: &b,
+		},
+	}
+}
+
+func newControlPlaneResourceLabels() []cd.ResourceIdentifierLabel {
 	return []cd.ResourceIdentifierLabel{
 		{
 			Name:  constants.ControlPlaneLabel,
@@ -71,6 +87,28 @@ func newResourceLabels() []cd.ResourceIdentifierLabel {
 		{
 			Name:  constants.KindLabel,
 			Value: constants.KindLabelValueControlPlane,
+		},
+
+		{
+			Name:  constants.ProjectLabel,
+			Value: "foo",
+		},
+	}
+}
+
+func newKubernetesClusterResourceLabels() []cd.ResourceIdentifierLabel {
+	return []cd.ResourceIdentifierLabel{
+		{
+			Name:  constants.KubernetesClusterLabel,
+			Value: "bar",
+		},
+		{
+			Name:  constants.ControlPlaneLabel,
+			Value: "baz",
+		},
+		{
+			Name:  constants.KindLabel,
+			Value: constants.KindLabelValueKubernetesCluster,
 		},
 
 		{
@@ -108,7 +146,7 @@ const (
 	version                 = "baz"
 )
 
-func newBundle(applications ...*unikornv1.HelmApplication) *unikornv1.ApplicationBundle {
+func newControlPlaneBundle(applications ...*unikornv1.HelmApplication) *unikornv1.ControlPlaneApplicationBundle {
 	apps := make([]unikornv1.ApplicationBundleApplication, 0, len(applications))
 
 	for _, application := range applications {
@@ -121,12 +159,36 @@ func newBundle(applications ...*unikornv1.HelmApplication) *unikornv1.Applicatio
 		})
 	}
 
-	bundle := &unikornv1.ApplicationBundle{
+	bundle := &unikornv1.ControlPlaneApplicationBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: resourceBundleName,
 		},
 		Spec: unikornv1.ApplicationBundleSpec{
-			Kind:         util.ToPointer(resourceBundleKind),
+			Applications: apps,
+		},
+	}
+
+	return bundle
+}
+
+func newKubernetesClusterBundle(applications ...*unikornv1.HelmApplication) *unikornv1.KubernetesClusterApplicationBundle {
+	apps := make([]unikornv1.ApplicationBundleApplication, 0, len(applications))
+
+	for _, application := range applications {
+		apps = append(apps, unikornv1.ApplicationBundleApplication{
+			Name: util.ToPointer(application.Name),
+			Reference: &unikornv1.ApplicationReference{
+				Kind: util.ToPointer(unikornv1.ApplicationReferenceKindHelm),
+				Name: util.ToPointer(application.Name),
+			},
+		})
+	}
+
+	bundle := &unikornv1.KubernetesClusterApplicationBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourceBundleName,
+		},
+		Spec: unikornv1.ApplicationBundleSpec{
 			Applications: apps,
 		},
 	}
@@ -150,14 +212,14 @@ func TestApplicationCreateHelm(t *testing.T) {
 		},
 	}
 
-	tc := mustNewTestContext(t, app, newBundle(app))
+	tc := mustNewTestContext(t, app, newControlPlaneBundle(app))
 
 	c := gomock.NewController(t)
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
 		Name:   applicationName,
-		Labels: newResourceLabels(),
+		Labels: newControlPlaneResourceLabels(),
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -167,7 +229,7 @@ func TestApplicationCreateHelm(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := newResource()
+	owner := newControlPlaneResource()
 
 	ctx := context.Background()
 	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
@@ -215,7 +277,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 		},
 	}
 
-	tc := mustNewTestContext(t, app, newBundle(app))
+	tc := mustNewTestContext(t, app, newKubernetesClusterBundle(app))
 
 	c := gomock.NewController(t)
 	defer c.Finish()
@@ -239,7 +301,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 
 	driverAppID := &cd.ResourceIdentifier{
 		Name:   overrideApplicationName,
-		Labels: newResourceLabels(),
+		Labels: newKubernetesClusterResourceLabels(),
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -260,7 +322,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := newResource()
+	owner := newKubernetesClusterResource()
 
 	ctx := context.Background()
 	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
@@ -293,14 +355,14 @@ func TestApplicationCreateGit(t *testing.T) {
 		},
 	}
 
-	tc := mustNewTestContext(t, app, newBundle(app))
+	tc := mustNewTestContext(t, app, newControlPlaneBundle(app))
 
 	c := gomock.NewController(t)
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
 		Name:   applicationName,
-		Labels: newResourceLabels(),
+		Labels: newControlPlaneResourceLabels(),
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -310,7 +372,7 @@ func TestApplicationCreateGit(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := newResource()
+	owner := newControlPlaneResource()
 
 	ctx := context.Background()
 	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
@@ -403,14 +465,14 @@ func TestApplicationCreateMutate(t *testing.T) {
 		},
 	}
 
-	tc := mustNewTestContext(t, app, newBundle(app))
+	tc := mustNewTestContext(t, app, newControlPlaneBundle(app))
 
 	c := gomock.NewController(t)
 	defer c.Finish()
 
 	driverAppID := &cd.ResourceIdentifier{
 		Name:   applicationName,
-		Labels: newResourceLabels(),
+		Labels: newControlPlaneResourceLabels(),
 	}
 
 	driverApp := &cd.HelmApplication{
@@ -438,7 +500,7 @@ func TestApplicationCreateMutate(t *testing.T) {
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := newResource()
+	owner := newControlPlaneResource()
 
 	ctx := context.Background()
 	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
@@ -464,11 +526,11 @@ func TestApplicationDeleteNotFound(t *testing.T) {
 
 	driverAppID := &cd.ResourceIdentifier{
 		Name:   applicationName,
-		Labels: newResourceLabels(),
+		Labels: newControlPlaneResourceLabels(),
 	}
 
 	driver := mock.NewMockDriver(c)
-	owner := newResource()
+	owner := newControlPlaneResource()
 
 	ctx := context.Background()
 	ctx = cd.NewContext(ctx, driver)

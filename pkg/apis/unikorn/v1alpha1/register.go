@@ -49,10 +49,14 @@ const (
 	HelmApplicationKind = "HelmApplication"
 	// HelmApplicationResource is the API endpoint for helm application descriptors.
 	HelmApplicationResource = "helmapplications"
-	// ApplicationBundleKind is the API kind for a bundle of applications.
-	ApplicationBundleKind = "ApplicationBundle"
-	// ApplicationBundleResource is the API endpoint for bundles of applications.
-	ApplicationBundleResource = "applicationbundles"
+	// ControlPlaneApplicationBundleKind is the API kind for a bundle of applications.
+	ControlPlaneApplicationBundleKind = "ControlPlaneApplicationBundle"
+	// ControlPlaneApplicationBundleResource is the API endpoint for bundles of applications.
+	ControlPlaneApplicationBundleResource = "controlplaneapplicationbundles"
+	// KubernetesClusterApplicationBundleKind is the API kind for a bundle of applications.
+	KubernetesClusterApplicationBundleKind = "KubernetesClusterApplicationBundle"
+	// KubernetesClusterApplicationBundleResource is the API endpoint for bundles of applications.
+	KubernetesClusterApplicationBundleResource = "kubernetesclusterapplicationbundles"
 )
 
 var (
@@ -75,7 +79,8 @@ func init() {
 	SchemeBuilder.Register(&ControlPlane{}, &ControlPlaneList{})
 	SchemeBuilder.Register(&KubernetesCluster{}, &KubernetesClusterList{})
 	SchemeBuilder.Register(&HelmApplication{}, &HelmApplicationList{})
-	SchemeBuilder.Register(&ApplicationBundle{}, &ApplicationBundleList{})
+	SchemeBuilder.Register(&ControlPlaneApplicationBundle{}, &ControlPlaneApplicationBundleList{})
+	SchemeBuilder.Register(&KubernetesClusterApplicationBundle{}, &KubernetesClusterApplicationBundleList{})
 }
 
 // Resource maps a resource type to a group resource.

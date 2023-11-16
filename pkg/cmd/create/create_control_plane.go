@@ -52,7 +52,7 @@ type createControlPlaneOptions struct {
 // addFlags registers create cluster options flags with the specified cobra command.
 func (o *createControlPlaneOptions) addFlags(f cmdutil.Factory, cmd *cobra.Command) {
 	o.projectFlags.AddFlags(f, cmd)
-	flags.RequiredStringVarWithCompletion(cmd, &o.applicationBundle, "application-bundle", "", "Application bundle, defining component versions, to deploy", flags.CompleteApplicationBundle(f, unikornv1.ApplicationBundleResourceKindControlPlane))
+	flags.RequiredStringVarWithCompletion(cmd, &o.applicationBundle, "application-bundle", "", "Application bundle, defining component versions, to deploy", flags.CompleteControlPlaneApplicationBundle(f))
 }
 
 // complete fills in any options not does automatically by flag parsing.
