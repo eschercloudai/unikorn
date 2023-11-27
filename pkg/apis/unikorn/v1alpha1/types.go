@@ -587,6 +587,10 @@ type HelmApplicationSpec struct {
 	// Icon is a base64 encoded icon for the application.
 	// TODO: remove optional once upgrade is complete.
 	Icon []byte `json:"icon,omitempty"`
+	// Tags allows an application to be given a free-form set of labels
+	// that can provide grouping, filtering or other contexts.  For
+	// example "networking", "monitoring", "database" etc.
+	Tags []string `json:"tags,omitempty"`
 	// Exported defines whether the application should be exported to
 	// the user visiable application manager.
 	Exported *bool `json:"exported,omitempty"`
