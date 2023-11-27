@@ -529,6 +529,11 @@ func (in *HelmApplicationSpec) DeepCopyInto(out *HelmApplicationSpec) {
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
+	if in.Tags != nil {
+		in, out := &in.Tags, &out.Tags
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Exported != nil {
 		in, out := &in.Exported, &out.Exported
 		*out = new(bool)

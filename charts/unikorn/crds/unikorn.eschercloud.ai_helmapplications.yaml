@@ -126,6 +126,13 @@ spec:
                   size limit. We'd like to have this on by default, but mutating admission
                   webhooks and controllers modifying the spec mess this up.
                 type: boolean
+              tags:
+                description: Tags allows an application to be given a free-form set
+                  of labels that can provide grouping, filtering or other contexts.  For
+                  example "networking", "monitoring", "database" etc.
+                items:
+                  type: string
+                type: array
               version:
                 description: Version is the chart version, or a branch when a path
                   is provided.
