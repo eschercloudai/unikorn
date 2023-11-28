@@ -266,7 +266,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 			Chart:   util.ToPointer(chart),
 			Version: util.ToPointer(version),
 			Release: util.ToPointer(release),
-			Parameters: []unikornv1.HelmApplicationSpecParameter{
+			Parameters: []unikornv1.HelmApplicationParameter{
 				{
 					Name:  util.ToPointer(parameter),
 					Value: util.ToPointer(value),
