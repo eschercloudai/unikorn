@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nginxingress
+package ingressnginx
 
 import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
@@ -22,7 +22,7 @@ import (
 
 const (
 	// applicationName is the unique name of the application.
-	applicationName = "nginx-ingress"
+	applicationName = "ingress-nginx"
 )
 
 // New returns a new initialized provisioner object.

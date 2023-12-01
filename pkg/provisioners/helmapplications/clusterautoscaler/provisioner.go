@@ -42,7 +42,7 @@ func New() *application.Provisioner {
 // Ensure the Provisioner interface is implemented.
 var _ application.Paramterizer = &Provisioner{}
 
-func (p *Provisioner) Parameters(ctx context.Context, version *string) (map[string]string, error) {
+func (p *Provisioner) Parameters(ctx context.Context, version string) (map[string]string, error) {
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 

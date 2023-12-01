@@ -54,8 +54,11 @@ type Application struct {
 	// Name Unique application name.
 	Name string `json:"name"`
 
-	// Version Application version.
-	Version string `json:"version"`
+	// Tags A set of tags for filtering applications.
+	Tags *ApplicationTags `json:"tags,omitempty"`
+
+	// Versions A set of application versions.
+	Versions ApplicationVersions `json:"versions"`
 }
 
 // ApplicationBundle A bundle of applications. This forms the basis of resource versions. Bundles marked
@@ -87,6 +90,36 @@ type ApplicationBundleAutoUpgrade struct {
 
 // ApplicationBundles A list of application bundles.
 type ApplicationBundles = []ApplicationBundle
+
+// ApplicationDependencies A set of applications that will be installed before this application.
+type ApplicationDependencies = []ApplicationDependency
+
+// ApplicationDependency An application dependency.
+type ApplicationDependency struct {
+	// Name The application name.
+	Name string `json:"name"`
+}
+
+// ApplicationRecommends A set of recommended application that may be installed after this application.
+type ApplicationRecommends = []ApplicationDependency
+
+// ApplicationTags A set of tags for filtering applications.
+type ApplicationTags = []string
+
+// ApplicationVersion An application version.
+type ApplicationVersion struct {
+	// Dependencies A set of applications that will be installed before this application.
+	Dependencies *ApplicationDependencies `json:"dependencies,omitempty"`
+
+	// Recommends A set of recommended application that may be installed after this application.
+	Recommends *ApplicationRecommends `json:"recommends,omitempty"`
+
+	// Version The application's Helm chart version.
+	Version string `json:"version"`
+}
+
+// ApplicationVersions A set of application versions.
+type ApplicationVersions = []ApplicationVersion
 
 // Applications A list of appications.
 type Applications = []Application

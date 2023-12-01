@@ -37,7 +37,7 @@ func New() *application.Provisioner {
 }
 
 // Customize implments the application.Customizer interface.
-func (p *Provisioner) Customize(version *string) ([]cd.HelmApplicationField, error) {
+func (p *Provisioner) Customize(version string) ([]cd.HelmApplicationField, error) {
 	fields := []cd.HelmApplicationField{
 		{
 			Group: "rbac.authorization.k8s.io",

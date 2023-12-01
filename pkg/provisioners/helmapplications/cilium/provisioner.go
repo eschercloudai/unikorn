@@ -41,7 +41,7 @@ type Provisioner struct{}
 // Ensure the Provisioner interface is implemented.
 var _ application.ValuesGenerator = &Provisioner{}
 
-func (p *Provisioner) Values(ctx context.Context, _ *string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, _ string) (interface{}, error) {
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 

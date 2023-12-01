@@ -86,7 +86,7 @@ func (p *Provisioner) remoteIngressIP(ctx context.Context) (net.IP, error) {
 }
 
 // Generate implements the application.Generator interface.
-func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, version string) (interface{}, error) {
 	// Now, we _should_ combine cert-manager's HTTP-01 acme challenge with external-dns
 	// however, in lieu of a DDNS server, we are using IP wildcard DNS via nip.io.  Now
 	// sadly to use _that_, you need to know the IP address of the ingress.  So two

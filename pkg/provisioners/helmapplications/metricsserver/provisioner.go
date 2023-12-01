@@ -43,7 +43,7 @@ func New() *application.Provisioner {
 // Generate implements the application.Generator interface.
 // This forces the server onto the control plane rather than take up a
 // worker node (and thus incur the ire of users).
-func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, version string) (interface{}, error) {
 	values := map[string]interface{}{
 		"tolerations":  util.ControlPlaneTolerations(),
 		"nodeSelector": util.ControlPlaneNodeSelector(),
