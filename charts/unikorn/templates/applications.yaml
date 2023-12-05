@@ -542,7 +542,7 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: longhorn-1.5.1-1
+  name: longhorn-1.5.3-1
 spec:
   name: Longhorn
   description: |-
@@ -555,11 +555,14 @@ spec:
   exported: true
   repo: https://charts.longhorn.io
   chart: longhorn
-  version: 1.5.1
+  version: 1.5.3
   parameters:
     - name: defaultSettings.kubernetesClusterAutoscalerEnabled
       value: 'true'
     - name: persistence.defaultClass
+      value: 'false'
+    # See https://github.com/longhorn/longhorn/issues/6415 for further details.
+    - name: helmPreUpgradeCheckerJob.enabled
       value: 'false'
   createNamespace: true
 ---
