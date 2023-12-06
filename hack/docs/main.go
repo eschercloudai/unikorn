@@ -255,13 +255,13 @@ func (o *options) convertRequestBody(requestBody *openapi3.RequestBody, spellche
 }
 
 // convertResponse does spellchecking and returns the internal representation.
-func (o *options) convertResponse(status string, response *openapi3.Response, spellchecker *trie.Trie) (*document.Response, error) {
+func (o *options) convertResponse(status int, response *openapi3.Response, spellchecker *trie.Trie) (*document.Response, error) {
 	if err := spellCheckParagraph(spellchecker, *response.Description); err != nil {
 		return nil, err
 	}
 
 	r := &document.Response{
-		Status:      status,
+		Status:      strconv.Itoa(status),
 		Description: *response.Description,
 	}
 
@@ -292,7 +292,12 @@ func (o *options) convertOperation(method string, operation *openapi3.Operation,
 		op.RequestBody = b
 	}
 
-	for status, response := range operation.Responses {
+	for status := 100; status < 600; status++ {
+		response := operation.Responses.Status(status)
+		if response == nil {
+			continue
+		}
+
 		r, err := o.convertResponse(status, response.Value, spellchecker)
 		if err != nil {
 			return nil, err
@@ -300,8 +305,6 @@ func (o *options) convertOperation(method string, operation *openapi3.Operation,
 
 		op.Responses = append(op.Responses, r)
 	}
-
-	sort.Stable(op.Responses)
 
 	return op, nil
 }
@@ -400,7 +403,9 @@ func (o *options) convertDocument(doc *openapi3.T, spellchecker *trie.Trie) (*do
 		Groups:      groups,
 	}
 
-	for path, pathItem := range doc.Paths {
+	for _, path := range doc.Paths.InMatchingOrder() {
+		pathItem := doc.Paths.Find(path)
+
 		p, err := o.convertPath(path, pathItem, spellchecker)
 		if err != nil {
 			return nil, err

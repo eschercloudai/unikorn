@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/uuid"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	"github.com/eschercloudai/unikorn/pkg/server/authorization/jose"
 )
