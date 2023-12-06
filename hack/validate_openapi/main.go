@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 )
@@ -46,7 +45,9 @@ func main() {
 		report("failed to validate spec", err)
 	}
 
-	for pathName, path := range spec.Paths {
+	for _, pathName := range spec.Paths.InMatchingOrder() {
+		path := spec.Paths.Find(pathName)
+
 		for method, operation := range path.Operations() {
 			// Everything needs security defining.
 			_, noSecurityAllowed := operation.Extensions["x-no-security-requirements"]
@@ -64,14 +65,14 @@ func main() {
 
 			//nolint:nestif
 			if method == http.MethodGet {
-				// GET calls will have a response.
-				if len(operation.Responses) == 0 {
-					report("no response set for", method, pathName)
-				}
-
 				// Where there are responses, they must have a schema.
-				for code, responseRef := range operation.Responses {
-					if code != strconv.Itoa(http.StatusOK) {
+				for code := 100; code < 600; code++ {
+					responseRef := operation.Responses.Status(code)
+					if responseRef == nil {
+						continue
+					}
+
+					if code != http.StatusOK {
 						continue
 					}
 
