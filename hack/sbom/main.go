@@ -284,13 +284,15 @@ func generateSBOM(name string, spec *unikornv1.ApplicationBundleSpec, applicatio
 			continue
 		}
 
-		p, err := generatePackage(*application.Spec.Repo, *application.Spec.Chart, *application.Spec.Version)
-		if err != nil {
-			return err
-		}
+		for _, version := range application.Spec.Versions {
+			p, err := generatePackage(*version.Repo, *version.Chart, *version.Version)
+			if err != nil {
+				return err
+			}
 
-		// TODO: we should probably deduplicate this, just in case.
-		document.Packages = append(document.Packages, p...)
+			// TODO: we should probably deduplicate this, just in case.
+			document.Packages = append(document.Packages, p...)
+		}
 	}
 
 	data, err := json.Marshal(document)
