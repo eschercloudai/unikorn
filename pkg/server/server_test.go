@@ -1511,7 +1511,8 @@ func TestApiV1ApplicationsList(t *testing.T) {
 	assert.Equal(t, applicationDocumentation, results[0].Documentation)
 	assert.Equal(t, applicationLicense, results[0].License)
 	assert.Equal(t, []byte(applicationIcon), results[0].Icon)
-	assert.Equal(t, applicationVersion, results[0].Version)
+	assert.Len(t, results[0].Versions, 1)
+	assert.Equal(t, applicationVersion, results[0].Versions[0].Version)
 }
 
 // TestApiV1ProvidersOpenstackProjects tests OpenStack projects can be listed.

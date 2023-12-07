@@ -153,8 +153,9 @@ func newControlPlaneBundle(applications ...*unikornv1.HelmApplication) *unikornv
 		apps = append(apps, unikornv1.ApplicationBundleApplication{
 			Name: util.ToPointer(application.Name),
 			Reference: &unikornv1.ApplicationReference{
-				Kind: util.ToPointer(unikornv1.ApplicationReferenceKindHelm),
-				Name: util.ToPointer(application.Name),
+				Kind:    util.ToPointer(unikornv1.ApplicationReferenceKindHelm),
+				Name:    util.ToPointer(application.Name),
+				Version: application.Spec.Versions[0].Version,
 			},
 		})
 	}
@@ -178,8 +179,9 @@ func newKubernetesClusterBundle(applications ...*unikornv1.HelmApplication) *uni
 		apps = append(apps, unikornv1.ApplicationBundleApplication{
 			Name: util.ToPointer(application.Name),
 			Reference: &unikornv1.ApplicationReference{
-				Kind: util.ToPointer(unikornv1.ApplicationReferenceKindHelm),
-				Name: util.ToPointer(application.Name),
+				Kind:    util.ToPointer(unikornv1.ApplicationReferenceKindHelm),
+				Name:    util.ToPointer(application.Name),
+				Version: application.Spec.Versions[0].Version,
 			},
 		})
 	}
@@ -206,9 +208,14 @@ func TestApplicationCreateHelm(t *testing.T) {
 			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    util.ToPointer(repo),
-			Chart:   util.ToPointer(chart),
-			Version: util.ToPointer(version),
+			Versions: []unikornv1.HelmApplicationVersion{
+				{
+
+					Repo:    util.ToPointer(repo),
+					Chart:   util.ToPointer(chart),
+					Version: util.ToPointer(version),
+				},
+			},
 		},
 	}
 
@@ -262,18 +269,22 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    util.ToPointer(repo),
-			Chart:   util.ToPointer(chart),
-			Version: util.ToPointer(version),
-			Release: util.ToPointer(release),
-			Parameters: []unikornv1.HelmApplicationParameter{
+			Versions: []unikornv1.HelmApplicationVersion{
 				{
-					Name:  util.ToPointer(parameter),
-					Value: util.ToPointer(value),
+					Repo:    util.ToPointer(repo),
+					Chart:   util.ToPointer(chart),
+					Version: util.ToPointer(version),
+					Release: util.ToPointer(release),
+					Parameters: []unikornv1.HelmApplicationParameter{
+						{
+							Name:  util.ToPointer(parameter),
+							Value: util.ToPointer(value),
+						},
+					},
+					CreateNamespace: util.ToPointer(true),
+					ServerSideApply: util.ToPointer(true),
 				},
 			},
-			CreateNamespace: util.ToPointer(true),
-			ServerSideApply: util.ToPointer(true),
 		},
 	}
 
@@ -349,9 +360,14 @@ func TestApplicationCreateGit(t *testing.T) {
 			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    util.ToPointer(repo),
-			Path:    util.ToPointer(path),
-			Version: util.ToPointer(version),
+			Versions: []unikornv1.HelmApplicationVersion{
+				{
+
+					Repo:    util.ToPointer(repo),
+					Path:    util.ToPointer(path),
+					Version: util.ToPointer(version),
+				},
+			},
 		},
 	}
 
@@ -415,7 +431,7 @@ func (m *mutator) ReleaseName(ctx context.Context) string {
 	return "sentinel"
 }
 
-func (m *mutator) Parameters(ctx context.Context, version *string) (map[string]string, error) {
+func (m *mutator) Parameters(ctx context.Context, version string) (map[string]string, error) {
 	p := map[string]string{
 		mutatorParameter: mutatorValue,
 	}
@@ -423,11 +439,11 @@ func (m *mutator) Parameters(ctx context.Context, version *string) (map[string]s
 	return p, nil
 }
 
-func (m *mutator) Values(ctx context.Context, version *string) (interface{}, error) {
+func (m *mutator) Values(ctx context.Context, version string) (interface{}, error) {
 	return mutatorValues, nil
 }
 
-func (m *mutator) Customize(version *string) ([]cd.HelmApplicationField, error) {
+func (m *mutator) Customize(version string) ([]cd.HelmApplicationField, error) {
 	differences := []cd.HelmApplicationField{
 		{
 			Group: mutatorIgnoreDifferencesGroup,
@@ -459,9 +475,14 @@ func TestApplicationCreateMutate(t *testing.T) {
 			Name: applicationName,
 		},
 		Spec: unikornv1.HelmApplicationSpec{
-			Repo:    util.ToPointer(repo),
-			Chart:   util.ToPointer(chart),
-			Version: util.ToPointer(version),
+			Versions: []unikornv1.HelmApplicationVersion{
+				{
+
+					Repo:    util.ToPointer(repo),
+					Chart:   util.ToPointer(chart),
+					Version: util.ToPointer(version),
+				},
+			},
 		},
 	}
 

@@ -172,7 +172,7 @@ func generateWorkloadPoolSchedulerHelmValues(p *unikornv1.KubernetesClusterWorkl
 }
 
 // Generate implements the application.Generator interface.
-func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, version string) (interface{}, error) {
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 

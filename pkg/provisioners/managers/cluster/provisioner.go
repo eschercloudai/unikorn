@@ -31,10 +31,10 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterautoscaler"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterautoscaleropenstack"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
+	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/ingressnginx"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/kubernetesdashboard"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/longhorn"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/metricsserver"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nginxingress"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/nvidiagpuoperator"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackcloudprovider"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackplugincindercsi"
@@ -140,7 +140,7 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 			openstackplugincindercsi.New(),
 			metricsserver.New(),
 			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New()),
-			conditional.New("nginx-ingress", p.cluster.IngressEnabled, nginxingress.New()),
+			conditional.New("ingress-nginx", p.cluster.IngressEnabled, ingressnginx.New()),
 			conditional.New("cert-manager", p.cluster.CertManagerEnabled, certManagerProvisioner),
 			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New()),
 			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New()),

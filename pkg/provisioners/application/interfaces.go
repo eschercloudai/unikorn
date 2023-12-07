@@ -33,19 +33,19 @@ type ReleaseNamer interface {
 // present, there is nothing special about overriding, it just appends, so ensure the
 // explicit and implicit sets don't overlap.
 type Paramterizer interface {
-	Parameters(ctx context.Context, version *string) (map[string]string, error)
+	Parameters(ctx context.Context, version string) (map[string]string, error)
 }
 
 // ValuesGenerator is an interface that allows generators to supply a raw values.yaml
 // file to Helm.  This accepts an object that can be marshaled to YAML.
 type ValuesGenerator interface {
-	Values(ctx context.Context, version *string) (interface{}, error)
+	Values(ctx context.Context, version string) (interface{}, error)
 }
 
 // Customizer is a generic generator interface that implemnets raw customizations to
 // the application template.  Try to avoid using this.
 type Customizer interface {
-	Customize(version *string) ([]cd.HelmApplicationField, error)
+	Customize(version string) ([]cd.HelmApplicationField, error)
 }
 
 // PostProvisionHook is an interface that lets an application provisioner run

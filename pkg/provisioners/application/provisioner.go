@@ -132,11 +132,11 @@ func (p *Provisioner) getResourceID(ctx context.Context) (*cd.ResourceIdentifier
 
 // getReleaseName uses the release name in the application spec by default
 // but allows the generator to override it.
-func (p *Provisioner) getReleaseName(ctx context.Context, application *unikornv1.HelmApplication) string {
+func (p *Provisioner) getReleaseName(ctx context.Context, versionSpec *unikornv1.HelmApplicationVersion) string {
 	var name string
 
-	if application.Spec.Release != nil {
-		name = *application.Spec.Release
+	if versionSpec.Release != nil {
+		name = *versionSpec.Release
 	}
 
 	if p.generator != nil {
@@ -154,10 +154,10 @@ func (p *Provisioner) getReleaseName(ctx context.Context, application *unikornv1
 
 // getParameters constructs a full list of Helm parameters by taking those provided
 // in the application spec, and appending any that the generator yields.
-func (p *Provisioner) getParameters(ctx context.Context, application *unikornv1.HelmApplication) ([]cd.HelmApplicationParameter, error) {
-	parameters := make([]cd.HelmApplicationParameter, 0, len(application.Spec.Parameters))
+func (p *Provisioner) getParameters(ctx context.Context, versionSpec *unikornv1.HelmApplicationVersion, iface string) ([]cd.HelmApplicationParameter, error) {
+	parameters := make([]cd.HelmApplicationParameter, 0, len(versionSpec.Parameters))
 
-	for _, parameter := range application.Spec.Parameters {
+	for _, parameter := range versionSpec.Parameters {
 		parameters = append(parameters, cd.HelmApplicationParameter{
 			Name:  *parameter.Name,
 			Value: *parameter.Value,
@@ -166,7 +166,7 @@ func (p *Provisioner) getParameters(ctx context.Context, application *unikornv1.
 
 	if p.generator != nil {
 		if parameterizer, ok := p.generator.(Paramterizer); ok {
-			p, err := parameterizer.Parameters(ctx, application.Spec.Interface)
+			p, err := parameterizer.Parameters(ctx, iface)
 			if err != nil {
 				return nil, err
 			}
@@ -190,7 +190,7 @@ func (p *Provisioner) getParameters(ctx context.Context, application *unikornv1.
 
 // getValues delegates to the generator to get an option values.yaml file to
 // pass to Helm.
-func (p *Provisioner) getValues(ctx context.Context, application *unikornv1.HelmApplication) (interface{}, error) {
+func (p *Provisioner) getValues(ctx context.Context, iface string) (interface{}, error) {
 	if p.generator == nil {
 		//nolint:nilnil
 		return nil, nil
@@ -202,7 +202,7 @@ func (p *Provisioner) getValues(ctx context.Context, application *unikornv1.Helm
 		return nil, nil
 	}
 
-	values, err := valuesGenerator.Values(ctx, application.Spec.Interface)
+	values, err := valuesGenerator.Values(ctx, iface)
 	if err != nil {
 		return nil, err
 	}
@@ -220,42 +220,55 @@ func (p *Provisioner) getClusterID() *cd.ResourceIdentifier {
 }
 
 // getApplication looks up the application in the resource's application catalogue/bundle.
-func (p *Provisioner) getApplication(ctx context.Context) (*unikornv1.HelmApplication, error) {
+func (p *Provisioner) getApplication(ctx context.Context) (*unikornv1.HelmApplication, string, error) {
 	var application *unikornv1.HelmApplication
 
+	var version string
+
 	unbundler := util.NewUnbundler(FromContext(ctx))
-	unbundler.AddApplication(&application, p.Name)
+	unbundler.AddApplication(&application, &version, p.Name)
 
 	if err := unbundler.Unbundle(ctx); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return application, nil
+	return application, version, nil
 }
 
 // generateApplication converts the provided object to a canonical form for a driver.
 //
 //nolint:cyclop
 func (p *Provisioner) generateApplication(ctx context.Context) (*cd.HelmApplication, error) {
-	application, err := p.getApplication(ctx)
+	application, version, err := p.getApplication(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	parameters, err := p.getParameters(ctx, application)
+	versionSpec, err := application.GetVersion(version)
 	if err != nil {
 		return nil, err
 	}
 
-	values, err := p.getValues(ctx, application)
+	var iface string
+
+	if versionSpec.Interface != nil {
+		iface = *versionSpec.Interface
+	}
+
+	parameters, err := p.getParameters(ctx, versionSpec, iface)
+	if err != nil {
+		return nil, err
+	}
+
+	values, err := p.getValues(ctx, iface)
 	if err != nil {
 		return nil, err
 	}
 
 	cdApplication := &cd.HelmApplication{
-		Repo:          *application.Spec.Repo,
-		Version:       *application.Spec.Version,
-		Release:       p.getReleaseName(ctx, application),
+		Repo:          *versionSpec.Repo,
+		Version:       *versionSpec.Version,
+		Release:       p.getReleaseName(ctx, versionSpec),
 		Parameters:    parameters,
 		Values:        values,
 		Cluster:       p.getClusterID(),
@@ -263,25 +276,25 @@ func (p *Provisioner) generateApplication(ctx context.Context) (*cd.HelmApplicat
 		AllowDegraded: p.allowDegraded,
 	}
 
-	if application.Spec.Chart != nil {
-		cdApplication.Chart = *application.Spec.Chart
+	if versionSpec.Chart != nil {
+		cdApplication.Chart = *versionSpec.Chart
 	}
 
-	if application.Spec.Path != nil {
-		cdApplication.Path = *application.Spec.Path
+	if versionSpec.Path != nil {
+		cdApplication.Path = *versionSpec.Path
 	}
 
-	if application.Spec.CreateNamespace != nil {
-		cdApplication.CreateNamespace = *application.Spec.CreateNamespace
+	if versionSpec.CreateNamespace != nil {
+		cdApplication.CreateNamespace = *versionSpec.CreateNamespace
 	}
 
-	if application.Spec.ServerSideApply != nil {
-		cdApplication.ServerSideApply = *application.Spec.ServerSideApply
+	if versionSpec.ServerSideApply != nil {
+		cdApplication.ServerSideApply = *versionSpec.ServerSideApply
 	}
 
 	if p.generator != nil {
 		if customization, ok := p.generator.(Customizer); ok {
-			ignoredDifferences, err := customization.Customize(application.Spec.Interface)
+			ignoredDifferences, err := customization.Customize(iface)
 			if err != nil {
 				return nil, err
 			}

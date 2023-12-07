@@ -276,8 +276,12 @@ func mustCreateHelmApplicationFixture(t *testing.T, tc *TestContext) {
 			Documentation: util.ToPointer(applicationDocumentation),
 			License:       util.ToPointer(applicationLicense),
 			Icon:          []byte(applicationIcon),
-			Version:       util.ToPointer(applicationVersion),
 			Exported:      util.ToPointer(true),
+			Versions: []unikornv1.HelmApplicationVersion{
+				{
+					Version: util.ToPointer(applicationVersion),
+				},
+			},
 		},
 	}
 

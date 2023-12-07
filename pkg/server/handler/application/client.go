@@ -42,6 +42,40 @@ func NewClient(client client.Client) *Client {
 }
 
 func convert(in *unikornv1.HelmApplication) *generated.Application {
+	versions := make(generated.ApplicationVersions, 0, len(in.Spec.Versions))
+
+	for _, version := range in.Spec.Versions {
+		v := generated.ApplicationVersion{
+			Version: *version.Version,
+		}
+
+		if len(version.Dependencies) != 0 {
+			deps := make(generated.ApplicationDependencies, 0, len(version.Dependencies))
+
+			for _, dependency := range version.Dependencies {
+				deps = append(deps, generated.ApplicationDependency{
+					Name: *dependency.Name,
+				})
+			}
+
+			v.Dependencies = &deps
+		}
+
+		if len(version.Recommends) != 0 {
+			recommends := make(generated.ApplicationRecommends, 0, len(version.Recommends))
+
+			for _, recommend := range version.Recommends {
+				recommends = append(recommends, generated.ApplicationDependency{
+					Name: *recommend.Name,
+				})
+			}
+
+			v.Recommends = &recommends
+		}
+
+		versions = append(versions, v)
+	}
+
 	out := &generated.Application{
 		Name:              in.Name,
 		HumanReadableName: *in.Spec.Name,
@@ -49,7 +83,8 @@ func convert(in *unikornv1.HelmApplication) *generated.Application {
 		Documentation:     *in.Spec.Documentation,
 		License:           *in.Spec.License,
 		Icon:              in.Spec.Icon,
-		Version:           *in.Spec.Version,
+		Versions:          versions,
+		Tags:              &in.Spec.Tags,
 	}
 
 	return out

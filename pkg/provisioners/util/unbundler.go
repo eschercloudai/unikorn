@@ -35,6 +35,8 @@ var (
 type unbundleItem struct {
 	// r is where to store the resource.
 	r **unikornv1.HelmApplication
+	// v is the application version.
+	v *string
 	// name is the resource name in the bundle.
 	name string
 	// optional is an optional item, this is typically used
@@ -67,9 +69,10 @@ func NewUnbundler(o unikornv1.ApplicationBundleGetter) *Unbundler {
 	}
 }
 
-func (u *Unbundler) AddApplication(r **unikornv1.HelmApplication, name string, options ...UnbundlerOption) {
+func (u *Unbundler) AddApplication(r **unikornv1.HelmApplication, v *string, name string, options ...UnbundlerOption) {
 	item := unbundleItem{
 		r:    r,
+		v:    v,
 		name: name,
 	}
 
@@ -132,6 +135,7 @@ func (u *Unbundler) Unbundle(ctx context.Context) error {
 		}
 
 		*item.r = application
+		*item.v = *applicationReference.Reference.Version
 	}
 
 	return nil

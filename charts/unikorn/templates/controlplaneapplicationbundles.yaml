@@ -9,15 +9,18 @@ spec:
   - name: vcluster
     reference:
       kind: HelmApplication
-      name: vcluster-0.15.0-1
+      name: vcluster
+      version: 0.15.0
   - name: cert-manager
     reference:
       kind: HelmApplication
-      name: cert-manager-1.11.0-1
+      name: cert-manager
+      version: v1.11.0
   - name: cluster-api
     reference:
       kind: HelmApplication
-      name: cluster-api-0.1.10-1
+      name: cluster-api
+      version: v0.1.10
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: ControlPlaneApplicationBundle
@@ -29,12 +32,15 @@ spec:
   - name: vcluster
     reference:
       kind: HelmApplication
-      name: vcluster-0.15.7-1
+      name: vcluster
+      version: 0.15.7
   - name: cert-manager
     reference:
       kind: HelmApplication
-      name: cert-manager-1.12.4-1
+      name: cert-manager
+      version: v1.12.4
   - name: cluster-api
     reference:
       kind: HelmApplication
-      name: cluster-api-0.1.10-1
+      name: cluster-api
+      version: v0.1.10
