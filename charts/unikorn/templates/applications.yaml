@@ -241,6 +241,20 @@ spec:
       value: "WITH_WORKLOAD"
     - name: validator.plugin.env[0].value
       value: f
+  - version: v23.9.1
+    repo: https://helm.ngc.nvidia.com/nvidia
+    chart: gpu-operator
+    parameters:
+    - name: validator.plugin.env[0].name
+      value: "WITH_WORKLOAD"
+    - name: validator.plugin.env[0].value
+      value: f
+    - name: driver.enabled
+      value: 'false'
+    - name: migManager.enabled
+      value: 'false'
+    - name: vgpuDeviceManager.enabled
+      value: 'false'
     interface: 1.0.0
 ---
 apiVersion: unikorn.eschercloud.ai/v1alpha1
