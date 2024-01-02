@@ -49,12 +49,13 @@ spec:
           spec:
             properties:
               chart:
-                description: Chart is the chart name in the repository.
+                description: 'Chart is the chart name in the repository. TODO: remove
+                  me!'
                 type: string
               createNamespace:
-                description: CreateNamespace indicates whether the chart requires
+                description: 'CreateNamespace indicates whether the chart requires
                   a namespace to be created by the tooling, rather than the chart
-                  itself.
+                  itself. TODO: remove me!'
                 type: boolean
               description:
                 description: Description describes what the application does.
@@ -71,15 +72,15 @@ spec:
                 format: byte
                 type: string
               interface:
-                description: Interface is the name of a Unikorn function that configures
-                  the application. In particular it's used when reading values from
+                description: 'Interface is the name of a Unikorn function that configures
+                  the application. In particular it''s used when reading values from
                   a custom resource and mapping them to Helm values.  This allows
                   us to version Helm interfaces in the context of "do we need to do
                   something differently", without having to come up with a generalized
                   solution that purely exists as Kubernetes resource specifications.
                   For example, building a Openstack Cloud Provider configuration from
                   a clouds.yaml is going to be bloody tricky without some proper code
-                  to handle it.
+                  to handle it. TODO: remove me!'
                 type: string
               license:
                 description: License describes the licence the application is released
@@ -89,8 +90,8 @@ spec:
                 description: Name is the human readable application name.
                 type: string
               parameters:
-                description: Parameters is a set of static --set parameters to pass
-                  to the chart.
+                description: 'Parameters is a set of static --set parameters to pass
+                  to the chart. TODO: remove me!'
                 items:
                   properties:
                     name:
@@ -105,27 +106,31 @@ spec:
                   type: object
                 type: array
               path:
-                description: Path is the path if the repo is a git repo.
+                description: 'Path is the path if the repo is a git repo. TODO: remove
+                  me!'
                 type: string
               release:
-                description: Release is the explicit release name for when chart resource
-                  names are dynamic. Typically we need predicatable names for things
-                  that are going to be remote clusters to derive endpoints or Kubernetes
-                  configurations.
+                description: 'Release is the explicit release name for when chart
+                  resource names are dynamic. Typically we need predicatable names
+                  for things that are going to be remote clusters to derive endpoints
+                  or Kubernetes configurations. TODO: remove me!'
                 type: string
               repo:
-                description: Repo is either a Helm chart repository, or git repository.
+                description: 'Repo is either a Helm chart repository, or git repository.
+                  TODO: remove me!'
                 type: string
               serverSideApply:
-                description: ServerSideApply allows you to bypass using kubectl apply.  This
+                description: 'ServerSideApply allows you to bypass using kubectl apply.  This
                   is useful in situations where CRDs are too big and blow the annotation
-                  size limit. We'd like to have this on by default, but mutating admission
-                  webhooks and controllers modifying the spec mess this up.
+                  size limit. We''d like to have this on by default, but mutating
+                  admission webhooks and controllers modifying the spec mess this
+                  up. TODO: remove me!'
                 type: boolean
               tags:
-                description: Tags allows an application to be given a free-form set
+                description: 'Tags allows an application to be given a free-form set
                   of labels that can provide grouping, filtering or other contexts.  For
-                  example "networking", "monitoring", "database" etc.
+                  example "networking", "monitoring", "database" etc. TODO: make me
+                  required.'
                 items:
                   type: string
                 type: array
@@ -152,8 +157,8 @@ spec:
                       items:
                         properties:
                           name:
-                            description: ApplicationName the name of the application
-                              to depend on.
+                            description: Name the name of the application to depend
+                              on.
                             type: string
                         required:
                         - name
@@ -198,8 +203,8 @@ spec:
                       items:
                         properties:
                           name:
-                            description: ApplicationName the name of the application
-                              to depend on.
+                            description: Name the name of the application to depend
+                              on.
                             type: string
                         required:
                         - name

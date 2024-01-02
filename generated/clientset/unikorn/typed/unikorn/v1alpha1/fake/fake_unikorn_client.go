@@ -52,6 +52,10 @@ func (c *FakeUnikornV1alpha1) Projects() v1alpha1.ProjectInterface {
 	return &FakeProjects{c}
 }
 
+func (c *FakeUnikornV1alpha1) UserApplicationBundles(namespace string) v1alpha1.UserApplicationBundleInterface {
+	return &FakeUserApplicationBundles{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeUnikornV1alpha1) RESTClient() rest.Interface {

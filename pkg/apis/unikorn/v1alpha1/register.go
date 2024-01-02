@@ -57,6 +57,10 @@ const (
 	KubernetesClusterApplicationBundleKind = "KubernetesClusterApplicationBundle"
 	// KubernetesClusterApplicationBundleResource is the API endpoint for bundles of applications.
 	KubernetesClusterApplicationBundleResource = "kubernetesclusterapplicationbundles"
+	// UserApplicationBundleKind is the API kind for user application bundles.
+	UserApplicationBundleKind = "UserApplicationBundle"
+	// UserApplicationBundleResource is the API endpoint for user application bundles.
+	UserApplicationBundleResource = "userapplicationbundles"
 )
 
 var (
@@ -81,6 +85,7 @@ func init() {
 	SchemeBuilder.Register(&HelmApplication{}, &HelmApplicationList{})
 	SchemeBuilder.Register(&ControlPlaneApplicationBundle{}, &ControlPlaneApplicationBundleList{})
 	SchemeBuilder.Register(&KubernetesClusterApplicationBundle{}, &KubernetesClusterApplicationBundleList{})
+	SchemeBuilder.Register(&UserApplicationBundle{}, &UserApplicationBundleList{})
 }
 
 // Resource maps a resource type to a group resource.

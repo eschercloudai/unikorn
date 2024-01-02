@@ -29,3 +29,5 @@ type KubernetesClusterExpansion interface{}
 type KubernetesClusterApplicationBundleExpansion interface{}
 
 type ProjectExpansion interface{}
+
+type UserApplicationBundleExpansion interface{}
