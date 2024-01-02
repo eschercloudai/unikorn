@@ -1,5 +1,5 @@
 /*
-Copyright 2022-2023 EscherCloud.
+Copyright 2022-2024 EscherCloud.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ const (
 	// TODO: may want to make this fuzzy (e.g. the date) and make it
 	// a regex match.
 	goApache2LicenseHeader = `/*
-Copyright 2022-2023 EscherCloud.
+Copyright 2022-2024 EscherCloud.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
