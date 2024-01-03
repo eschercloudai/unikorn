@@ -624,53 +624,6 @@ func (in *HelmApplicationSpec) DeepCopyInto(out *HelmApplicationSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.Repo != nil {
-		in, out := &in.Repo, &out.Repo
-		*out = new(string)
-		**out = **in
-	}
-	if in.Chart != nil {
-		in, out := &in.Chart, &out.Chart
-		*out = new(string)
-		**out = **in
-	}
-	if in.Path != nil {
-		in, out := &in.Path, &out.Path
-		*out = new(string)
-		**out = **in
-	}
-	if in.Version != nil {
-		in, out := &in.Version, &out.Version
-		*out = new(string)
-		**out = **in
-	}
-	if in.Release != nil {
-		in, out := &in.Release, &out.Release
-		*out = new(string)
-		**out = **in
-	}
-	if in.Parameters != nil {
-		in, out := &in.Parameters, &out.Parameters
-		*out = make([]HelmApplicationParameter, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
-	if in.CreateNamespace != nil {
-		in, out := &in.CreateNamespace, &out.CreateNamespace
-		*out = new(bool)
-		**out = **in
-	}
-	if in.ServerSideApply != nil {
-		in, out := &in.ServerSideApply, &out.ServerSideApply
-		*out = new(bool)
-		**out = **in
-	}
-	if in.Interface != nil {
-		in, out := &in.Interface, &out.Interface
-		*out = new(string)
-		**out = **in
-	}
 	if in.Versions != nil {
 		in, out := &in.Versions, &out.Versions
 		*out = make([]HelmApplicationVersion, len(*in))

@@ -60,6 +60,44 @@ func init() {
 	metrics.Registry.MustRegister(durationMetric)
 }
 
+type ApplicationReferenceGetter struct {
+	controlPlane *unikornv1.ControlPlane
+}
+
+func newApplicationReferenceGetter(controlPlane *unikornv1.ControlPlane) *ApplicationReferenceGetter {
+	return &ApplicationReferenceGetter{
+		controlPlane: controlPlane,
+	}
+}
+
+func (a *ApplicationReferenceGetter) getApplication(ctx context.Context, name string) (*unikornv1.ApplicationReference, error) {
+	cli := clientlib.StaticClientFromContext(ctx)
+
+	key := client.ObjectKey{
+		Name: *a.controlPlane.Spec.ApplicationBundle,
+	}
+
+	bundle := &unikornv1.ControlPlaneApplicationBundle{}
+
+	if err := cli.Get(ctx, key, bundle); err != nil {
+		return nil, err
+	}
+
+	return bundle.Spec.GetApplication(name)
+}
+
+func (a *ApplicationReferenceGetter) vCluster(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "vcluster")
+}
+
+func (a *ApplicationReferenceGetter) certManager(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "cert-manager")
+}
+
+func (a *ApplicationReferenceGetter) clusterAPI(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "cluster-api")
+}
+
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
 	provisioners.ProvisionerMeta
@@ -137,11 +175,13 @@ func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string)
 // getControlPlaneProvisioner returns a provisoner that encodes control plane
 // provisioning steps.
 func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.Provisioner {
+	apps := newApplicationReferenceGetter(&p.controlPlane)
+
 	remoteControlPlane := remotecluster.New(vcluster.NewRemoteCluster(namespace, &p.controlPlane), true)
 
 	clusterAPIProvisioner := concurrent.New("cluster-api",
-		certmanager.New(),
-		clusterapi.New(),
+		certmanager.New(apps.certManager),
+		clusterapi.New(apps.clusterAPI),
 	)
 
 	// Set up deletion semantics.
@@ -150,7 +190,7 @@ func (p *Provisioner) getControlPlaneProvisioner(namespace string) provisioners.
 	// Provision the vitual cluster, setup the remote cluster then
 	// install cert manager and cluster API into it.
 	return serial.New("control plane",
-		vcluster.New().InNamespace(namespace),
+		vcluster.New(apps.vCluster).InNamespace(namespace),
 		remoteControlPlane.ProvisionOn(clusterAPIProvisioner),
 	)
 }

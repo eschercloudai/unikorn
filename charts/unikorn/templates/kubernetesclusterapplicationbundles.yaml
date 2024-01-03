@@ -73,5 +73,5 @@ spec:
   - name: prometheus
     reference:
       kind: HelmApplication
-      name: kube-prometheus-stack
+      name: prometheus
       version: 50.2.0

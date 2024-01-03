@@ -21,23 +21,18 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "cluster-api"
-)
-
 type Provisioner struct{}
 
 // Ensure the Provisioner interface is implemented.
 var _ application.Customizer = &Provisioner{}
 
 // New returns a new initialized provisioner object.
-func New() *application.Provisioner {
-	return application.New(applicationName).WithGenerator(&Provisioner{})
+func New(getApplication application.GetterFunc) *application.Provisioner {
+	return application.New(getApplication).WithGenerator(&Provisioner{})
 }
 
 // Customize implments the application.Customizer interface.
-func (p *Provisioner) Customize(version string) ([]cd.HelmApplicationField, error) {
+func (p *Provisioner) Customize(version *string) ([]cd.HelmApplicationField, error) {
 	fields := []cd.HelmApplicationField{
 		{
 			Group: "rbac.authorization.k8s.io",

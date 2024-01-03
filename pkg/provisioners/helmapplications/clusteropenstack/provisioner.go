@@ -27,9 +27,6 @@ import (
 )
 
 const (
-	// applicationName is the unique name of the application.
-	applicationName = "cluster-openstack"
-
 	// legacyApplicationName is what the application needs to be called so it's
 	// not deleted and recreated, which would be quite catastrophic for an entire
 	// Kubernetes cluster!
@@ -44,12 +41,12 @@ type Provisioner struct {
 }
 
 // New returns a new initialized provisioner object.
-func New(controlPlanePrefix string) *application.Provisioner {
+func New(getApplication application.GetterFunc, controlPlanePrefix string) *application.Provisioner {
 	provisioner := &Provisioner{
 		controlPlanePrefix: controlPlanePrefix,
 	}
 
-	return application.New(applicationName).WithApplicationName(legacyApplicationName).WithGenerator(provisioner).AllowDegraded()
+	return application.New(getApplication).WithApplicationName(legacyApplicationName).WithGenerator(provisioner).AllowDegraded()
 }
 
 // Ensure the Provisioner interface is implemented.
@@ -172,7 +169,7 @@ func generateWorkloadPoolSchedulerHelmValues(p *unikornv1.KubernetesClusterWorkl
 }
 
 // Generate implements the application.Generator interface.
-func (p *Provisioner) Values(ctx context.Context, version string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 

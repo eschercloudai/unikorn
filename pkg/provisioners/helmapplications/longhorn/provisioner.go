@@ -20,12 +20,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "longhorn"
-)
-
 // New returns a new initialized provisioner object.
-func New() *application.Provisioner {
-	return application.New(applicationName).InNamespace("longhorn-system")
+func New(getApplication application.GetterFunc) *application.Provisioner {
+	return application.New(getApplication).InNamespace("longhorn-system")
 }

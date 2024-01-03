@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -37,6 +38,10 @@ var (
 	// ErrMissingLabel is raised when an expected label is not present on
 	// a resource.
 	ErrMissingLabel = errors.New("expected label is missing")
+
+	// ErrApplicationLookup is raised when the named application is not
+	// present in an application bundle bundle.
+	ErrApplicationLookup = errors.New("failed to lookup an application")
 )
 
 // IPv4AddressSliceFromIPSlice is a simple converter from Go types
@@ -130,14 +135,6 @@ func (c *Project) ResourceLabels() (labels.Set, error) {
 	return labels, nil
 }
 
-func (c *Project) ApplicationBundleKind() ApplicationBundleResourceKind {
-	return ""
-}
-
-func (c *Project) ApplicationBundleName() string {
-	return ""
-}
-
 // StatusConditionRead scans the status conditions for an existing condition whose type
 // matches.
 func (c *ControlPlane) StatusConditionRead(t ConditionType) (*Condition, error) {
@@ -166,14 +163,6 @@ func (c *ControlPlane) ResourceLabels() (labels.Set, error) {
 	}
 
 	return labels, nil
-}
-
-func (c *ControlPlane) ApplicationBundleKind() ApplicationBundleResourceKind {
-	return ApplicationBundleResourceKindControlPlane
-}
-
-func (c *ControlPlane) ApplicationBundleName() string {
-	return *c.Spec.ApplicationBundle
 }
 
 func (c ControlPlane) Entropy() []byte {
@@ -218,14 +207,6 @@ func (c *KubernetesCluster) ResourceLabels() (labels.Set, error) {
 	}
 
 	return labels, nil
-}
-
-func (c *KubernetesCluster) ApplicationBundleKind() ApplicationBundleResourceKind {
-	return ApplicationBundleResourceKindKubernetesCluster
-}
-
-func (c *KubernetesCluster) ApplicationBundleName() string {
-	return *c.Spec.ApplicationBundle
 }
 
 func (c KubernetesCluster) Entropy() []byte {
@@ -367,14 +348,14 @@ func (l KubernetesClusterApplicationBundleList) Upgradable() *KubernetesClusterA
 	return result
 }
 
-func (s ApplicationBundleSpec) GetApplication(name string) *ApplicationNamedReference {
+func (s ApplicationBundleSpec) GetApplication(name string) (*ApplicationReference, error) {
 	for i := range s.Applications {
 		if *s.Applications[i].Name == name {
-			return &s.Applications[i]
+			return s.Applications[i].Reference, nil
 		}
 	}
 
-	return nil
+	return nil, fmt.Errorf("%w: %s", ErrApplicationLookup, name)
 }
 
 // Weekdays returns the days of the week that are set in the spec.

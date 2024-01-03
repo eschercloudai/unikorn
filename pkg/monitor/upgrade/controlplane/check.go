@@ -44,7 +44,7 @@ func New(client client.Client) *Checker {
 func (c *Checker) upgradeResource(ctx context.Context, resource *unikornv1.ControlPlane, bundles *unikornv1.ControlPlaneApplicationBundleList, target *unikornv1.ControlPlaneApplicationBundle) error {
 	logger := log.FromContext(ctx)
 
-	bundle := bundles.Get(resource.ApplicationBundleName())
+	bundle := bundles.Get(*resource.Spec.ApplicationBundle)
 	if bundle == nil {
 		return fmt.Errorf("%w: %s", errors.ErrMissingBundle, *resource.Spec.ApplicationBundle)
 	}

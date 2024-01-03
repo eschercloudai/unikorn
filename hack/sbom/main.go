@@ -277,14 +277,14 @@ func generateSBOM(name string, spec *unikornv1.ApplicationBundleSpec, applicatio
 			return err
 		}
 
-		// Skip things that are pulled directly from GitHub as I cannot be bothered
-		// to figure out how to get the Chart.yaml file... something, something
-		// rawcontent.
-		if application.Spec.Path != nil {
-			continue
-		}
-
 		for _, version := range application.Spec.Versions {
+			// Skip things that are pulled directly from GitHub as I cannot be bothered
+			// to figure out how to get the Chart.yaml file... something, something
+			// rawcontent.
+			if version.Path != nil {
+				continue
+			}
+
 			p, err := generatePackage(*version.Repo, *version.Chart, *version.Version)
 			if err != nil {
 				return err

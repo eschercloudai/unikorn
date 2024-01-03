@@ -33,11 +33,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "openstack-cloud-provider"
-)
-
 var (
 	// ErrCloudConfiguration is returned when the cloud configuration is not
 	// correctly formatted.
@@ -48,10 +43,10 @@ var (
 type Provisioner struct{}
 
 // New returns a new initialized provisioner object.
-func New() *application.Provisioner {
+func New(getApplication application.GetterFunc) *application.Provisioner {
 	provisioner := &Provisioner{}
 
-	return application.New(applicationName).WithGenerator(provisioner).InNamespace("ocp-system")
+	return application.New(getApplication).WithGenerator(provisioner).InNamespace("ocp-system")
 }
 
 // Ensure the Provisioner interface is implemented.
@@ -127,7 +122,7 @@ func GenerateCloudConfig(cluster *unikornv1.KubernetesCluster) (string, error) {
 // Generate implements the application.Generator interface.
 // Note there is an option, to just pass through the clouds.yaml file, however
 // the chart doesn't allow it to be exposed so we need to translate between formats.
-func (p *Provisioner) Values(ctx context.Context, _ string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, _ *string) (interface{}, error) {
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 

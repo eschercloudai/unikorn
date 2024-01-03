@@ -24,19 +24,16 @@ import (
 )
 
 const (
-	// applicationName is the unique name of the application.
-	applicationName = "nvidia-gpu-operator"
-
 	// defaultNamespace is where to install the component.
 	// NOTE: this requires the namespace to exist first, so pick an existing one.
 	defaultNamespace = "kube-system"
 )
 
 // New returns a new initialized provisioner object.
-func New() *application.Provisioner {
+func New(getApplication application.GetterFunc) *application.Provisioner {
 	p := &Provisioner{}
 
-	return application.New(applicationName).WithGenerator(p).InNamespace(defaultNamespace)
+	return application.New(getApplication).WithGenerator(p).InNamespace(defaultNamespace)
 }
 
 type Provisioner struct{}
@@ -45,7 +42,7 @@ type Provisioner struct{}
 var _ application.ValuesGenerator = &Provisioner{}
 
 // Generate implements the application.Generator interface.
-func (p *Provisioner) Values(ctx context.Context, version string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, version *string) (interface{}, error) {
 	// We limit images to those with the driver pre-installed as it's far quicker for UX.
 	// Also the default affinity is broken and prevents scale to zero, also tolerations
 	// don't allow execution using our default taints.

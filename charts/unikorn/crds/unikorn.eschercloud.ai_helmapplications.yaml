@@ -17,15 +17,6 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.repo
-      name: repo
-      type: string
-    - jsonPath: .spec.chart
-      name: chart
-      type: string
-    - jsonPath: .spec.version
-      name: version
-      type: string
     - jsonPath: .metadata.creationTimestamp
       name: age
       type: date
@@ -48,15 +39,6 @@ spec:
             type: object
           spec:
             properties:
-              chart:
-                description: 'Chart is the chart name in the repository. TODO: remove
-                  me!'
-                type: string
-              createNamespace:
-                description: 'CreateNamespace indicates whether the chart requires
-                  a namespace to be created by the tooling, rather than the chart
-                  itself. TODO: remove me!'
-                type: boolean
               description:
                 description: Description describes what the application does.
                 type: string
@@ -71,17 +53,6 @@ spec:
                 description: Icon is a base64 encoded icon for the application.
                 format: byte
                 type: string
-              interface:
-                description: 'Interface is the name of a Unikorn function that configures
-                  the application. In particular it''s used when reading values from
-                  a custom resource and mapping them to Helm values.  This allows
-                  us to version Helm interfaces in the context of "do we need to do
-                  something differently", without having to come up with a generalized
-                  solution that purely exists as Kubernetes resource specifications.
-                  For example, building a Openstack Cloud Provider configuration from
-                  a clouds.yaml is going to be bloody tricky without some proper code
-                  to handle it. TODO: remove me!'
-                type: string
               license:
                 description: License describes the licence the application is released
                   under.
@@ -89,55 +60,13 @@ spec:
               name:
                 description: Name is the human readable application name.
                 type: string
-              parameters:
-                description: 'Parameters is a set of static --set parameters to pass
-                  to the chart. TODO: remove me!'
-                items:
-                  properties:
-                    name:
-                      description: Name is the name of the parameter.
-                      type: string
-                    value:
-                      description: Value is the value of the parameter.
-                      type: string
-                  required:
-                  - name
-                  - value
-                  type: object
-                type: array
-              path:
-                description: 'Path is the path if the repo is a git repo. TODO: remove
-                  me!'
-                type: string
-              release:
-                description: 'Release is the explicit release name for when chart
-                  resource names are dynamic. Typically we need predicatable names
-                  for things that are going to be remote clusters to derive endpoints
-                  or Kubernetes configurations. TODO: remove me!'
-                type: string
-              repo:
-                description: 'Repo is either a Helm chart repository, or git repository.
-                  TODO: remove me!'
-                type: string
-              serverSideApply:
-                description: 'ServerSideApply allows you to bypass using kubectl apply.  This
-                  is useful in situations where CRDs are too big and blow the annotation
-                  size limit. We''d like to have this on by default, but mutating
-                  admission webhooks and controllers modifying the spec mess this
-                  up. TODO: remove me!'
-                type: boolean
               tags:
-                description: 'Tags allows an application to be given a free-form set
+                description: Tags allows an application to be given a free-form set
                   of labels that can provide grouping, filtering or other contexts.  For
-                  example "networking", "monitoring", "database" etc. TODO: make me
-                  required.'
+                  example "networking", "monitoring", "database" etc.
                 items:
                   type: string
                 type: array
-              version:
-                description: 'Version is the chart version, or a branch when a path
-                  is provided. TODO: remove me!'
-                type: string
               versions:
                 description: Versions are the application versions that are supported.
                 items:
@@ -249,6 +178,7 @@ spec:
             - icon
             - license
             - name
+            - tags
             type: object
           status:
             type: object

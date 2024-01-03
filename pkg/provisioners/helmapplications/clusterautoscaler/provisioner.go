@@ -24,25 +24,20 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusteropenstack"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "cluster-autoscaler"
-)
-
 // Provisioner encapsulates provisioning.
 type Provisioner struct{}
 
 // New returns a new initialized provisioner object.
-func New() *application.Provisioner {
+func New(getApplication application.GetterFunc) *application.Provisioner {
 	provisoner := &Provisioner{}
 
-	return application.New(applicationName).WithGenerator(provisoner)
+	return application.New(getApplication).WithGenerator(provisoner)
 }
 
 // Ensure the Provisioner interface is implemented.
 var _ application.Paramterizer = &Provisioner{}
 
-func (p *Provisioner) Parameters(ctx context.Context, version string) (map[string]string, error) {
+func (p *Provisioner) Parameters(ctx context.Context, version *string) (map[string]string, error) {
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 
