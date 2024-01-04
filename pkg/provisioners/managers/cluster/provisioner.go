@@ -50,6 +50,89 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type ApplicationReferenceGetter struct {
+	cluster *unikornv1.KubernetesCluster
+}
+
+func newApplicationReferenceGetter(cluster *unikornv1.KubernetesCluster) *ApplicationReferenceGetter {
+	return &ApplicationReferenceGetter{
+		cluster: cluster,
+	}
+}
+
+func (a *ApplicationReferenceGetter) getApplication(ctx context.Context, name string) (*unikornv1.ApplicationReference, error) {
+	// TODO: we could cache this, it's from a cache anyway, so quite cheap...
+	cli := clientlib.StaticClientFromContext(ctx)
+
+	key := client.ObjectKey{
+		Name: *a.cluster.Spec.ApplicationBundle,
+	}
+
+	bundle := &unikornv1.KubernetesClusterApplicationBundle{}
+
+	if err := cli.Get(ctx, key, bundle); err != nil {
+		return nil, err
+	}
+
+	return bundle.Spec.GetApplication(name)
+}
+
+func (a *ApplicationReferenceGetter) certManager(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "cert-manager")
+}
+
+func (a *ApplicationReferenceGetter) certManagerIssuers(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "cert-manager-issuers")
+}
+
+func (a *ApplicationReferenceGetter) clusterOpenstack(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "cluster-openstack")
+}
+
+func (a *ApplicationReferenceGetter) cilium(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "cilium")
+}
+
+func (a *ApplicationReferenceGetter) openstackCloudProvider(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "openstack-cloud-provider")
+}
+
+func (a *ApplicationReferenceGetter) openstackPluginCinderCSI(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "openstack-plugin-cinder-csi")
+}
+
+func (a *ApplicationReferenceGetter) metricsServer(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "metrics-server")
+}
+
+func (a *ApplicationReferenceGetter) nvidiaGPUOperator(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "nvidia-gpu-operator")
+}
+
+func (a *ApplicationReferenceGetter) clusterAutoscaler(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "cluster-autoscaler")
+}
+
+func (a *ApplicationReferenceGetter) clusterAutoscalerOpenstack(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "cluster-autoscaler-openstack")
+}
+
+func (a *ApplicationReferenceGetter) ingressNginx(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "ingress-nginx")
+}
+
+func (a *ApplicationReferenceGetter) kubernetesDashboard(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "kubernetes-dashboard")
+}
+
+func (a *ApplicationReferenceGetter) longhorn(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "longhorn")
+}
+
+func (a *ApplicationReferenceGetter) prometheus(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	return a.getApplication(ctx, "prometheus")
+}
+
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
 	provisioners.ProvisionerMeta
@@ -98,6 +181,8 @@ func (p *Provisioner) getControlPlane(ctx context.Context) (*unikornv1.ControlPl
 }
 
 func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisioner, error) {
+	apps := newApplicationReferenceGetter(&p.cluster)
+
 	controlPlane, err := p.getControlPlane(ctx)
 	if err != nil {
 		return nil, err
@@ -112,42 +197,42 @@ func (p *Provisioner) getProvisioner(ctx context.Context) (provisioners.Provisio
 
 	remoteCluster := remotecluster.New(clusteropenstack.NewRemoteCluster(&p.cluster), true)
 
-	clusterProvisioner := clusteropenstack.New(controlPlanePrefix).InNamespace(p.cluster.Name)
+	clusterProvisioner := clusteropenstack.New(apps.clusterOpenstack, controlPlanePrefix).InNamespace(p.cluster.Name)
 
 	// These applications are required to get the cluster up and running, they must
 	// tolerate control plane taints, be scheduled onto control plane nodes and allow
 	// scale from zero.
 	bootstrapProvisioner := concurrent.New("cluster bootstrap",
-		cilium.New(),
-		openstackcloudprovider.New(),
+		cilium.New(apps.cilium),
+		openstackcloudprovider.New(apps.openstackCloudProvider),
 	)
 
 	clusterAutoscalerProvisioner := conditional.New("cluster-autoscaler",
 		p.cluster.AutoscalingEnabled,
 		concurrent.New("cluster-autoscaler",
-			clusterautoscaler.New().InNamespace(p.cluster.Name),
-			clusterautoscaleropenstack.New().InNamespace(p.cluster.Name),
+			clusterautoscaler.New(apps.clusterAutoscaler).InNamespace(p.cluster.Name),
+			clusterautoscaleropenstack.New(apps.clusterAutoscalerOpenstack).InNamespace(p.cluster.Name),
 		),
 	)
 
 	certManagerProvisioner := serial.New("cert-manager",
-		certmanager.New(),
-		certmanagerissuers.New(),
+		certmanager.New(apps.certManager),
+		certmanagerissuers.New(apps.certManagerIssuers),
 	)
 
 	addonsProvisioner := serial.New("cluster add-ons",
 		concurrent.New("cluster add-ons wave 1",
-			openstackplugincindercsi.New(),
-			metricsserver.New(),
-			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New()),
-			conditional.New("ingress-nginx", p.cluster.IngressEnabled, ingressnginx.New()),
+			openstackplugincindercsi.New(apps.openstackPluginCinderCSI),
+			metricsserver.New(apps.metricsServer),
+			conditional.New("nvidia-gpu-operator", p.cluster.NvidiaOperatorEnabled, nvidiagpuoperator.New(apps.nvidiaGPUOperator)),
+			conditional.New("ingress-nginx", p.cluster.IngressEnabled, ingressnginx.New(apps.ingressNginx)),
 			conditional.New("cert-manager", p.cluster.CertManagerEnabled, certManagerProvisioner),
-			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New()),
-			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New()),
+			conditional.New("longhorn", p.cluster.FileStorageEnabled, longhorn.New(apps.longhorn)),
+			conditional.New("prometheus", p.cluster.PrometheusEnabled, prometheus.New(apps.prometheus)),
 		),
 		concurrent.New("cluster add-ons wave 2",
 			// TODO: this hack where it needs the remote is pretty ugly.
-			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New()),
+			conditional.New("kubernetes-dashboard", p.cluster.KubernetesDashboardEnabled, kubernetesdashboard.New(apps.kubernetesDashboard)),
 		),
 	)
 

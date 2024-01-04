@@ -57,8 +57,7 @@ spec:
             properties:
               applications:
                 description: Applications is a list of application references for
-                  the bundle. I've left this nullable so we can trigger reconciles
-                  for resources that don't have applications e.g. projects.
+                  the bundle.
                 items:
                   properties:
                     name:

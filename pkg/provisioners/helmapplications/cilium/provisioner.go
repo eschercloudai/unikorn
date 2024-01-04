@@ -24,16 +24,11 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "cilium"
-)
-
 // New returns a new initialized provisioner object.
-func New() *application.Provisioner {
+func New(getApplication application.GetterFunc) *application.Provisioner {
 	provisioner := &Provisioner{}
 
-	return application.New(applicationName).WithGenerator(provisioner).InNamespace("kube-system")
+	return application.New(getApplication).WithGenerator(provisioner).InNamespace("kube-system")
 }
 
 type Provisioner struct{}
@@ -41,7 +36,7 @@ type Provisioner struct{}
 // Ensure the Provisioner interface is implemented.
 var _ application.ValuesGenerator = &Provisioner{}
 
-func (p *Provisioner) Values(ctx context.Context, _ string) (interface{}, error) {
+func (p *Provisioner) Values(ctx context.Context, _ *string) (interface{}, error) {
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 

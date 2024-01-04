@@ -383,7 +383,7 @@ spec:
 apiVersion: unikorn.eschercloud.ai/v1alpha1
 kind: HelmApplication
 metadata:
-  name: kube-prometheus-stack
+  name: prometheus
 spec:
   name: Kubernetes Prometheus Stack
   description: |-

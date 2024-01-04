@@ -44,7 +44,7 @@ const (
 	resourceBundleName = "bundle-x.y.z"
 )
 
-func newControlPlaneResource() unikornv1.ManagableResourceInterface {
+func newControlPlaneResource() *unikornv1.ControlPlane {
 	b := resourceBundleName
 
 	return &unikornv1.ControlPlane{
@@ -60,7 +60,7 @@ func newControlPlaneResource() unikornv1.ManagableResourceInterface {
 	}
 }
 
-func newKubernetesClusterResource() unikornv1.ManagableResourceInterface {
+func newKubernetesClusterResource() *unikornv1.KubernetesCluster {
 	b := resourceBundleName
 
 	return &unikornv1.KubernetesCluster{
@@ -83,12 +83,10 @@ func newControlPlaneResourceLabels() []cd.ResourceIdentifierLabel {
 			Name:  constants.ControlPlaneLabel,
 			Value: "bar",
 		},
-
 		{
 			Name:  constants.KindLabel,
 			Value: constants.KindLabelValueControlPlane,
 		},
-
 		{
 			Name:  constants.ProjectLabel,
 			Value: "foo",
@@ -110,7 +108,6 @@ func newKubernetesClusterResourceLabels() []cd.ResourceIdentifierLabel {
 			Name:  constants.KindLabel,
 			Value: constants.KindLabelValueKubernetesCluster,
 		},
-
 		{
 			Name:  constants.ProjectLabel,
 			Value: "foo",
@@ -198,6 +195,16 @@ func newKubernetesClusterBundle(applications ...*unikornv1.HelmApplication) *uni
 	return bundle
 }
 
+func getApplicationReference(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+	ref := &unikornv1.ApplicationReference{
+		Kind:    util.ToPointer(unikornv1.ApplicationReferenceKindHelm),
+		Name:    util.ToPointer(applicationName),
+		Version: util.ToPointer(version),
+	}
+
+	return ref, nil
+}
+
 // TestApplicationCreateHelm tests that given the requested input the provisioner
 // creates a CD Application, and the fields are populated as expected.
 func TestApplicationCreateHelm(t *testing.T) {
@@ -245,7 +252,7 @@ func TestApplicationCreateHelm(t *testing.T) {
 
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
-	provisioner := application.New(applicationName)
+	provisioner := application.New(getApplicationReference)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
@@ -342,7 +349,7 @@ func TestApplicationCreateHelmExtended(t *testing.T) {
 
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
-	provisioner := application.New(applicationName).WithApplicationName(overrideApplicationName).AllowDegraded()
+	provisioner := application.New(getApplicationReference).WithApplicationName(overrideApplicationName).AllowDegraded()
 	provisioner.OnRemote(r)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
@@ -397,7 +404,7 @@ func TestApplicationCreateGit(t *testing.T) {
 
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(provisioners.ErrYield)
 
-	provisioner := application.New(applicationName)
+	provisioner := application.New(getApplicationReference)
 
 	assert.ErrorIs(t, provisioner.Provision(ctx), provisioners.ErrYield)
 }
@@ -431,7 +438,7 @@ func (m *mutator) ReleaseName(ctx context.Context) string {
 	return "sentinel"
 }
 
-func (m *mutator) Parameters(ctx context.Context, version string) (map[string]string, error) {
+func (m *mutator) Parameters(ctx context.Context, version *string) (map[string]string, error) {
 	p := map[string]string{
 		mutatorParameter: mutatorValue,
 	}
@@ -439,11 +446,11 @@ func (m *mutator) Parameters(ctx context.Context, version string) (map[string]st
 	return p, nil
 }
 
-func (m *mutator) Values(ctx context.Context, version string) (interface{}, error) {
+func (m *mutator) Values(ctx context.Context, version *string) (interface{}, error) {
 	return mutatorValues, nil
 }
 
-func (m *mutator) Customize(version string) ([]cd.HelmApplicationField, error) {
+func (m *mutator) Customize(version *string) ([]cd.HelmApplicationField, error) {
 	differences := []cd.HelmApplicationField{
 		{
 			Group: mutatorIgnoreDifferencesGroup,
@@ -531,7 +538,8 @@ func TestApplicationCreateMutate(t *testing.T) {
 	driver.EXPECT().CreateOrUpdateHelmApplication(ctx, driverAppID, driverApp).Return(nil)
 
 	mutator := &mutator{}
-	provisioner := application.New(applicationName).WithGenerator(mutator).InNamespace(namespace)
+
+	provisioner := application.New(getApplicationReference).WithGenerator(mutator).InNamespace(namespace)
 
 	assert.NoError(t, provisioner.Provision(ctx))
 	assert.True(t, mutator.postProvisionCalled)
@@ -541,6 +549,24 @@ func TestApplicationCreateMutate(t *testing.T) {
 // doesn't exist.
 func TestApplicationDeleteNotFound(t *testing.T) {
 	t.Parallel()
+
+	app := &unikornv1.HelmApplication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: applicationName,
+		},
+		Spec: unikornv1.HelmApplicationSpec{
+			Versions: []unikornv1.HelmApplicationVersion{
+				{
+
+					Repo:    util.ToPointer(repo),
+					Chart:   util.ToPointer(chart),
+					Version: util.ToPointer(version),
+				},
+			},
+		},
+	}
+
+	tc := mustNewTestContext(t, app, newControlPlaneBundle(app))
 
 	c := gomock.NewController(t)
 	defer c.Finish()
@@ -554,12 +580,13 @@ func TestApplicationDeleteNotFound(t *testing.T) {
 	owner := newControlPlaneResource()
 
 	ctx := context.Background()
+	ctx = clientlib.NewContextWithStaticClient(ctx, tc.client)
 	ctx = cd.NewContext(ctx, driver)
 	ctx = application.NewContext(ctx, owner)
 
 	driver.EXPECT().DeleteHelmApplication(ctx, driverAppID, false).Return(provisioners.ErrYield)
 
-	provisioner := application.New(applicationName)
+	provisioner := application.New(getApplicationReference)
 
 	assert.ErrorIs(t, provisioner.Deprovision(ctx), provisioners.ErrYield)
 }

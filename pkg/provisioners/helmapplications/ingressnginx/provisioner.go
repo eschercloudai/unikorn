@@ -20,12 +20,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "ingress-nginx"
-)
-
 // New returns a new initialized provisioner object.
-func New() *application.Provisioner {
-	return application.New(applicationName).InNamespace("nginx-system")
+func New(getApplication application.GetterFunc) *application.Provisioner {
+	return application.New(getApplication).InNamespace("nginx-system")
 }

@@ -603,6 +603,7 @@ type KubernetesClusterApplicationBundle struct {
 	Status            ApplicationBundleStatus `json:"status,omitempty"`
 }
 
+// ApplicationBundleSpec defines the requested resource state.
 type ApplicationBundleSpec struct {
 	// Version is a semantic version of the bundle, must be unique.
 	Version *string `json:"version"`
@@ -614,20 +615,8 @@ type ApplicationBundleSpec struct {
 	// ahead of the deadline, or that a forced upgrade should be triggered.
 	EndOfLife *metav1.Time `json:"endOfLife,omitempty"`
 	// Applications is a list of application references for the bundle.
-	// I've left this nullable so we can trigger reconciles for resources
-	// that don't have applications e.g. projects.
 	Applications []ApplicationNamedReference `json:"applications,omitempty"`
 }
-
-// ApplicationBundleResourceKind defines the custom resource a bundle is associated with.
-type ApplicationBundleResourceKind string
-
-const (
-	// ApplicationBundleResourceKindControlPlane defines this bundle is for control planes.
-	ApplicationBundleResourceKindControlPlane ApplicationBundleResourceKind = "ControlPlane"
-	// ApplicationBundleResourceKindKubernetesCluster defines this bundle is for kubernetes clusters.
-	ApplicationBundleResourceKindKubernetesCluster ApplicationBundleResourceKind = "KubernetesCluster"
-)
 
 type ApplicationNamedReference struct {
 	// Name is the name of the application.  This must match what is encoded into

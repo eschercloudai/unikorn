@@ -20,12 +20,7 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
 )
 
-const (
-	// applicationName is the unique name of the application.
-	applicationName = "cert-manager-issuers"
-)
-
 // New returns a new initialized provisioner object.
-func New() *application.Provisioner {
-	return application.New(applicationName)
+func New(getApplication application.GetterFunc) *application.Provisioner {
+	return application.New(getApplication)
 }

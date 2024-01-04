@@ -34,14 +34,6 @@ type ResourceLabeller interface {
 	ResourceLabels() (labels.Set, error)
 }
 
-// ApplicationBundleGetter is a type, typically a custom resource, that has an attached
-// application bundle.
-// TODO: make this a KindNamer that's attached to the resource remote reference.
-type ApplicationBundleGetter interface {
-	ApplicationBundleKind() ApplicationBundleResourceKind
-	ApplicationBundleName() string
-}
-
 // ReconcilePauser indicates a resource can have its reconciliation paused.
 type ReconcilePauser interface {
 	// Paused indicates a resource is paused and will not do anything.
@@ -68,7 +60,6 @@ type StatusConditionWriter interface {
 type ManagableResourceInterface interface {
 	client.Object
 	ResourceLabeller
-	ApplicationBundleGetter
 	ReconcilePauser
 	StatusConditionReader
 	StatusConditionWriter
