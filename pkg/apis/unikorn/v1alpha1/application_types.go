@@ -169,3 +169,69 @@ type HelmApplicationDependency struct {
 }
 
 type HelmApplicationStatus struct{}
+
+// UserApplicationBundleList defines a list of Helm application sets.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type UserApplicationBundleList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []UserApplicationBundle `json:"items"`
+}
+
+// UserApplicationBundle defines a user defined collection of applications.
+// This functions in much the same way as a package manager e.g. you install
+// "python" and the package manager handles any dependencies and recommended
+// additional packages. For entities like Clusters and ControlPlanes, The
+// ApplicationBundle types are used instead.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Namespaced,categories=unikorn
+// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+type UserApplicationBundle struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              UserApplicationBundleSpec   `json:"spec"`
+	Status            UserApplicationBundleStatus `json:"status,omitempty"`
+}
+
+// UserApplicationBundleSpec defines the requested state of applications on the chosen cluster.
+type UserApplicationBundleSpec struct {
+	// Pause, if true, will inhibit reconciliation.
+	Pause bool `json:"pause,omitempty"`
+	// ClusterName is the cluster name that the application set is for.
+	// You must only define one per-cluster to avoid split brain problems.
+	// The cluster must exist in the same namespace as the UserApplicationBundle.
+	ClusterName *string `json:"clusterName"`
+	// Applications defines the desired set of applications to install.
+	// This does not need to explicitly define prerequisites, a management
+	// engine should perform this for you and indicate the full list of
+	// installed applications both explicit and implied in the status.
+	// +listType=map
+	// +listMapKey=name
+	Applications []ApplicationNamedReference `json:"applications"`
+}
+
+// UserApplicationBundleStatus defines status conditions for the application set and
+// individual applications within it.
+type UserApplicationBundleStatus struct {
+	// Conditions define overall status for the application set.
+	// +listType=map
+	// +listMapKey=type
+	Conditions []Condition `json:"conditions,omitempty"`
+	// Applications defines a list of applications that have been selected
+	// to be installed my the management engine, and their status.
+	// +listType=map
+	// +listMapKey=name
+	Applications []ApplicationStatus `json:"applicationStatuses,omitempty"`
+}
+
+type ApplicationStatus struct {
+	// Name is the application name.
+	Name *string `json:"name"`
+	// Conditions provides per-application status.
+	Conditions []Condition `json:"conditions,omitempty"`
+	// Endpoint is an optional HTTPS endpoint to get access to the application.
+	Endpoint *string `json:"endpoint,omitempty"`
+}

@@ -147,10 +147,10 @@ const (
 )
 
 func newControlPlaneBundle(applications ...*unikornv1.HelmApplication) *unikornv1.ControlPlaneApplicationBundle {
-	apps := make([]unikornv1.ApplicationBundleApplication, 0, len(applications))
+	apps := make([]unikornv1.ApplicationNamedReference, 0, len(applications))
 
 	for _, application := range applications {
-		apps = append(apps, unikornv1.ApplicationBundleApplication{
+		apps = append(apps, unikornv1.ApplicationNamedReference{
 			Name: util.ToPointer(application.Name),
 			Reference: &unikornv1.ApplicationReference{
 				Kind:    util.ToPointer(unikornv1.ApplicationReferenceKindHelm),
@@ -173,10 +173,10 @@ func newControlPlaneBundle(applications ...*unikornv1.HelmApplication) *unikornv
 }
 
 func newKubernetesClusterBundle(applications ...*unikornv1.HelmApplication) *unikornv1.KubernetesClusterApplicationBundle {
-	apps := make([]unikornv1.ApplicationBundleApplication, 0, len(applications))
+	apps := make([]unikornv1.ApplicationNamedReference, 0, len(applications))
 
 	for _, application := range applications {
-		apps = append(apps, unikornv1.ApplicationBundleApplication{
+		apps = append(apps, unikornv1.ApplicationNamedReference{
 			Name: util.ToPointer(application.Name),
 			Reference: &unikornv1.ApplicationReference{
 				Kind:    util.ToPointer(unikornv1.ApplicationReferenceKindHelm),

@@ -616,7 +616,7 @@ type ApplicationBundleSpec struct {
 	// Applications is a list of application references for the bundle.
 	// I've left this nullable so we can trigger reconciles for resources
 	// that don't have applications e.g. projects.
-	Applications []ApplicationBundleApplication `json:"applications,omitempty"`
+	Applications []ApplicationNamedReference `json:"applications,omitempty"`
 }
 
 // ApplicationBundleResourceKind defines the custom resource a bundle is associated with.
@@ -629,7 +629,7 @@ const (
 	ApplicationBundleResourceKindKubernetesCluster ApplicationBundleResourceKind = "KubernetesCluster"
 )
 
-type ApplicationBundleApplication struct {
+type ApplicationNamedReference struct {
 	// Name is the name of the application.  This must match what is encoded into
 	// Unikorn's application management engine.
 	Name *string `json:"name"`

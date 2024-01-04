@@ -367,7 +367,7 @@ func (l KubernetesClusterApplicationBundleList) Upgradable() *KubernetesClusterA
 	return result
 }
 
-func (s ApplicationBundleSpec) GetApplication(name string) *ApplicationBundleApplication {
+func (s ApplicationBundleSpec) GetApplication(name string) *ApplicationNamedReference {
 	for i := range s.Applications {
 		if *s.Applications[i].Name == name {
 			return &s.Applications[i]

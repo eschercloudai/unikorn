@@ -34,6 +34,7 @@ type UnikornV1alpha1Interface interface {
 	KubernetesClustersGetter
 	KubernetesClusterApplicationBundlesGetter
 	ProjectsGetter
+	UserApplicationBundlesGetter
 }
 
 // UnikornV1alpha1Client is used to interact with features provided by the unikorn.eschercloud.ai group.
@@ -63,6 +64,10 @@ func (c *UnikornV1alpha1Client) KubernetesClusterApplicationBundles() Kubernetes
 
 func (c *UnikornV1alpha1Client) Projects() ProjectInterface {
 	return newProjects(c)
+}
+
+func (c *UnikornV1alpha1Client) UserApplicationBundles(namespace string) UserApplicationBundleInterface {
+	return newUserApplicationBundles(c, namespace)
 }
 
 // NewForConfig creates a new UnikornV1alpha1Client for the given config.
