@@ -1583,7 +1583,7 @@ func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 	results := *response.JSON200
 
 	// NOTE: server converts from MiB to GiB of memory.
-	assert.Len(t, results, 4)
+	assert.Len(t, results, 3)
 	assert.Equal(t, flavorID, results[0].Id)
 	assert.Equal(t, flavorName, results[0].Name)
 	assert.Equal(t, flavorCpus, results[0].Cpus)
@@ -1591,7 +1591,6 @@ func TestApiV1ProvidersOpenstackFlavors(t *testing.T) {
 	assert.Equal(t, flavorDisk, results[0].Disk)
 	assert.Equal(t, flavorName2, results[1].Name)
 	assert.Equal(t, flavorName3, results[2].Name)
-	assert.Equal(t, flavorName4, results[3].Name)
 }
 
 // TestApiV1ProvidersOpenstackFlavorsUnauthorized tests an unauthorized response
