@@ -430,12 +430,12 @@ const flavorDisk = 20
 
 const flavorName2 = "strawberry"
 const flavorName3 = "raspberry"
-const flavorName4 = "gooseberry"
 
 // flavorsDetail returns a load of different flavors, we expect these to
 // be sorted by the provider so things with a GPU come first, and then CPU
 // only flavors.  Those buckets are then sorted by the number of GPUs and
-// CPUs respectively, low to high.
+// CPUs respectively, low to high.  Flavors with <1 CPU and <2GiB RAM should
+// not be returned.
 // NOTE: Extra specs are available in microversion 2.61 onward.
 func flavorsDetail() []byte {
 	return []byte(fmt.Sprintf(`{
@@ -459,11 +459,26 @@ func flavorsDetail() []byte {
 		},
 		{
 			"id": "2b037c3a-24c5-49b3-820a-c72c232d26a0",
-			"name": "%s",
+			"name": "filtered1",
 			"vcpus": 1,
 			"ram": 4096,
 			"disk": 20
 		},
+		{
+                        "id": "2b037c3a-24c5-49b3-820a-c72c232d26a0",
+                        "name": "filtered2",
+                        "vcpus": 2,
+                        "ram": 512,
+                        "disk": 20
+                },
+		{
+                        "id": "2b037c3a-24c5-49b3-820a-c72c232d26a0",
+                        "name": "filtered3",
+                        "vcpus": 2,
+                        "ram": 4096,
+                        "disk": 20,
+			"swap": 1024
+                },
 		{
 			"id": "d7f75b0f-888c-4fed-a807-2cbbee7d5afe",
 			"name": "g.baremetal",
@@ -486,7 +501,7 @@ func flavorsDetail() []byte {
 			}
 		}
 	]
-}`, flavorName4, flavorName2, flavorName3, flavorID, flavorName, flavorCpus, flavorMemory, flavorDisk))
+}`, flavorName3, flavorName2, flavorID, flavorName, flavorCpus, flavorMemory, flavorDisk))
 }
 
 func RegisterComputeV2FlavorsDetail(tc *TestContext) {

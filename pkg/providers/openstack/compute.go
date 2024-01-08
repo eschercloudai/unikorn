@@ -225,6 +225,21 @@ func (c *ComputeClient) Flavors(ctx context.Context) ([]Flavor, error) {
 	}
 
 	flavors = slices.DeleteFunc(flavors, func(flavor Flavor) bool {
+		// Kubeadm requires 2 VCPU, 2 "GB" of RAM (I'll pretend it's GiB) and no swap:
+		// https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+		if flavor.VCPUs < 2 {
+			return true
+		}
+
+		// In MB...
+		if flavor.RAM < 2048 {
+			return true
+		}
+
+		if flavor.Swap != 0 {
+			return true
+		}
+
 		for _, exclude := range c.options.flavorsExclusions {
 			if _, ok := flavor.ExtraSpecs[exclude]; ok {
 				return true
