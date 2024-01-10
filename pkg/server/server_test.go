@@ -729,6 +729,32 @@ func TestApiV1ControlPlanesCreateImplicitProject(t *testing.T) {
 	assert.Contains(t, resource.Labels, constants.VersionLabel)
 }
 
+// TestApiV1ControlPlanesNotCreateImplicitProject checks a project is not created when the
+// control plane request is not a create.
+func TestApiV1ControlPlanesNotCreateImplicitProject(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameWithResponse(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
+	assert.NotNil(t, response.JSON404)
+
+	serverErr := *response.JSON404
+
+	assert.Equal(t, serverErr.Error, generated.NotFound)
+
+	var resource unikornv1.Project
+
+	assert.Error(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Name: projectNameFromID(projectID)}, &resource))
+}
+
 // TestApiV1ControlPlanesGet tests a control plane can be retrieved and
 // that its fields are completed as specified by the schema.  This flexes
 // compositing of resources e.g. expansion of application bundles.
@@ -1122,6 +1148,38 @@ func TestApiV1ClustersCreateImplicitControlPlane(t *testing.T) {
 	assert.NoError(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
 	assert.Contains(t, resource.Labels, constants.VersionLabel)
 	assert.Contains(t, resource.Labels, constants.ProjectLabel)
+}
+
+// TestApiV1ClustersNotCreateImplicitControlPlane tests a control plane is not created
+// when the request is not a create.
+func TestApiV1ClustersNotCreateImplicitControlPlane(t *testing.T) {
+	t.Parallel()
+
+	tc, cleanup := MustNewTestContext(t)
+	defer cleanup()
+
+	RegisterIdentityHandlers(tc)
+	RegisterImageV2Images(tc)
+	RegisterComputeV2FlavorsDetail(tc)
+	RegisterComputeV2ServerGroups(tc)
+
+	project := mustCreateProjectFixture(t, tc, projectID)
+	mustCreateControlPlaneApplicationBundleFixture(t, tc)
+
+	unikornClient := MustNewScopedClient(t, tc)
+
+	response, err := unikornClient.GetApiV1ControlplanesControlPlaneNameClustersClusterNameWithResponse(context.TODO(), "foo", "foo")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, response.HTTPResponse.StatusCode)
+	assert.NotNil(t, response.JSON404)
+
+	serverErr := *response.JSON404
+
+	assert.Equal(t, generated.NotFound, serverErr.Error)
+
+	var resource unikornv1.ControlPlane
+
+	assert.Error(t, tc.KubernetesClient().Get(context.TODO(), client.ObjectKey{Namespace: project.Status.Namespace, Name: "foo"}, &resource))
 }
 
 // TestApiV1ClustersGet tests a cluster can be referenced by name.

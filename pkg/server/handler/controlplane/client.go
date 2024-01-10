@@ -123,7 +123,7 @@ func (c *Client) provisionDefaultControlPlane(ctx context.Context, name string) 
 		return ErrApplicationBundle
 	}
 
-	// Metadata should be called by descendents of the control
+	// GetMetadata should be called by descendents of the control
 	// plane e.g. clusters. Rather than delegate creation to each
 	// and every client implicitly create it.
 	defaultControlPlane := &generated.ControlPlane{
@@ -139,9 +139,30 @@ func (c *Client) provisionDefaultControlPlane(ctx context.Context, name string) 
 	return nil
 }
 
-// Metadata retrieves the control plane metadata.
-func (c *Client) Metadata(ctx context.Context, name string) (*Meta, error) {
-	project, err := project.NewClient(c.client).Metadata(ctx)
+// GetMetadata retrieves the control plane metadata.
+func (c *Client) GetMetadata(ctx context.Context, name string) (*Meta, error) {
+	project, err := project.NewClient(c.client).GetMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := c.get(ctx, project.Namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := &Meta{
+		Project:   project,
+		Name:      name,
+		Namespace: result.Status.Namespace,
+		Deleting:  result.DeletionTimestamp != nil,
+	}
+
+	return metadata, nil
+}
+
+func (c *Client) GetOrCreateMetadata(ctx context.Context, name string) (*Meta, error) {
+	project, err := project.NewClient(c.client).GetMetadata(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +265,7 @@ func (c *Client) convertList(ctx context.Context, in *unikornv1.ControlPlaneList
 
 // List returns all control planes.
 func (c *Client) List(ctx context.Context) ([]*generated.ControlPlane, error) {
-	project, err := project.NewClient(c.client).Metadata(ctx)
+	project, err := project.NewClient(c.client).GetMetadata(ctx)
 	if err != nil {
 		// If the project hasn't been created, then this will 404, which is
 		// kinda confusing, as the project isn't in the path, so return an empty
@@ -289,7 +310,7 @@ func (c *Client) get(ctx context.Context, namespace, name string) (*unikornv1.Co
 
 // Get returns the control plane.
 func (c *Client) Get(ctx context.Context, name generated.ControlPlaneNameParameter) (*generated.ControlPlane, error) {
-	project, err := project.NewClient(c.client).Metadata(ctx)
+	project, err := project.NewClient(c.client).GetMetadata(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +351,7 @@ func createControlPlane(project *project.Meta, request *generated.ControlPlane) 
 
 // Create creates a control plane.
 func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) error {
-	project, err := project.NewClient(c.client).Metadata(ctx)
+	project, err := project.NewClient(c.client).GetOrCreateMetadata(ctx)
 	if err != nil {
 		return err
 	}
@@ -355,7 +376,7 @@ func (c *Client) Create(ctx context.Context, request *generated.ControlPlane) er
 
 // Delete deletes the control plane.
 func (c *Client) Delete(ctx context.Context, name generated.ControlPlaneNameParameter) error {
-	project, err := project.NewClient(c.client).Metadata(ctx)
+	project, err := project.NewClient(c.client).GetMetadata(ctx)
 	if err != nil {
 		return err
 	}
@@ -384,7 +405,7 @@ func (c *Client) Delete(ctx context.Context, name generated.ControlPlaneNamePara
 
 // Update implements read/modify/write for the control plane.
 func (c *Client) Update(ctx context.Context, name generated.ControlPlaneNameParameter, request *generated.ControlPlane) error {
-	project, err := project.NewClient(c.client).Metadata(ctx)
+	project, err := project.NewClient(c.client).GetMetadata(ctx)
 	if err != nil {
 		return err
 	}

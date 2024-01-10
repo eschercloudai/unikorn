@@ -54,6 +54,7 @@ spec:
           metadata:
             type: object
           spec:
+            description: ApplicationBundleSpec defines the requested resource state.
             properties:
               applications:
                 description: Applications is a list of application references for
