@@ -67,7 +67,7 @@ func NewClient(client client.Client, request *http.Request, authenticator *autho
 
 // List returns all clusters owned by the implicit control plane.
 func (c *Client) List(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter) ([]*generated.KubernetesCluster, error) {
-	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
+	controlPlane, err := controlplane.NewClient(c.client).GetMetadata(ctx, controlPlaneName)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (c *Client) get(ctx context.Context, namespace, name string) (*unikornv1.Ku
 
 // Get returns the cluster.
 func (c *Client) Get(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, name generated.ClusterNameParameter) (*generated.KubernetesCluster, error) {
-	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
+	controlPlane, err := controlplane.NewClient(c.client).GetMetadata(ctx, controlPlaneName)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (c *Client) Get(ctx context.Context, controlPlaneName generated.ControlPlan
 
 // GetKubeconfig returns the kubernetes configuation associated with a cluster.
 func (c *Client) GetKubeconfig(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, name generated.ClusterNameParameter) ([]byte, error) {
-	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
+	controlPlane, err := controlplane.NewClient(c.client).GetMetadata(ctx, controlPlaneName)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +245,7 @@ func (c *Client) createServerGroup(controlPlane *controlplane.Meta, name, kind s
 
 // Create creates the implicit cluster indentified by the JTW claims.
 func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, options *generated.KubernetesCluster) error {
-	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
+	controlPlane, err := controlplane.NewClient(c.client).GetOrCreateMetadata(ctx, controlPlaneName)
 	if err != nil {
 		return err
 	}
@@ -290,7 +290,7 @@ func (c *Client) Create(ctx context.Context, controlPlaneName generated.ControlP
 
 // Delete deletes the implicit cluster indentified by the JTW claims.
 func (c *Client) Delete(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, name generated.ClusterNameParameter) error {
-	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
+	controlPlane, err := controlplane.NewClient(c.client).GetMetadata(ctx, controlPlaneName)
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func (c *Client) Delete(ctx context.Context, controlPlaneName generated.ControlP
 
 // Update implements read/modify/write for the cluster.
 func (c *Client) Update(ctx context.Context, controlPlaneName generated.ControlPlaneNameParameter, name generated.ClusterNameParameter, request *generated.KubernetesCluster) error {
-	controlPlane, err := controlplane.NewClient(c.client).Metadata(ctx, controlPlaneName)
+	controlPlane, err := controlplane.NewClient(c.client).GetMetadata(ctx, controlPlaneName)
 	if err != nil {
 		return err
 	}

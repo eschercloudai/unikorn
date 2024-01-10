@@ -91,10 +91,30 @@ func active(p *unikornv1.Project) error {
 	return nil
 }
 
-// Metadata retrieves the project metadata.
+// GetMetadata retrieves the project metadata.
 // Clients should consult at least the Active status before doing anything
 // with the project.
-func (c *Client) Metadata(ctx context.Context) (*Meta, error) {
+func (c *Client) GetMetadata(ctx context.Context) (*Meta, error) {
+	name, err := NameFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := c.get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := &Meta{
+		Name:      name,
+		Namespace: result.Status.Namespace,
+		Deleting:  result.DeletionTimestamp != nil,
+	}
+
+	return metadata, nil
+}
+
+func (c *Client) GetOrCreateMetadata(ctx context.Context) (*Meta, error) {
 	name, err := NameFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -108,9 +128,9 @@ func (c *Client) Metadata(ctx context.Context) (*Meta, error) {
 
 		log := log.FromContext(ctx)
 
-		log.Info("creating implicit project", "name", name)
+		log.Info("creating implicit project")
 
-		// Metadata should be called by descendents of the project
+		// GetMetadata should be called by descendents of the project
 		// e.g. control planes, and by transitive closure, clusters.
 		// Rather than delegate creation to each and every client,
 		// implicitly create it.
