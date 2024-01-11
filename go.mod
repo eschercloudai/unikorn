@@ -1,6 +1,6 @@
 module github.com/eschercloudai/unikorn
 
-go 1.21
+go 1.21.1
 
 require (
 	github.com/coreos/go-oidc/v3 v3.9.0
@@ -31,7 +31,7 @@ require (
 	k8s.io/apimachinery v0.29.0
 	k8s.io/cli-runtime v0.29.0
 	k8s.io/client-go v0.29.0
-	k8s.io/klog/v2 v2.110.1
+	k8s.io/klog/v2 v2.120.0
 	k8s.io/kubectl v0.29.0
 	sigs.k8s.io/controller-runtime v0.16.3
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1
@@ -59,6 +59,7 @@ require (
 	github.com/chenzhuoyu/iasm v0.9.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
+	github.com/eschercloudai/unikorn-core v0.0.0-20240115102218-1a1bc2424a65 // indirect
 	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.7.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect

@@ -17,7 +17,7 @@ limitations under the License.
 package certmanager
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/application"
 )
 
 const (

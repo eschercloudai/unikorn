@@ -17,7 +17,7 @@ limitations under the License.
 package ingressnginx
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/application"
 )
 
 // New returns a new initialized provisioner object.

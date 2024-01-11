@@ -36,10 +36,6 @@ func (c *FakeUnikornV1alpha1) ControlPlaneApplicationBundles() v1alpha1.ControlP
 	return &FakeControlPlaneApplicationBundles{c}
 }
 
-func (c *FakeUnikornV1alpha1) HelmApplications() v1alpha1.HelmApplicationInterface {
-	return &FakeHelmApplications{c}
-}
-
 func (c *FakeUnikornV1alpha1) KubernetesClusters(namespace string) v1alpha1.KubernetesClusterInterface {
 	return &FakeKubernetesClusters{c, namespace}
 }
@@ -50,10 +46,6 @@ func (c *FakeUnikornV1alpha1) KubernetesClusterApplicationBundles() v1alpha1.Kub
 
 func (c *FakeUnikornV1alpha1) Projects() v1alpha1.ProjectInterface {
 	return &FakeProjects{c}
-}
-
-func (c *FakeUnikornV1alpha1) UserApplicationBundles(namespace string) v1alpha1.UserApplicationBundleInterface {
-	return &FakeUserApplicationBundles{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

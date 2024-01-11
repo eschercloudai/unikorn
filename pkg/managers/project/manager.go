@@ -17,10 +17,14 @@ limitations under the License.
 package project
 
 import (
+	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/managers/common"
-	"github.com/eschercloudai/unikorn/pkg/managers/options"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/managers/project"
+
+	coreclient "github.com/eschercloudai/unikorn-core/pkg/client"
+	"github.com/eschercloudai/unikorn-core/pkg/constants"
+	coremanager "github.com/eschercloudai/unikorn-core/pkg/manager"
+	"github.com/eschercloudai/unikorn-core/pkg/manager/options"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -34,11 +38,16 @@ import (
 // Factory provides methods that can build a type specific controller.
 type Factory struct{}
 
-var _ common.ControllerFactory = &Factory{}
+var _ coremanager.ControllerFactory = &Factory{}
+
+// Metadata returns the application, version and revision.
+func (*Factory) Metadata() (string, string, string) {
+	return constants.Application, constants.Version, constants.Revision
+}
 
 // Reconciler returns a new reconciler instance.
 func (*Factory) Reconciler(options *options.Options, manager manager.Manager) reconcile.Reconciler {
-	return common.NewReconciler(options, manager.GetClient(), project.New)
+	return coremanager.NewReconciler(options, manager.GetClient(), project.New)
 }
 
 // RegisterWatches adds any watches that would trigger a reconcile.
@@ -55,4 +64,12 @@ func (*Factory) RegisterWatches(manager manager.Manager, controller controller.C
 // and potential fail.
 func (*Factory) Upgrade(_ client.Client) error {
 	return nil
+}
+
+// Schemes allows controllers to add types to the client beyond
+// the defaults defined in this repository.
+func (*Factory) Schemes() []coreclient.SchemeAdder {
+	return []coreclient.SchemeAdder{
+		unikornscheme.AddToScheme,
+	}
 }

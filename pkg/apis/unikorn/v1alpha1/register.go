@@ -45,10 +45,6 @@ const (
 	KubernetesClusterKind = "KubernetesCluster"
 	// KubernetesClusterResource is the API endpoint for a cluster resource.
 	KubernetesClusterResource = "kubernetesclusters"
-	// HelmApplicationKind is the API kind for helm application descriptors.
-	HelmApplicationKind = "HelmApplication"
-	// HelmApplicationResource is the API endpoint for helm application descriptors.
-	HelmApplicationResource = "helmapplications"
 	// ControlPlaneApplicationBundleKind is the API kind for a bundle of applications.
 	ControlPlaneApplicationBundleKind = "ControlPlaneApplicationBundle"
 	// ControlPlaneApplicationBundleResource is the API endpoint for bundles of applications.
@@ -57,10 +53,6 @@ const (
 	KubernetesClusterApplicationBundleKind = "KubernetesClusterApplicationBundle"
 	// KubernetesClusterApplicationBundleResource is the API endpoint for bundles of applications.
 	KubernetesClusterApplicationBundleResource = "kubernetesclusterapplicationbundles"
-	// UserApplicationBundleKind is the API kind for user application bundles.
-	UserApplicationBundleKind = "UserApplicationBundle"
-	// UserApplicationBundleResource is the API endpoint for user application bundles.
-	UserApplicationBundleResource = "userapplicationbundles"
 )
 
 var (
@@ -82,10 +74,8 @@ func init() {
 	SchemeBuilder.Register(&Project{}, &ProjectList{})
 	SchemeBuilder.Register(&ControlPlane{}, &ControlPlaneList{})
 	SchemeBuilder.Register(&KubernetesCluster{}, &KubernetesClusterList{})
-	SchemeBuilder.Register(&HelmApplication{}, &HelmApplicationList{})
 	SchemeBuilder.Register(&ControlPlaneApplicationBundle{}, &ControlPlaneApplicationBundleList{})
 	SchemeBuilder.Register(&KubernetesClusterApplicationBundle{}, &KubernetesClusterApplicationBundleList{})
-	SchemeBuilder.Register(&UserApplicationBundle{}, &UserApplicationBundleList{})
 }
 
 // Resource maps a resource type to a group resource.

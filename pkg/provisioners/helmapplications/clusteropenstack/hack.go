@@ -22,9 +22,10 @@ import (
 	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
-	clientlib "github.com/eschercloudai/unikorn/pkg/client"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+
+	"github.com/eschercloudai/unikorn-core/pkg/cd"
+	coreclient "github.com/eschercloudai/unikorn-core/pkg/client"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/application"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -220,7 +221,7 @@ func (p *Provisioner) deleteOrphanedMachineDeployments(ctx context.Context) erro
 	//nolint:forcetypeassert
 	cluster := application.FromContext(ctx).(*unikornv1.KubernetesCluster)
 
-	client := clientlib.DynamicClientFromContext(ctx)
+	client := coreclient.DynamicClientFromContext(ctx)
 
 	deployments, err := p.getMachineDeployments(ctx, client)
 	if err != nil {

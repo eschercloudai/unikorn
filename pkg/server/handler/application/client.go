@@ -21,9 +21,10 @@ import (
 	"slices"
 	"strings"
 
-	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
+
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,7 +42,7 @@ func NewClient(client client.Client) *Client {
 	}
 }
 
-func convert(in *unikornv1.HelmApplication) *generated.Application {
+func convert(in *coreunikornv1.HelmApplication) *generated.Application {
 	versions := make(generated.ApplicationVersions, 0, len(in.Spec.Versions))
 
 	for _, version := range in.Spec.Versions {
@@ -90,7 +91,7 @@ func convert(in *unikornv1.HelmApplication) *generated.Application {
 	return out
 }
 
-func convertList(in []unikornv1.HelmApplication) []*generated.Application {
+func convertList(in []coreunikornv1.HelmApplication) []*generated.Application {
 	out := make([]*generated.Application, len(in))
 
 	for i := range in {
@@ -101,7 +102,7 @@ func convertList(in []unikornv1.HelmApplication) []*generated.Application {
 }
 
 func (c *Client) List(ctx context.Context) ([]*generated.Application, error) {
-	result := &unikornv1.HelmApplicationList{}
+	result := &coreunikornv1.HelmApplicationList{}
 
 	if err := c.client.List(ctx, result); err != nil {
 		return nil, errors.OAuth2ServerError("failed to list applications").WithError(err)
@@ -109,7 +110,7 @@ func (c *Client) List(ctx context.Context) ([]*generated.Application, error) {
 
 	exported := result.Exported()
 
-	slices.SortStableFunc(exported.Items, unikornv1.CompareHelmApplication)
+	slices.SortStableFunc(exported.Items, coreunikornv1.CompareHelmApplication)
 
 	return convertList(exported.Items), nil
 }

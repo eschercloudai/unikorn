@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/managers/common"
 	"github.com/eschercloudai/unikorn/pkg/managers/controlplane"
+
+	"github.com/eschercloudai/unikorn-core/pkg/manager"
 )
 
 func main() {
-	common.Run(&controlplane.Factory{})
+	manager.Run(&controlplane.Factory{})
 }

@@ -3,6 +3,7 @@ VERSION = 0.0.0
 
 # Base go module name.
 MODULE := $(shell cat go.mod | grep -m1 module | awk '{print $$2}')
+CORE_MODULE := github.com/eschercloudai/unikorn-core
 
 # Git revision.
 REVISION := $(shell git rev-parse HEAD)
@@ -71,7 +72,7 @@ GOPATH := $(shell go env GOPATH)
 GOBIN := $(if $(shell go env GOBIN),$(shell go env GOBIN),$(GOPATH)/bin)
 
 # Common linker flags.
-FLAGS=-trimpath -ldflags '-X $(MODULE)/pkg/constants.Version=$(VERSION) -X $(MODULE)/pkg/constants.Revision=$(REVISION)'
+FLAGS=-trimpath -ldflags '-X $(CORE_MODULE)/pkg/constants.Version=$(VERSION) -X $(CORE_MODULE)/pkg/constants.Revision=$(REVISION)'
 
 # Defines the linter version.
 LINT_VERSION=v1.54.2
@@ -92,7 +93,7 @@ MOCKGEN_VERSION=v0.3.0
 GENAPIBASE = github.com/eschercloudai/unikorn/pkg/apis
 
 # This is the list of APIs to generate clients for.
-GENAPIS = $(GENAPIBASE)/unikorn/v1alpha1,$(GENAPIBASE)/argoproj/v1alpha1
+GENAPIS = $(GENAPIBASE)/unikorn/v1alpha1
 
 # These are generic arguments that need to be passed to client generation.
 GENARGS = --go-header-file hack/boilerplate.go.txt --output-base ../../..
@@ -211,10 +212,10 @@ validate: $(SRVGENDIR)
 # Validate the docs can be generated without fail.
 .PHONY: validate-docs
 validate-docs: $(SRVGENDIR)
-	go run ./hack/docs --dry-run
+	go run github.com/eschercloudai/unikorn-core/hack/docs --dry-run
 
 # Perform license checking.
 # This must pass or you will be denied by CI.
 .PHONY: license
 license:
-	go run ./hack/check_license
+	go run github.com/eschercloudai/unikorn-core/hack/check_license
