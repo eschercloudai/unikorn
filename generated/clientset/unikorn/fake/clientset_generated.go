@@ -20,8 +20,6 @@ package fake
 
 import (
 	clientset "github.com/eschercloudai/unikorn/generated/clientset/unikorn"
-	argoprojv1alpha1 "github.com/eschercloudai/unikorn/generated/clientset/unikorn/typed/argoproj/v1alpha1"
-	fakeargoprojv1alpha1 "github.com/eschercloudai/unikorn/generated/clientset/unikorn/typed/argoproj/v1alpha1/fake"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/generated/clientset/unikorn/typed/unikorn/v1alpha1"
 	fakeunikornv1alpha1 "github.com/eschercloudai/unikorn/generated/clientset/unikorn/typed/unikorn/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,11 +78,6 @@ var (
 	_ clientset.Interface = &Clientset{}
 	_ testing.FakeClient  = &Clientset{}
 )
-
-// ArgoprojV1alpha1 retrieves the ArgoprojV1alpha1Client
-func (c *Clientset) ArgoprojV1alpha1() argoprojv1alpha1.ArgoprojV1alpha1Interface {
-	return &fakeargoprojv1alpha1.FakeArgoprojV1alpha1{Fake: &c.Fake}
-}
 
 // UnikornV1alpha1 retrieves the UnikornV1alpha1Client
 func (c *Clientset) UnikornV1alpha1() unikornv1alpha1.UnikornV1alpha1Interface {

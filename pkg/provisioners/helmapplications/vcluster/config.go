@@ -22,8 +22,8 @@ import (
 	"io"
 	"os"
 
-	clientlib "github.com/eschercloudai/unikorn/pkg/client"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
+	coreclient "github.com/eschercloudai/unikorn-core/pkg/client"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -102,7 +102,7 @@ func (c *ControllerRuntimeClient) GetSecret(ctx context.Context, namespace, name
 	log := log.FromContext(ctx)
 
 	secret := &corev1.Secret{}
-	if err := clientlib.DynamicClientFromContext(ctx).Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, secret); err != nil {
+	if err := coreclient.DynamicClientFromContext(ctx).Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, secret); err != nil {
 		if kerrors.IsNotFound(err) {
 			log.Info("vitual cluster kubeconfig does not exist, yielding")
 

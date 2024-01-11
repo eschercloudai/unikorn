@@ -23,16 +23,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	clientlib "github.com/eschercloudai/unikorn/pkg/client"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanager"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/clusterapi"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/resource"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
+
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+	coreclient "github.com/eschercloudai/unikorn-core/pkg/client"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/concurrent"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/resource"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/serial"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,8 +72,8 @@ func newApplicationReferenceGetter(controlPlane *unikornv1.ControlPlane) *Applic
 	}
 }
 
-func (a *ApplicationReferenceGetter) getApplication(ctx context.Context, name string) (*unikornv1.ApplicationReference, error) {
-	cli := clientlib.StaticClientFromContext(ctx)
+func (a *ApplicationReferenceGetter) getApplication(ctx context.Context, name string) (*coreunikornv1.ApplicationReference, error) {
+	cli := coreclient.StaticClientFromContext(ctx)
 
 	key := client.ObjectKey{
 		Name: *a.controlPlane.Spec.ApplicationBundle,
@@ -86,21 +88,21 @@ func (a *ApplicationReferenceGetter) getApplication(ctx context.Context, name st
 	return bundle.Spec.GetApplication(name)
 }
 
-func (a *ApplicationReferenceGetter) vCluster(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) vCluster(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "vcluster")
 }
 
-func (a *ApplicationReferenceGetter) certManager(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) certManager(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "cert-manager")
 }
 
-func (a *ApplicationReferenceGetter) clusterAPI(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) clusterAPI(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "cluster-api")
 }
 
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
-	provisioners.ProvisionerMeta
+	provisioners.Metadata
 
 	// controlPlane is the control plane CR this deployment relates to
 	controlPlane unikornv1.ControlPlane
@@ -114,7 +116,7 @@ func New() provisioners.ManagerProvisioner {
 // Ensure the ManagerProvisioner interface is implemented.
 var _ provisioners.ManagerProvisioner = &Provisioner{}
 
-func (p *Provisioner) Object() unikornv1.ManagableResourceInterface {
+func (p *Provisioner) Object() coreunikornv1.ManagableResourceInterface {
 	return &p.controlPlane
 }
 
@@ -156,7 +158,7 @@ func (p *Provisioner) provisionNamespace(ctx context.Context) (*corev1.Namespace
 
 // deprovisionClusters removes any kubernetes clusters, and frees up OpenStack resources.
 func (p *Provisioner) deprovisionClusters(ctx context.Context, namespace string) error {
-	c := clientlib.StaticClientFromContext(ctx)
+	c := coreclient.StaticClientFromContext(ctx)
 
 	clusters := &unikornv1.KubernetesClusterList{}
 	if err := c.List(ctx, clusters, &client.ListOptions{Namespace: namespace}); err != nil {

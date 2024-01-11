@@ -25,9 +25,11 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/eschercloudai/unikorn/pkg/constants"
+	unikornscheme "github.com/eschercloudai/unikorn/generated/clientset/unikorn/scheme"
 	"github.com/eschercloudai/unikorn/pkg/monitor"
-	"github.com/eschercloudai/unikorn/pkg/util/client"
+
+	coreclient "github.com/eschercloudai/unikorn-core/pkg/client"
+	"github.com/eschercloudai/unikorn-core/pkg/constants"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -68,7 +70,7 @@ func main() {
 		cancel()
 	}()
 
-	client, err := client.New(ctx)
+	client, err := coreclient.New(ctx, unikornscheme.AddToScheme)
 	if err != nil {
 		logger.Error(err, "failed to create client")
 

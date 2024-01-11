@@ -23,15 +23,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/eschercloudai/unikorn/pkg/constants"
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn-core/pkg/constants"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
-	// ErrStatusConditionLookup is raised when a condition is not found in
+	// ErrStatuscoreunikornv1.ConditionLookup is raised when a condition is not found in
 	// the resource status.
 	ErrStatusConditionLookup = errors.New("status condition not found")
 
@@ -71,57 +71,17 @@ func (c *KubernetesCluster) Paused() bool {
 	return c.Spec.Pause
 }
 
-// getCondition is a generic condition lookup function.
-func getCondition(conditions []Condition, t ConditionType) (*Condition, error) {
-	for i, condition := range conditions {
-		if condition.Type == t {
-			return &conditions[i], nil
-		}
-	}
-
-	return nil, ErrStatusConditionLookup
-}
-
-// updateCondition either adds or updates a condition in the control plane
-// status. If the condition, status and message match an existing condition
-// the update is ignored.
-func updateCondition(conditions *[]Condition, t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
-	condition := Condition{
-		Type:               t,
-		Status:             status,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-
-	existingPtr, err := getCondition(*conditions, t)
-	if err != nil {
-		*conditions = append(*conditions, condition)
-
-		return
-	}
-
-	// Do a shallow copy and set the same time, then do a shallow equality to
-	// see if we need an update.
-	existing := *existingPtr
-	existing.LastTransitionTime = condition.LastTransitionTime
-
-	if existing != condition {
-		*existingPtr = condition
-	}
-}
-
 // StatusConditionRead scans the status conditions for an existing condition whose type
 // matches.
-func (c *Project) StatusConditionRead(t ConditionType) (*Condition, error) {
-	return getCondition(c.Status.Conditions, t)
+func (c *Project) StatusConditionRead(t coreunikornv1.ConditionType) (*coreunikornv1.Condition, error) {
+	return coreunikornv1.GetCondition(c.Status.Conditions, t)
 }
 
 // StatusConditionWrite either adds or updates a condition in the control plane status.
 // If the condition, status and message match an existing condition the update is
 // ignored.
-func (c *Project) StatusConditionWrite(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
-	updateCondition(&c.Status.Conditions, t, status, reason, message)
+func (c *Project) StatusConditionWrite(t coreunikornv1.ConditionType, status corev1.ConditionStatus, reason coreunikornv1.ConditionReason, message string) {
+	coreunikornv1.UpdateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
@@ -137,15 +97,15 @@ func (c *Project) ResourceLabels() (labels.Set, error) {
 
 // StatusConditionRead scans the status conditions for an existing condition whose type
 // matches.
-func (c *ControlPlane) StatusConditionRead(t ConditionType) (*Condition, error) {
-	return getCondition(c.Status.Conditions, t)
+func (c *ControlPlane) StatusConditionRead(t coreunikornv1.ConditionType) (*coreunikornv1.Condition, error) {
+	return coreunikornv1.GetCondition(c.Status.Conditions, t)
 }
 
 // StatusConditionWrite either adds or updates a condition in the control plane status.
 // If the condition, status and message match an existing condition the update is
 // ignored.
-func (c *ControlPlane) StatusConditionWrite(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
-	updateCondition(&c.Status.Conditions, t, status, reason, message)
+func (c *ControlPlane) StatusConditionWrite(t coreunikornv1.ConditionType, status corev1.ConditionStatus, reason coreunikornv1.ConditionReason, message string) {
+	coreunikornv1.UpdateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
@@ -175,15 +135,15 @@ func (c ControlPlane) UpgradeSpec() *ApplicationBundleAutoUpgradeSpec {
 
 // StatusConditionRead scans the status conditions for an existing condition whose type
 // matches.
-func (c *KubernetesCluster) StatusConditionRead(t ConditionType) (*Condition, error) {
-	return getCondition(c.Status.Conditions, t)
+func (c *KubernetesCluster) StatusConditionRead(t coreunikornv1.ConditionType) (*coreunikornv1.Condition, error) {
+	return coreunikornv1.GetCondition(c.Status.Conditions, t)
 }
 
 // StatusConditionWrite either adds or updates a condition in the cluster status.
 // If the condition, status and message match an existing condition the update is
 // ignored.
-func (c *KubernetesCluster) StatusConditionWrite(t ConditionType, status corev1.ConditionStatus, reason ConditionReason, message string) {
-	updateCondition(&c.Status.Conditions, t, status, reason, message)
+func (c *KubernetesCluster) StatusConditionWrite(t coreunikornv1.ConditionType, status corev1.ConditionStatus, reason coreunikornv1.ConditionReason, message string) {
+	coreunikornv1.UpdateCondition(&c.Status.Conditions, t, status, reason, message)
 }
 
 // ResourceLabels generates a set of labels to uniquely identify the resource
@@ -272,23 +232,6 @@ func CompareKubernetesClusterApplicationBundle(a, b KubernetesClusterApplication
 	return strings.Compare(*a.Spec.Version, *b.Spec.Version)
 }
 
-func CompareHelmApplication(a, b HelmApplication) int {
-	return strings.Compare(a.Name, b.Name)
-}
-
-// Exported returns all applications that are exported, and thus end-user installable.
-func (l HelmApplicationList) Exported() HelmApplicationList {
-	result := HelmApplicationList{}
-
-	for i := range l.Items {
-		if l.Items[i].Spec.Exported != nil && *l.Items[i].Spec.Exported {
-			result.Items = append(result.Items, l.Items[i])
-		}
-	}
-
-	return result
-}
-
 // Get retrieves the named bundle.
 func (l ControlPlaneApplicationBundleList) Get(name string) *ControlPlaneApplicationBundle {
 	for i := range l.Items {
@@ -348,7 +291,7 @@ func (l KubernetesClusterApplicationBundleList) Upgradable() *KubernetesClusterA
 	return result
 }
 
-func (s ApplicationBundleSpec) GetApplication(name string) (*ApplicationReference, error) {
+func (s ApplicationBundleSpec) GetApplication(name string) (*coreunikornv1.ApplicationReference, error) {
 	for i := range s.Applications {
 		if *s.Applications[i].Name == name {
 			return s.Applications[i].Reference, nil

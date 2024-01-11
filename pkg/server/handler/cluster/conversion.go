@@ -29,6 +29,9 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/server/handler/common"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/controlplane"
 
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+	coreconstants "github.com/eschercloudai/unikorn-core/pkg/constants"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -170,7 +173,7 @@ func convertStatus(in *unikornv1.KubernetesCluster) *generated.KubernetesResourc
 		out.DeletionTime = &in.DeletionTimestamp.Time
 	}
 
-	condition, err := in.StatusConditionRead(unikornv1.ConditionAvailable)
+	condition, err := in.StatusConditionRead(coreunikornv1.ConditionAvailable)
 	if err == nil {
 		out.Status = string(condition.Reason)
 	}
@@ -486,9 +489,9 @@ func (c *Client) createCluster(controlPlane *controlplane.Meta, options *generat
 			Name:      options.Name,
 			Namespace: controlPlane.Namespace,
 			Labels: map[string]string{
-				constants.VersionLabel:      constants.Version,
-				constants.ProjectLabel:      controlPlane.Project.Name,
-				constants.ControlPlaneLabel: controlPlane.Name,
+				coreconstants.VersionLabel:      coreconstants.Version,
+				coreconstants.ProjectLabel:      controlPlane.Project.Name,
+				coreconstants.ControlPlaneLabel: controlPlane.Name,
 			},
 		},
 		Spec: unikornv1.KubernetesClusterSpec{

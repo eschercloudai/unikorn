@@ -26,9 +26,10 @@ import (
 	ini "gopkg.in/ini.v1"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
+
+	"github.com/eschercloudai/unikorn-core/pkg/constants"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/util"
 
 	"sigs.k8s.io/yaml"
 )

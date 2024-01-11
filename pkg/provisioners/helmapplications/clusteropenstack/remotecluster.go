@@ -22,10 +22,11 @@ import (
 	"fmt"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
-	clientlib "github.com/eschercloudai/unikorn/pkg/client"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
+
+	"github.com/eschercloudai/unikorn-core/pkg/cd"
+	coreclient "github.com/eschercloudai/unikorn-core/pkg/client"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -112,7 +113,7 @@ func (g *RemoteCluster) Config(ctx context.Context) (*clientcmdapi.Config, error
 	}
 
 	// Retry getting the secret until it exists.
-	if err := clientlib.DynamicClientFromContext(ctx).Get(ctx, secretKey, secret); err != nil {
+	if err := coreclient.DynamicClientFromContext(ctx).Get(ctx, secretKey, secret); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("kubernetes cluster kubeconfig does not exist, yielding")
 
