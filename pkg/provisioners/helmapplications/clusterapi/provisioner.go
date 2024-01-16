@@ -17,8 +17,8 @@ limitations under the License.
 package clusterapi
 
 import (
-	"github.com/eschercloudai/unikorn/pkg/cd"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn-core/pkg/cd"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/application"
 )
 
 type Provisioner struct{}

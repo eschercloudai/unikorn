@@ -35,6 +35,7 @@ linters-settings:
     - standard
     - default
     - prefix(github.com/eschercloudai/unikorn)
+    - prefix(github.com/eschercloudai/unikorn-core)
     - prefix(k8s.io)
     - prefix(sigs.k8s.io)
     skip-generated: true

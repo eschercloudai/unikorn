@@ -18,9 +18,10 @@ package main
 
 import (
 	"github.com/eschercloudai/unikorn/pkg/managers/cluster"
-	"github.com/eschercloudai/unikorn/pkg/managers/common"
+
+	"github.com/eschercloudai/unikorn-core/pkg/manager"
 )
 
 func main() {
-	common.Run(&cluster.Factory{})
+	manager.Run(&cluster.Factory{})
 }

@@ -22,13 +22,15 @@ import (
 	"slices"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
 	"github.com/eschercloudai/unikorn/pkg/server/errors"
 	"github.com/eschercloudai/unikorn/pkg/server/generated"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/applicationbundle"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/common"
 	"github.com/eschercloudai/unikorn/pkg/server/handler/project"
-	"github.com/eschercloudai/unikorn/pkg/util/retry"
+
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn-core/pkg/constants"
+	"github.com/eschercloudai/unikorn-core/pkg/util/retry"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -240,7 +242,7 @@ func (c *Client) convert(ctx context.Context, in *unikornv1.ControlPlane) (*gene
 		out.Status.DeletionTime = &in.DeletionTimestamp.Time
 	}
 
-	if condition, err := in.StatusConditionRead(unikornv1.ConditionAvailable); err == nil {
+	if condition, err := in.StatusConditionRead(coreunikornv1.ConditionAvailable); err == nil {
 		out.Status.Status = string(condition.Reason)
 	}
 

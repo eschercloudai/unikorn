@@ -21,7 +21,8 @@ import (
 	"errors"
 	"net"
 
-	corev1 "k8s.io/api/core/v1"
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -150,62 +151,6 @@ func (IPv4Prefix) OpenAPISchemaFormat() string {
 	return ""
 }
 
-// +kubebuilder:validation:Enum=Available
-type ConditionType string
-
-const (
-	// ConditionAvailable if not defined or false means that the
-	// resource is not ready, or is known to be in a bad state and should
-	// not be used.  When true, while not guaranteed to be fully functional.
-	ConditionAvailable ConditionType = "Available"
-)
-
-// ConditionReason defines the possible reasons of a resource
-// condition.  These are generic and may be used by any condition.
-// +kubebuilder:validation:Enum=Provisioning;Provisioned;Cancelled;Errored;Deprovisioning;Deprovisioned
-type ConditionReason string
-
-const (
-	// ConditionReasonProvisioning is used for the Available condition
-	// to indicate that a resource has been seen, it has no pre-existing condition
-	// and we assume it's being provisioned for the first time.
-	ConditionReasonProvisioning ConditionReason = "Provisioning"
-	// ConditionReasonProvisioned is used for the Available condition
-	// to mean that the resource is ready to be used.
-	ConditionReasonProvisioned ConditionReason = "Provisioned"
-	// ConditionReasonCancelled is used by a condition to
-	// indicate the controller was cancelled e.g. via a container shutdown.
-	ConditionReasonCancelled ConditionReason = "Cancelled"
-	// ConditionReasonErrored is used by a condition to
-	// indicate an unexpected error occurred e.g. Kubernetes API transient error.
-	// If we see these, consider formulating a fix, for example a retry loop.
-	ConditionReasonErrored ConditionReason = "Errored"
-	// ConditionReasonDeprovisioning is used by a condition to
-	// indicate the controller has picked up a deprovision event.
-	ConditionReasonDeprovisioning ConditionReason = "Deprovisioning"
-	// ConditionReasonDeprovisioned is used by a condition to
-	// indicate we have finished deprovisioning and the Kubernetes
-	// garbage collector can remove the resource.
-	ConditionReasonDeprovisioned ConditionReason = "Deprovisioned"
-)
-
-// Condition is a generic condition type for use across all resource types.
-// It's generic so that the underlying controller-manager functionality can
-// be shared across all resources.
-type Condition struct {
-	// Type is the type of the condition.
-	Type ConditionType `json:"type"`
-	// Status is the status of the condition.
-	// Can be True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-	// Unique, one-word, CamelCase reason for the condition's last transition.
-	Reason ConditionReason `json:"reason"`
-	// Human-readable message indicating details about last transition.
-	Message string `json:"message"`
-}
-
 // ProjectList is a typed list of projects.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ProjectList struct {
@@ -243,7 +188,7 @@ type ProjectStatus struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// Current service state of a project.
-	Conditions []Condition `json:"conditions,omitempty"`
+	Conditions []coreunikornv1.Condition `json:"conditions,omitempty"`
 }
 
 // ControlPlaneList is a typed list of control planes.
@@ -297,7 +242,7 @@ type ControlPlaneStatus struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// Current service state of a control plane.
-	Conditions []Condition `json:"conditions,omitempty"`
+	Conditions []coreunikornv1.Condition `json:"conditions,omitempty"`
 }
 
 // MachineGeneric contains common things across all pool types, including
@@ -544,7 +489,7 @@ type KubernetesClusterStatus struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// Current service state of a Kubernetes cluster.
-	Conditions []Condition `json:"conditions,omitempty"`
+	Conditions []coreunikornv1.Condition `json:"conditions,omitempty"`
 }
 
 // ControlPlaneApplicationBundleList defines a list of application bundles.
@@ -623,27 +568,8 @@ type ApplicationNamedReference struct {
 	// Unikorn's application management engine.
 	Name *string `json:"name"`
 	// Reference is a reference to the application definition.
-	Reference *ApplicationReference `json:"reference"`
+	Reference *coreunikornv1.ApplicationReference `json:"reference"`
 }
-
-type ApplicationReference struct {
-	// Kind is the kind of resource we are referencing.
-	// +kubebuilder:validation:Enum=HelmApplication
-	Kind *ApplicationReferenceKind `json:"kind"`
-	// Name is the name of the resource we are referencing.
-	Name *string `json:"name"`
-	// Version is the version of the application within the application type.
-	// TODO: make mandatory.
-	Version *string `json:"version,omitempty"`
-}
-
-// ApplicationReferenceKind defines the application kind we wish to reference.
-type ApplicationReferenceKind string
-
-const (
-	// ApplicationReferenceKindHelm references a helm application.
-	ApplicationReferenceKindHelm ApplicationReferenceKind = "HelmApplication"
-)
 
 type ApplicationBundleStatus struct{}
 

@@ -21,9 +21,11 @@ import (
 	"errors"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/resource"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
+
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/resource"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +37,7 @@ var (
 
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
-	provisioners.ProvisionerMeta
+	provisioners.Metadata
 
 	// project is the Kubernetes project we're provisioning.
 	project unikornv1.Project
@@ -49,7 +51,7 @@ func New() provisioners.ManagerProvisioner {
 // Ensure the ManagerProvisioner interface is implemented.
 var _ provisioners.ManagerProvisioner = &Provisioner{}
 
-func (p *Provisioner) Object() unikornv1.ManagableResourceInterface {
+func (p *Provisioner) Object() coreunikornv1.ManagableResourceInterface {
 	return &p.project
 }
 

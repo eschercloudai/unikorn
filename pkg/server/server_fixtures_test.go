@@ -24,8 +24,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/util"
+
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn-core/pkg/constants"
+	"github.com/eschercloudai/unikorn-core/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,11 +58,11 @@ func mustCreateProjectFixture(t *testing.T, tc *TestContext, projectID string) *
 		},
 		Status: unikornv1.ProjectStatus{
 			Namespace: namespace.Name,
-			Conditions: []unikornv1.Condition{
+			Conditions: []coreunikornv1.Condition{
 				{
-					Type:   unikornv1.ConditionAvailable,
+					Type:   coreunikornv1.ConditionAvailable,
 					Status: corev1.ConditionTrue,
-					Reason: unikornv1.ConditionReasonProvisioned,
+					Reason: coreunikornv1.ConditionReasonProvisioned,
 				},
 			},
 		},
@@ -103,11 +105,11 @@ func mustCreateControlPlaneFixture(t *testing.T, tc *TestContext, namespace, nam
 		},
 		Status: unikornv1.ControlPlaneStatus{
 			Namespace: ns.Name,
-			Conditions: []unikornv1.Condition{
+			Conditions: []coreunikornv1.Condition{
 				{
-					Type:   unikornv1.ConditionAvailable,
+					Type:   coreunikornv1.ConditionAvailable,
 					Status: corev1.ConditionTrue,
-					Reason: unikornv1.ConditionReasonProvisioned,
+					Reason: coreunikornv1.ConditionReasonProvisioned,
 				},
 			},
 		},
@@ -196,11 +198,11 @@ func mustCreateKubernetesClusterFixture(t *testing.T, tc *TestContext, namespace
 			},
 		},
 		Status: unikornv1.KubernetesClusterStatus{
-			Conditions: []unikornv1.Condition{
+			Conditions: []coreunikornv1.Condition{
 				{
-					Type:   unikornv1.ConditionAvailable,
+					Type:   coreunikornv1.ConditionAvailable,
 					Status: corev1.ConditionTrue,
-					Reason: unikornv1.ConditionReasonProvisioned,
+					Reason: coreunikornv1.ConditionReasonProvisioned,
 				},
 			},
 		},
@@ -266,18 +268,18 @@ const (
 func mustCreateHelmApplicationFixture(t *testing.T, tc *TestContext) {
 	t.Helper()
 
-	app := &unikornv1.HelmApplication{
+	app := &coreunikornv1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: applicationName,
 		},
-		Spec: unikornv1.HelmApplicationSpec{
+		Spec: coreunikornv1.HelmApplicationSpec{
 			Name:          util.ToPointer(applicationHumanReadableName),
 			Description:   util.ToPointer(applicationDescription),
 			Documentation: util.ToPointer(applicationDocumentation),
 			License:       util.ToPointer(applicationLicense),
 			Icon:          []byte(applicationIcon),
 			Exported:      util.ToPointer(true),
-			Versions: []unikornv1.HelmApplicationVersion{
+			Versions: []coreunikornv1.HelmApplicationVersion{
 				{
 					Version: util.ToPointer(applicationVersion),
 				},

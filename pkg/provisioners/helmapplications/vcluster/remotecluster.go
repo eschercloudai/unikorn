@@ -19,10 +19,11 @@ package vcluster
 import (
 	"context"
 
-	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	"github.com/eschercloudai/unikorn/pkg/cd"
 	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
+
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+	"github.com/eschercloudai/unikorn-core/pkg/cd"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -33,14 +34,14 @@ type RemoteCluster struct {
 
 	// labeller is used to identify the owner of and uniquely identify
 	// a remote cluster instance.
-	labeller unikornv1.ResourceLabeller
+	labeller coreunikornv1.ResourceLabeller
 }
 
 // Ensure this implements the remotecluster.Generator interface.
 var _ provisioners.RemoteCluster = &RemoteCluster{}
 
 // NewRemoteCluster return a new instance of a remote cluster generator.
-func NewRemoteCluster(namespace string, labeller unikornv1.ResourceLabeller) *RemoteCluster {
+func NewRemoteCluster(namespace string, labeller coreunikornv1.ResourceLabeller) *RemoteCluster {
 	return &RemoteCluster{
 		namespace: namespace,
 		labeller:  labeller,

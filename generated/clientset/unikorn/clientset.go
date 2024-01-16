@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/http"
 
-	argoprojv1alpha1 "github.com/eschercloudai/unikorn/generated/clientset/unikorn/typed/argoproj/v1alpha1"
 	unikornv1alpha1 "github.com/eschercloudai/unikorn/generated/clientset/unikorn/typed/unikorn/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -31,20 +30,13 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	ArgoprojV1alpha1() argoprojv1alpha1.ArgoprojV1alpha1Interface
 	UnikornV1alpha1() unikornv1alpha1.UnikornV1alpha1Interface
 }
 
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	argoprojV1alpha1 *argoprojv1alpha1.ArgoprojV1alpha1Client
-	unikornV1alpha1  *unikornv1alpha1.UnikornV1alpha1Client
-}
-
-// ArgoprojV1alpha1 retrieves the ArgoprojV1alpha1Client
-func (c *Clientset) ArgoprojV1alpha1() argoprojv1alpha1.ArgoprojV1alpha1Interface {
-	return c.argoprojV1alpha1
+	unikornV1alpha1 *unikornv1alpha1.UnikornV1alpha1Client
 }
 
 // UnikornV1alpha1 retrieves the UnikornV1alpha1Client
@@ -96,10 +88,6 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
-	cs.argoprojV1alpha1, err = argoprojv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
 	cs.unikornV1alpha1, err = unikornv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -125,7 +113,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.argoprojV1alpha1 = argoprojv1alpha1.New(c)
 	cs.unikornV1alpha1 = unikornv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)

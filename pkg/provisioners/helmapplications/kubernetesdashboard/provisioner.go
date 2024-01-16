@@ -23,10 +23,10 @@ import (
 	"net"
 	"strings"
 
-	clientlib "github.com/eschercloudai/unikorn/pkg/client"
-	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/application"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/util"
+	coreclient "github.com/eschercloudai/unikorn-core/pkg/client"
+	"github.com/eschercloudai/unikorn-core/pkg/constants"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/application"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/util"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -49,7 +49,7 @@ func New(getApplication application.GetterFunc) *application.Provisioner {
 func (p *Provisioner) remoteIngressIP(ctx context.Context) (net.IP, error) {
 	var services corev1.ServiceList
 
-	if err := clientlib.DynamicClientFromContext(ctx).List(ctx, &services); err != nil {
+	if err := coreclient.DynamicClientFromContext(ctx).List(ctx, &services); err != nil {
 		return nil, err
 	}
 

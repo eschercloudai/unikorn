@@ -20,11 +20,6 @@ import (
 	"context"
 
 	unikornv1 "github.com/eschercloudai/unikorn/pkg/apis/unikorn/v1alpha1"
-	clientlib "github.com/eschercloudai/unikorn/pkg/client"
-	"github.com/eschercloudai/unikorn/pkg/constants"
-	"github.com/eschercloudai/unikorn/pkg/provisioners"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/concurrent"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/conditional"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanager"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/certmanagerissuers"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/cilium"
@@ -40,10 +35,17 @@ import (
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/openstackplugincindercsi"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/prometheus"
 	"github.com/eschercloudai/unikorn/pkg/provisioners/helmapplications/vcluster"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/remotecluster"
-	"github.com/eschercloudai/unikorn/pkg/provisioners/serial"
-	provisionersutil "github.com/eschercloudai/unikorn/pkg/provisioners/util"
-	"github.com/eschercloudai/unikorn/pkg/util"
+
+	coreunikornv1 "github.com/eschercloudai/unikorn-core/pkg/apis/unikorn/v1alpha1"
+	coreclient "github.com/eschercloudai/unikorn-core/pkg/client"
+	"github.com/eschercloudai/unikorn-core/pkg/constants"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/concurrent"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/conditional"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/remotecluster"
+	"github.com/eschercloudai/unikorn-core/pkg/provisioners/serial"
+	provisionersutil "github.com/eschercloudai/unikorn-core/pkg/provisioners/util"
+	"github.com/eschercloudai/unikorn-core/pkg/util"
 
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -60,9 +62,9 @@ func newApplicationReferenceGetter(cluster *unikornv1.KubernetesCluster) *Applic
 	}
 }
 
-func (a *ApplicationReferenceGetter) getApplication(ctx context.Context, name string) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) getApplication(ctx context.Context, name string) (*coreunikornv1.ApplicationReference, error) {
 	// TODO: we could cache this, it's from a cache anyway, so quite cheap...
-	cli := clientlib.StaticClientFromContext(ctx)
+	cli := coreclient.StaticClientFromContext(ctx)
 
 	key := client.ObjectKey{
 		Name: *a.cluster.Spec.ApplicationBundle,
@@ -77,65 +79,65 @@ func (a *ApplicationReferenceGetter) getApplication(ctx context.Context, name st
 	return bundle.Spec.GetApplication(name)
 }
 
-func (a *ApplicationReferenceGetter) certManager(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) certManager(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "cert-manager")
 }
 
-func (a *ApplicationReferenceGetter) certManagerIssuers(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) certManagerIssuers(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "cert-manager-issuers")
 }
 
-func (a *ApplicationReferenceGetter) clusterOpenstack(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) clusterOpenstack(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "cluster-openstack")
 }
 
-func (a *ApplicationReferenceGetter) cilium(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) cilium(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "cilium")
 }
 
-func (a *ApplicationReferenceGetter) openstackCloudProvider(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) openstackCloudProvider(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "openstack-cloud-provider")
 }
 
-func (a *ApplicationReferenceGetter) openstackPluginCinderCSI(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) openstackPluginCinderCSI(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "openstack-plugin-cinder-csi")
 }
 
-func (a *ApplicationReferenceGetter) metricsServer(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) metricsServer(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "metrics-server")
 }
 
-func (a *ApplicationReferenceGetter) nvidiaGPUOperator(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) nvidiaGPUOperator(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "nvidia-gpu-operator")
 }
 
-func (a *ApplicationReferenceGetter) clusterAutoscaler(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) clusterAutoscaler(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "cluster-autoscaler")
 }
 
-func (a *ApplicationReferenceGetter) clusterAutoscalerOpenstack(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) clusterAutoscalerOpenstack(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "cluster-autoscaler-openstack")
 }
 
-func (a *ApplicationReferenceGetter) ingressNginx(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) ingressNginx(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "ingress-nginx")
 }
 
-func (a *ApplicationReferenceGetter) kubernetesDashboard(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) kubernetesDashboard(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "kubernetes-dashboard")
 }
 
-func (a *ApplicationReferenceGetter) longhorn(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) longhorn(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "longhorn")
 }
 
-func (a *ApplicationReferenceGetter) prometheus(ctx context.Context) (*unikornv1.ApplicationReference, error) {
+func (a *ApplicationReferenceGetter) prometheus(ctx context.Context) (*coreunikornv1.ApplicationReference, error) {
 	return a.getApplication(ctx, "prometheus")
 }
 
 // Provisioner encapsulates control plane provisioning.
 type Provisioner struct {
-	provisioners.ProvisionerMeta
+	provisioners.Metadata
 
 	// cluster is the Kubernetes cluster we're provisioning.
 	cluster unikornv1.KubernetesCluster
@@ -149,7 +151,7 @@ func New() provisioners.ManagerProvisioner {
 // Ensure the ManagerProvisioner interface is implemented.
 var _ provisioners.ManagerProvisioner = &Provisioner{}
 
-func (p *Provisioner) Object() unikornv1.ManagableResourceInterface {
+func (p *Provisioner) Object() coreunikornv1.ManagableResourceInterface {
 	return &p.cluster
 }
 
@@ -173,7 +175,7 @@ func (p *Provisioner) getControlPlane(ctx context.Context) (*unikornv1.ControlPl
 		Name:      p.cluster.Labels[constants.ControlPlaneLabel],
 	}
 
-	if err := clientlib.StaticClientFromContext(ctx).Get(ctx, key, &controlPlane); err != nil {
+	if err := coreclient.StaticClientFromContext(ctx).Get(ctx, key, &controlPlane); err != nil {
 		return nil, err
 	}
 
