@@ -1,4 +1,0 @@
-ignore:
-- 'generated'
-- 'pkg/server/generated'
-- '**/zz_generated.deepcopy.go'
