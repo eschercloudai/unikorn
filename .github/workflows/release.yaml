@@ -14,6 +14,8 @@ jobs:
     steps:
     - name: checkout
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
@@ -34,7 +36,11 @@ jobs:
     - name: Build SBOMS
       run: go run ./hack/sbom
     - name: Build Documentation
-      run: sudo apt -y install wbritish && go run ./hack/docs -o docs/server-api.md
+      run: sudo apt -y install wbritish && go run github.com/eschercloudai/unikorn-core/hack/docs -o docs/server-api.md
+    - name: Configure Git
+      run: |
+        git config user.name "$GITHUB_ACTOR"
+        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
     - name: Release Helm Chart
       uses: eschercloudai/unikorn-chart-release-action@v1
       env:
