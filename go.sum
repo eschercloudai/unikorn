@@ -64,6 +64,8 @@ github.com/eschercloudai/unikorn-core v0.0.0-20240116120007-5064c70d58c2 h1:JIk0
 github.com/eschercloudai/unikorn-core v0.0.0-20240116120007-5064c70d58c2/go.mod h1:sSSaF9Zh4JPM2ZN/FZYqAPb2q+SFVdPdqSAs7qP/I18=
 github.com/eschercloudai/unikorn-core v0.1.0 h1:n6CvAp5O4sSnXIvmhRucP+ilqOblVU8LJes0YurRGMg=
 github.com/eschercloudai/unikorn-core v0.1.0/go.mod h1:sSSaF9Zh4JPM2ZN/FZYqAPb2q+SFVdPdqSAs7qP/I18=
+github.com/eschercloudai/unikorn-core v0.1.1 h1:GFwnkFUDTJmzqcgjfdu/wRN4Qv1DtDWxVWUh00wXGo4=
+github.com/eschercloudai/unikorn-core v0.1.1/go.mod h1:sSSaF9Zh4JPM2ZN/FZYqAPb2q+SFVdPdqSAs7qP/I18=
 github.com/evanphx/json-patch v5.7.0+incompatible h1:vgGkfT/9f8zE6tvSCe74nfpAVDQ2tG6yudJd8LBksgI=
 github.com/evanphx/json-patch v5.7.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.7.0 h1:nJqP7uwL84RJInrohHfW0Fx3awjbm8qZeFv0nW9SYGc=

@@ -5,7 +5,7 @@ go 1.21.1
 require (
 	github.com/coreos/go-oidc/v3 v3.9.0
 	github.com/deepmap/oapi-codegen v1.16.2
-	github.com/eschercloudai/unikorn-core v0.1.0
+	github.com/eschercloudai/unikorn-core v0.1.1
 	github.com/getkin/kin-openapi v0.122.0
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/go-jose/go-jose/v3 v3.0.1
